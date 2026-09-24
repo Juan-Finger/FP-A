@@ -97,7 +97,7 @@ function SNAP(estados) {
     s.lastro = semLastro(6).map(o => [o.u, o.a, o.val, o.meses]);
     s.lsorc = lastroSemOrc(6).map(o => [o.u, o.a, o.val, o.meses]);
     s.porConta = Object.fromEntries(segs.map(sg => [sg, contasDoSegmento(sg).map(o =>
-      ({ a: o.a, sem: o.sem, val: o.val, tipo: o.tipo, uns: o.uns.map(u => u.cod + (u.muda ? "*" : "")).join() }))]));
+      ({ a: o.a, res: ehResultado(o.a), sem: o.sem, val: o.val, tipo: o.tipo, uns: o.uns.map(u => u.cod + (u.muda ? "*" : "")).join() }))]));
     s.unid = {};
     for (const u of amostra) {
       view.unit = u; view.seg = umap[u].seg;
@@ -125,6 +125,8 @@ for (const modo of ["geral", "rec"]) for (const periodo of ["mes", "acum", "sem"
  * propósito. O resto continua tendo de bater exatamente. */
 const INTENCIONAIS = [];
 const intencional = (id, fn) => INTENCIONAIS.push({ id, fn });
+// A3: "Por conta" deixou de listar receita/dedução como falha
+intencional("A3", (o, n) => { for (const sg in o.porConta) o.porConta[sg] = o.porConta[sg].filter(x => !x.res); });
 
 /* ================================================================== */
 teste("T01", "payload idêntico ao painel original e ao gerador Python", async () => {
@@ -163,6 +165,8 @@ function TELAS() {
   return out;
 }
 const TEXTO_INTENCIONAL = [];   // [id, fn(orig, novo, chave)] — normaliza diferenças de texto intencionais
+// A3: a lista "Por conta" mudou (sem receita); os dados dela são conferidos no T02 e no teste A3
+TEXTO_INTENCIONAL.push(["A3", (o, n, k) => { if (k.startsWith("ct:")) { delete o.body; delete n.body; } }]);
 teste("T05", "texto visível de todas as telas idêntico ao original (estado padrão)", async () => {
   const [o, n] = await Promise.all([pagina("orig"), pagina("novo")]);
   const a = await o.evaluate(TELAS), b = await n.evaluate(TELAS);
@@ -192,6 +196,15 @@ teste("T06", "métricas e telas idênticas ao snapshot aprovado", async () => {
   const atual = await snapshotAtual();
   if (process.argv.includes("--aprovar")) { fs.writeFileSync(APROVADO, JSON.stringify(atual, null, 1) + "\n"); console.log("        snapshot aprovado gravado"); return; }
   ok(fs.existsSync(APROVADO), "sem snapshot aprovado: rode com --aprovar");
+  if (process.argv.includes("--diff")) {
+    const ap = JSON.parse(fs.readFileSync(APROVADO, "utf8")), mud = {};
+    for (const g of ["metricas", "telas"]) for (const k of new Set([...Object.keys(ap[g]), ...Object.keys(atual[g])])) {
+      if (g === "telas") { if (ap[g][k] !== atual[g][k]) (mud["tela " + k.split(":")[0]] ??= []).push(k); continue; }
+      for (const c of new Set([...Object.keys(ap[g][k] || {}), ...Object.keys(atual[g][k] || {})]))
+        if ((ap[g][k] || {})[c] !== (atual[g][k] || {})[c]) (mud["métrica " + c] ??= []).push(k);
+    }
+    for (const [c, ks] of Object.entries(mud)) console.log(`        mudou: ${c} em ${ks.length} estado(s)/tela(s)`);
+  }
   igual(JSON.parse(fs.readFileSync(APROVADO, "utf8")), atual, "difere do snapshot aprovado");
 });
 
@@ -354,6 +367,33 @@ teste("A5", "texto do CSV nunca vira HTML/JS (nomes, descrições e códigos com
   ok(v === 'd"x', "valor da busca: " + v);
   ok(!p._erros.length, p._erros.join(" | "));
   await p.context().close();
+});
+
+teste("A2", "tooltip do KPI e hover do Top 10 batem com o número do cartão (todos os modos)", async () => {
+  const p = await pagina("novo");
+  const r = await p.evaluate(() => {
+    const falhas = [];
+    for (const m of ["geral", "rec"]) for (const per of ["mes", "acum", "sem"]) for (const c of [0, 5000]) {
+      modo = m; periodo = per; corte = c; go({ tipo: "hub" });
+      const {a} = met(); let sem = 0; Object.values(a).forEach(o => sem += o.sem);
+      if (semLancEscopo().length !== sem) falhas.push(`${m}/${per}/${c}: tooltip ${semLancEscopo().length} × cartão ${sem}`);
+      for (const o of Object.values(a)) if (topContasUnidade(o.cod, 10).total !== o.sem) { falhas.push(`${m}/${per}/${c} ${o.cod}: hover ≠ ranking`); break; }
+    }
+    modo = "geral"; periodo = "mes"; corte = 0; go({ tipo: "hub" });
+    return falhas;
+  });
+  ok(!r.length, r.slice(0, 5).join("; "));
+});
+
+teste("A3", "'Por conta' não lista receita nem dedução como falha", async () => {
+  const p = await pagina("novo");
+  const r = await p.evaluate(() => { const out = [];
+    SEG.forEach(s => { contasDoSegmento(s).forEach(o => { if (ehResultado(o.a)) out.push(s + ":" + o.a); }); });
+    const s = SEG.find(s => DB.units.some(u => u.seg === s && !u.vig)); go({ tipo: "seg", seg: s }); setVseg("ct");
+    const txt = document.getElementById("body").innerText; setVseg("un"); go({ tipo: "hub" });
+    DB.accts.filter(a => ["rec", "ded"].includes(a.nat)).forEach(a => { if (txt.includes(a.cod)) out.push("tela:" + a.cod); });
+    return out; });
+  ok(!r.length, r.join(", "));
 });
 
 /* ================================================================== */

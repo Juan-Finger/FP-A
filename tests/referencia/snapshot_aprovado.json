@@ -7,7 +7,7 @@
    "exc": "31acc05480d96ab5",
    "lastro": "ad336a4e74c83a2c",
    "lsorc": "4f53cda18c2baa0c",
-   "porConta": "2a3a473f02a1784d",
+   "porConta": "10e8dc6a3de4a034",
    "unid": "1f8f944559f049e2"
   },
   "{\"modo\":\"geral\",\"periodo\":\"mes\",\"corte\":0,\"M\":2}": {
@@ -17,7 +17,7 @@
    "exc": "0a5be851daf91f8c",
    "lastro": "ad336a4e74c83a2c",
    "lsorc": "4f53cda18c2baa0c",
-   "porConta": "6b234afb0a3dc428",
+   "porConta": "da2289af9f7b62e1",
    "unid": "240620ce9c5d8e7f"
   },
   "{\"modo\":\"geral\",\"periodo\":\"mes\",\"corte\":5000,\"M\":\"ult\"}": {
@@ -27,7 +27,7 @@
    "exc": "31acc05480d96ab5",
    "lastro": "ad336a4e74c83a2c",
    "lsorc": "4f53cda18c2baa0c",
-   "porConta": "6cdda09359c6d6ac",
+   "porConta": "4d7813194ba40b2a",
    "unid": "ddde64d91d904369"
   },
   "{\"modo\":\"geral\",\"periodo\":\"mes\",\"corte\":5000,\"M\":2}": {
@@ -37,7 +37,7 @@
    "exc": "0a5be851daf91f8c",
    "lastro": "ad336a4e74c83a2c",
    "lsorc": "4f53cda18c2baa0c",
-   "porConta": "fb1eeee67f0fd602",
+   "porConta": "024d25ba77e56240",
    "unid": "44680b9d3b6dd203"
   },
   "{\"modo\":\"geral\",\"periodo\":\"acum\",\"corte\":0,\"M\":\"ult\"}": {
@@ -47,7 +47,7 @@
    "exc": "1a6642668eff8458",
    "lastro": "ad336a4e74c83a2c",
    "lsorc": "4f53cda18c2baa0c",
-   "porConta": "d7dbd3a0932d2ab9",
+   "porConta": "1c283623a48d330c",
    "unid": "59e4553d6b3da724"
   },
   "{\"modo\":\"geral\",\"periodo\":\"acum\",\"corte\":0,\"M\":2}": {
@@ -57,7 +57,7 @@
    "exc": "1452b4bef6daee8a",
    "lastro": "ad336a4e74c83a2c",
    "lsorc": "4f53cda18c2baa0c",
-   "porConta": "6cb6fdd5611c4afd",
+   "porConta": "9e64773567bb9b58",
    "unid": "00eb316e0c0548a3"
   },
   "{\"modo\":\"geral\",\"periodo\":\"acum\",\"corte\":5000,\"M\":\"ult\"}": {
@@ -67,7 +67,7 @@
    "exc": "1a6642668eff8458",
    "lastro": "ad336a4e74c83a2c",
    "lsorc": "4f53cda18c2baa0c",
-   "porConta": "d7dbd3a0932d2ab9",
+   "porConta": "1c283623a48d330c",
    "unid": "59e4553d6b3da724"
   },
   "{\"modo\":\"geral\",\"periodo\":\"acum\",\"corte\":5000,\"M\":2}": {
@@ -77,7 +77,7 @@
    "exc": "1452b4bef6daee8a",
    "lastro": "ad336a4e74c83a2c",
    "lsorc": "4f53cda18c2baa0c",
-   "porConta": "d526692c40758123",
+   "porConta": "9e64773567bb9b58",
    "unid": "00eb316e0c0548a3"
   },
   "{\"modo\":\"geral\",\"periodo\":\"sem\",\"corte\":0,\"M\":\"ult\"}": {
@@ -87,7 +87,7 @@
    "exc": "da4dd60de9fabd39",
    "lastro": "ad336a4e74c83a2c",
    "lsorc": "4f53cda18c2baa0c",
-   "porConta": "aca1c08b1d445295",
+   "porConta": "5376f14fc35764e3",
    "unid": "e523fddb0d0722b2"
   },
   "{\"modo\":\"geral\",\"periodo\":\"sem\",\"corte\":0,\"M\":2}": {
@@ -97,7 +97,7 @@
    "exc": "f2adad76f98cf365",
    "lastro": "ad336a4e74c83a2c",
    "lsorc": "4f53cda18c2baa0c",
-   "porConta": "4e4e926afa704678",
+   "porConta": "103b3668e561327a",
    "unid": "3e66a82541f926bf"
   },
   "{\"modo\":\"geral\",\"periodo\":\"sem\",\"corte\":5000,\"M\":\"ult\"}": {
@@ -107,7 +107,7 @@
    "exc": "da4dd60de9fabd39",
    "lastro": "ad336a4e74c83a2c",
    "lsorc": "4f53cda18c2baa0c",
-   "porConta": "5da5932e2a229858",
+   "porConta": "2bab985e6ffc9aeb",
    "unid": "58a697a7060dce4e"
   },
   "{\"modo\":\"geral\",\"periodo\":\"sem\",\"corte\":5000,\"M\":2}": {
@@ -117,7 +117,7 @@
    "exc": "f2adad76f98cf365",
    "lastro": "ad336a4e74c83a2c",
    "lsorc": "4f53cda18c2baa0c",
-   "porConta": "4e4e926afa704678",
+   "porConta": "103b3668e561327a",
    "unid": "3e66a82541f926bf"
   },
   "{\"modo\":\"rec\",\"periodo\":\"mes\",\"corte\":0,\"M\":\"ult\"}": {
@@ -127,7 +127,7 @@
    "exc": "31acc05480d96ab5",
    "lastro": "5363d25cac53bb4e",
    "lsorc": "4f53cda18c2baa0c",
-   "porConta": "79f09654e8257937",
+   "porConta": "ee0f446add6189a4",
    "unid": "d6df74fa8439bcd9"
   },
   "{\"modo\":\"rec\",\"periodo\":\"mes\",\"corte\":0,\"M\":2}": {
@@ -137,7 +137,7 @@
    "exc": "0a5be851daf91f8c",
    "lastro": "5363d25cac53bb4e",
    "lsorc": "4f53cda18c2baa0c",
-   "porConta": "8ec398633e8ca376",
+   "porConta": "aa313edbb06fd755",
    "unid": "2aa2a7f3431fcd83"
   },
   "{\"modo\":\"rec\",\"periodo\":\"mes\",\"corte\":5000,\"M\":\"ult\"}": {
@@ -147,7 +147,7 @@
    "exc": "31acc05480d96ab5",
    "lastro": "5363d25cac53bb4e",
    "lsorc": "4f53cda18c2baa0c",
-   "porConta": "6155d0f6d3e5403f",
+   "porConta": "552abf28fb986974",
    "unid": "768ebeb585e59fa4"
   },
   "{\"modo\":\"rec\",\"periodo\":\"mes\",\"corte\":5000,\"M\":2}": {
@@ -157,7 +157,7 @@
    "exc": "0a5be851daf91f8c",
    "lastro": "5363d25cac53bb4e",
    "lsorc": "4f53cda18c2baa0c",
-   "porConta": "f59f195cd6eb64b9",
+   "porConta": "1ea30d6446f5d9ed",
    "unid": "2aa2a7f3431fcd83"
   },
   "{\"modo\":\"rec\",\"periodo\":\"acum\",\"corte\":0,\"M\":\"ult\"}": {
@@ -167,7 +167,7 @@
    "exc": "1a6642668eff8458",
    "lastro": "5363d25cac53bb4e",
    "lsorc": "4f53cda18c2baa0c",
-   "porConta": "3898c1fabebcc6d3",
+   "porConta": "6ef25cc2210c38b4",
    "unid": "0f9510ba92104a35"
   },
   "{\"modo\":\"rec\",\"periodo\":\"acum\",\"corte\":0,\"M\":2}": {
@@ -177,7 +177,7 @@
    "exc": "1452b4bef6daee8a",
    "lastro": "5363d25cac53bb4e",
    "lsorc": "4f53cda18c2baa0c",
-   "porConta": "55b57d31f6e3046b",
+   "porConta": "6e00f0f8e75685ed",
    "unid": "fdc89a5dc8450ebe"
   },
   "{\"modo\":\"rec\",\"periodo\":\"acum\",\"corte\":5000,\"M\":\"ult\"}": {
@@ -187,7 +187,7 @@
    "exc": "1a6642668eff8458",
    "lastro": "5363d25cac53bb4e",
    "lsorc": "4f53cda18c2baa0c",
-   "porConta": "3898c1fabebcc6d3",
+   "porConta": "6ef25cc2210c38b4",
    "unid": "0f9510ba92104a35"
   },
   "{\"modo\":\"rec\",\"periodo\":\"acum\",\"corte\":5000,\"M\":2}": {
@@ -197,7 +197,7 @@
    "exc": "1452b4bef6daee8a",
    "lastro": "5363d25cac53bb4e",
    "lsorc": "4f53cda18c2baa0c",
-   "porConta": "d57bcb08bdad54c5",
+   "porConta": "6e00f0f8e75685ed",
    "unid": "fdc89a5dc8450ebe"
   },
   "{\"modo\":\"rec\",\"periodo\":\"sem\",\"corte\":0,\"M\":\"ult\"}": {
@@ -207,7 +207,7 @@
    "exc": "da4dd60de9fabd39",
    "lastro": "5363d25cac53bb4e",
    "lsorc": "4f53cda18c2baa0c",
-   "porConta": "9b7b660d6f6bfcde",
+   "porConta": "11a3a61ec86ef6eb",
    "unid": "635de67812f3c266"
   },
   "{\"modo\":\"rec\",\"periodo\":\"sem\",\"corte\":0,\"M\":2}": {
@@ -217,7 +217,7 @@
    "exc": "f2adad76f98cf365",
    "lastro": "5363d25cac53bb4e",
    "lsorc": "4f53cda18c2baa0c",
-   "porConta": "83c8e1f2129a2b74",
+   "porConta": "46a02ce9fa0a54a2",
    "unid": "e6a9a53e322ae9f0"
   },
   "{\"modo\":\"rec\",\"periodo\":\"sem\",\"corte\":5000,\"M\":\"ult\"}": {
@@ -227,7 +227,7 @@
    "exc": "da4dd60de9fabd39",
    "lastro": "5363d25cac53bb4e",
    "lsorc": "4f53cda18c2baa0c",
-   "porConta": "0bcc80fc778a0b23",
+   "porConta": "c4c9f887dd7402ca",
    "unid": "635de67812f3c266"
   },
   "{\"modo\":\"rec\",\"periodo\":\"sem\",\"corte\":5000,\"M\":2}": {
@@ -237,7 +237,7 @@
    "exc": "f2adad76f98cf365",
    "lastro": "5363d25cac53bb4e",
    "lsorc": "4f53cda18c2baa0c",
-   "porConta": "83c8e1f2129a2b74",
+   "porConta": "46a02ce9fa0a54a2",
    "unid": "e6a9a53e322ae9f0"
   }
  },
@@ -251,7 +251,7 @@
   "mp:Alfandegados": "2bcfdd1e1646e615",
   "un:Alfandegados": "30f54b122084267e",
   "seg:CDs": "c72e584529048606",
-  "ct:CDs": "200e59f4a7828147",
+  "ct:CDs": "156d55fc968bbeef",
   "mp:CDs": "25c027723eef0121",
   "un:CDs": "c72e584529048606",
   "seg:Transportes": "756af15d4421a5fc",

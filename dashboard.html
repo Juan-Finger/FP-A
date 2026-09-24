@@ -1030,23 +1030,27 @@ function confDe(d){
 }
 const CONF={alta:"lançava todo mês",media:"lança às vezes",baixa:"nunca lançou"};
 
+// Linha conta × unidade que entra na conta de pendência. É a MESMA regra para os
+// cartões, tooltips, ranking, "Por conta" e exportação — não duplicar.
+//   fora: unidades vigiadas (tela própria) e receita/dedução (não faturar não é falha);
+//   respeita o modo (só recorrentes) e o corte de materialidade no período.
+function relevante(d){
+  if(VIG.has(d.u)) return false;
+  if(!ehPendencia(d.a)) return false;
+  if(modo==="rec" && !ehRec(d.a)) return false;
+  if(corte>0){
+    const [p,r]=agr(d);
+    if(Math.abs(p)<corte && Math.abs(r)<corte) return false;
+  }
+  return true;
+}
+
 const cache={};
 function met(){
   const key=modo+"|"+periodo+"|"+M+"|"+corte;
   if(cache[key]) return cache[key];
   const ms=mesesAtivos(), aberto=ms.length===0;
-  // relevante = respeita o modo e o corte de materialidade
-  const rel=d=>{
-    if(VIG.has(d.u)) return false;              // vigiadas têm tela própria
-    if(!ehPendencia(d.a)) return false;         // receita não vira pendência
-    if(modo==="rec" && !ehRec(d.a)) return false;
-    if(corte>0){
-      const mm=mesesAtivos();
-      let p=0,r=0; mm.forEach(i=>{p+=d.p[i];r+=d.r[i];});
-      if(Math.abs(p)<corte && Math.abs(r)<corte) return false;
-    }
-    return true;
-  };
+  const rel=relevante;
   // estado da unidade no período
   const temR={}, jaLancou={};
   DB.units.forEach(u=>{temR[u.cod]=false; jaLancou[u.cod]=false;});
@@ -1057,14 +1061,14 @@ function met(){
   const est={};
   DB.units.forEach(u=>est[u.cod]= temR[u.cod] ? "ativa" : (jaLancou[u.cod] ? "muda" : "inativa"));
   const a={}; DB.units.filter(u=>!u.vig).forEach(u=>a[u.cod]={sem:0,orc:0,plan:0,real:0,expo:0,alta:0,
-      sorc:0,vsorc:0, seg:u.seg,nome:u.nome,cod:u.cod});
+      sorc:0,vsorc:0,pSem:0, seg:u.seg,nome:u.nome,cod:u.cod});
   DB.data.forEach(d=>{ const o=a[d.u]; if(!o||!rel(d))return;
     let p=0,r=0; ms.forEach(i=>{p+=d.p[i];r+=d.r[i];});
     o.plan+=p; o.real+=r;
     if(Math.abs(p)>EPS) o.orc++;
     const stt=statusOf(p,r,aberto,est[d.u]);
     if(stt==="sem"){
-      o.sem++; o.expo+=Math.abs(p);
+      o.sem++; o.expo+=Math.abs(p); o.pSem+=p;
       if(confDe(d)==="alta") o.alta++;
     } else if(stt==="sorc"){ o.sorc++; o.vsorc+=Math.abs(r); }});
   DB.units.forEach(u=>{ if(a[u.cod]) a[u.cod].est=est[u.cod]; });
@@ -1122,8 +1126,9 @@ function renderKpis(){
   const scope=Object.values(a).filter(o=>
       view.tipo==="hub" ? true : view.tipo==="seg" ? o.seg===view.seg : o.cod===view.unit);
   let mudas=0, expoMudas=0;
+  let pSem=0;
   scope.forEach(o=>{sem+=o.sem;if(o.sem>0)afe++;plan+=o.plan;real+=o.real;
-      expo+=o.expo;alta+=o.alta;un++;
+      expo+=o.expo;alta+=o.alta;un++;pSem+=o.pSem;
       if(o.est==="muda"){mudas++;expoMudas+=o.expo;}});
   const v=real-plan;
   const pctv=Math.abs(plan)>EPS?(v/Math.abs(plan)*100):null;
@@ -1150,15 +1155,18 @@ function renderKpis(){
   const tpVar = `<b>Variação de custo e despesa</b>
      <div class="tl">Este número <b>não inclui receita</b>: mede só o gasto contra o orçado.
        O resultado do período está na faixa abaixo dos cartões.</div>
-     <div class="tsep"></div>
+     <div class="tsep"></div><div class="tl">Neste cartão${modo==="rec"?" (só recorrentes":" ("}${corte>0?`, ignorando abaixo de R$ ${fmtN(corte)}`:""}${modo==="rec"||corte>0?")":"todas as contas de custo)"}:</div>
+     <div class="tr2"><span>Planejado</span><b class="num">${fmtC(plan)}</b></div>
+     <div class="tr2"><span>Realizado</span><b class="num">${fmtC(real)}</b></div>
+     <div class="tr2"><span>Variação</span><b class="num ${v<0?'neg':'pos'}">${fmtC(v)} · ${FAVLBL[favor(v)]}</b></div>
+     ${Math.abs(pSem)>EPS?`<div class="tr2"><span>Sem as contas sem lançamento</span><b class="num ${v+pSem<0?'neg':'pos'}">${fmtC(v+pSem)}</b></div>
+     <div class="tl">Conta sem lançamento entra como variação ${favor(-pSem)==="fav"?"favorável":"desfavorável"} (orçado sem realizado). Excluindo-as, a variação é a de quem de fato lançou.</div>`:""}
+     <div class="tsep"></div><div class="tl">Resultado do período (todas as contas, sem corte):</div>
      <div class="tr2"><span>Receita líquida</span><b class="num">${fmtC(res.rr)}</b></div>
      <div class="tr2"><span>Custos e despesas</span><b class="num">${fmtC(res.cr)}</b></div>
      <div class="tr2"><span>Resultado</span><b class="num ${res.resR<0?'neg':'pos'}">${fmtC(res.resR)}</b></div>
      <div class="tsep"></div>
-     <div class="tl">Nesta base o DRE é aditivo: receita positiva, despesa negativa. Por isso <b>variação positiva sempre favorece o resultado</b> — gastou menos ou faturou mais.</div>
-     <div class="tsep"></div><div class="tr2"><span>Planejado</span><b class="num">${fmtC(plan)}</b></div>
-     <div class="tr2"><span>Realizado</span><b class="num">${fmtC(real)}</b></div>
-     <div class="tr2"><span>Efeito</span><b class="${v<0?'neg':'pos'}">${FAVLBL[favor(v)]}</b></div>`;
+     <div class="tl">Nesta base o DRE é aditivo: receita positiva, despesa negativa. Por isso <b>variação positiva sempre favorece o resultado</b> — gastou menos ou faturou mais.</div>`;
 
   document.getElementById("kpis").innerHTML=`
    ${view.tipo==="det"
@@ -1245,6 +1253,7 @@ function contasDoSegmento(sg){
   const set=new Set(uns), mp={};
   DB.data.forEach(d=>{
     if(!set.has(d.u)) return;
+    if(!ehPendencia(d.a)) return;               // receita não vira pendência (como nos cartões)
     if(modo==="rec" && !ehRec(d.a)) return;
     const [p,r]=agr(d);
     if(corte>0 && Math.abs(p)<corte && Math.abs(r)<corte) return;
@@ -2308,8 +2317,8 @@ function semLancEscopo(){
   const un=new Set(escopoUnidades().map(o=>o.cod));
   const out=[];
   DB.data.forEach(d=>{
-    if(!un.has(d.u)) return;
-    const p=d.p[M], r=d.r[M];
+    if(!un.has(d.u)||!relevante(d)) return;
+    const [p,r]=agr(d);
     if(statusOf(p,r,aberto,est[d.u])!=="sem") return;
     out.push({u:d.u,a:d.a,p,cf:confDe(d),hist:histDe(d)});
   });
@@ -2319,8 +2328,8 @@ function semLancEscopo(){
 function topContasUnidade(cod,n){
   const {aberto,est}=met(), out=[];
   DB.data.forEach(d=>{
-    if(d.u!==cod) return;
-    const p=d.p[M], r=d.r[M];
+    if(d.u!==cod||!relevante(d)) return;
+    const [p,r]=agr(d);
     if(statusOf(p,r,aberto,est[cod])!=="sem") return;
     out.push({a:d.a,p:Math.abs(p),cf:confDe(d)});
   });
