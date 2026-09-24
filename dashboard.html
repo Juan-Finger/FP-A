@@ -203,7 +203,7 @@ td.r{text-align:right}
 .cf{font-size:9.5px;padding:2px 7px;border-radius:5px;white-space:nowrap}
 .cf.alta{background:rgba(242,109,109,.14);color:#F79A9A}
 .cf.media{background:rgba(239,178,92,.13);color:#F3C784}
-.cf.baixa{background:rgba(143,163,184,.10);color:var(--dim)}
+.cf.baixa,.cf.nd{background:rgba(143,163,184,.10);color:var(--dim)}
 .expl{background:var(--s1);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;margin-bottom:18px}
 .erow{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:12px}
 .erow .bn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1014,21 +1014,24 @@ function natureza(cod){ return NATLBL[natMap[cod]]||"Outros"; }
 const favor = v => Math.abs(v)<EPS ? "neutro" : (v>0 ? "fav" : "desf");
 const FAVLBL={fav:"favorável",desf:"desfavorável",neutro:"—"};
 
-// referência de histórico: no modo mês olha os meses anteriores;
-// nos modos de período olha os próprios meses do período.
+// referência da "confiança": os meses fechados ANTES do período analisado.
+// (Nos modos Acum./Sem. a conta pendente não lançou em nenhum mês do período;
+//  usar o próprio período daria sempre "nunca lançou".)
 function refMeses(){
-  if(periodo!=="mes") return mesesAtivos();
-  const out=[]; for(let i=0;i<M;i++) if(DB.fechado[i]) out.push(i);
+  const ini=periodo==="mes"?M:faixa()[0];
+  const out=[]; for(let i=0;i<ini;i++) if(DB.fechado[i]) out.push(i);
   return out;
 }
 function confDe(d){
-  const ref=refMeses(); if(!ref.length) return "media";
+  const ref=refMeses(); if(!ref.length) return "nd";          // sem mês anterior para comparar
   const n=ref.filter(i=>Math.abs(d.r[i])>EPS).length;
   if(n===0) return "baixa";
   if(n>=ref.length-1) return "alta";
   return "media";
 }
-const CONF={alta:"lançava todo mês",media:"lança às vezes",baixa:"nunca lançou"};
+const CONF={alta:"lançava todo mês",media:"lança às vezes",baixa:"nunca lançou",nd:"sem histórico"};
+// texto "N lançavam todo mês" — sem mês anterior ao período, não há como saber
+const altaTxt=n=>refMeses().length?n+" lançavam todo mês":"sem histórico anterior";
 
 // Linha conta × unidade que entra na conta de pendência. É a MESMA regra para os
 // cartões, tooltips, ranking, "Por conta" e exportação — não duplicar.
@@ -1137,7 +1140,7 @@ function renderKpis(){
   const pctv=Math.abs(plan)>EPS?(v/Math.abs(plan)*100):null;
   // detalhamento para os tooltips
   const sl=semLancEscopo();
-  const cc={alta:0,media:0,baixa:0}, cv={alta:0,media:0,baixa:0};
+  const cc={alta:0,media:0,baixa:0,nd:0}, cv={alta:0,media:0,baixa:0,nd:0};
   sl.forEach(o=>{cc[o.cf]++; cv[o.cf]+=Math.abs(o.p);});
   const fech=DB.fechado.filter(Boolean).length;
   const linhaC=(k,lbl)=>`<div class="tr2"><span>${lbl}</span><b>${cc[k]} contas</b>
@@ -1149,10 +1152,10 @@ function renderKpis(){
   const tpSem = `<b>${modo==="rec"?"Contas recorrentes sem lançamento":"Contas sem lançamento"}</b>
      <div class="tl">Contas com orçamento em ${faixaLbl()} e realizado zerado no período, <b>mesmo a unidade tendo lançado outras contas</b>. Indica lançamento faltante, não valor zero real.</div>
      ${modo==="rec"?`<div class="tl">Escopo: apenas as ${N_REC} contas classificadas como recorrentes (mais Etiquetagem). São as que deveriam aparecer todo mês.</div>`:""}
-     <div class="tsep"></div>${linhaC("alta","Lançavam todo mês")}${linhaC("media","Lançam às vezes")}${linhaC("baixa","Nunca lançaram")}`;
+     <div class="tsep"></div>${linhaC("alta","Lançavam todo mês")}${linhaC("media","Lançam às vezes")}${linhaC("baixa","Nunca lançaram")}${cc.nd?linhaC("nd","Sem histórico anterior"):""}`;
   const tpExp = `<b>R$ exposto</b>
      <div class="tl">Soma do valor orçado das ${fmtN(sem)} contas sem lançamento. É o quanto de orçamento ainda não apareceu no realizado.</div>
-     <div class="tsep"></div>${linhaC("alta","Lançavam todo mês")}${linhaC("media","Lançam às vezes")}${linhaC("baixa","Nunca lançaram")}
+     <div class="tsep"></div>${linhaC("alta","Lançavam todo mês")}${linhaC("media","Lançam às vezes")}${linhaC("baixa","Nunca lançaram")}${cc.nd?linhaC("nd","Sem histórico anterior"):""}
      <div class="tl" style="margin-top:6px">As de <b>“lançavam todo mês”</b> são as mais prováveis de serem falha de lançamento.</div>`;
   const res=resumoResultado(scope.map(o=>o.cod));
   const tpVar = `<b>Variação de custo e despesa</b>
@@ -1182,7 +1185,7 @@ function renderKpis(){
      <div class="v num">${aberto?"—":fmtN(sem)}</div>
      <div class="sub">${aberto?"mês não fechado":(view.tipo==="det"?"nesta unidade":afe+" unidades afetadas")}</div></div>
    <div class="kpi a" ${T(tpExp)}><div class="lbl">R$ exposto${modo==="rec"?" (recorrentes)":""}</div><div class="v num">${aberto?"—":fmtMi(expo)}</div>
-     <div class="sub">${aberto?"mês não fechado":alta+" lançavam todo mês"}</div></div>
+     <div class="sub">${aberto?"mês não fechado":altaTxt(alta)}</div></div>
    <div class="kpi ${v<0?'r':'g'}" ${T(tpVar)}><div class="lbl">Variação custo/desp.${modo==="rec"?" (recorr.)":""}</div><div class="v num">${fmtMi(v)}</div>
      <div class="sub">${pctv==null?"—":(pctv>0?"+":"")+pct(pctv)+" vs orçado"}</div></div>`;
 }
@@ -1214,7 +1217,7 @@ function renderHub(){
       <div class="top"><div class="nm">${SEGNM[s]}</div>
         <span class="tag" style="${tint(s)}">${b.n} un</span></div>
       <div class="mid" style="display:block"><div class="big num ${b.expo?'':'z'}" style="font-size:25px">${aberto?"—":"R$ "+fmtMi(b.expo)}</div>
-        <div class="biglbl" style="margin-top:3px">exposto · ${aberto?"—":b.alta+" lançavam todo mês"}</div></div>
+        <div class="biglbl" style="margin-top:3px">exposto · ${aberto?"—":altaTxt(b.alta)}</div></div>
       <div class="pbar"><i style="width:${aberto?0:(b.expo/maxE*100)}%"></i></div>
       <div class="foot"><span>${aberto?"—":b.sem+" contas"}</span>
         <span class="num ${v<0?'neg':'pos'}">${fmtMi(v)}</span></div></div>`;}).join("");
@@ -1301,7 +1304,7 @@ function renderSeg(){
           <span class="tag" style="${tint(s)}">${he(o.cod)}</span></div>
         <div class="mid"><div>
             <div class="big num ${calm?'z':''}" style="font-size:24px">${aberto?"—":"R$ "+fmtMi(o.expo)}</div>
-            <div class="biglbl" style="margin-top:3px">${aberto?"":o.sem+" contas · "+o.alta+" lançavam todo mês"}</div>
+            <div class="biglbl" style="margin-top:3px">${aberto?"":o.sem+" contas · "+altaTxt(o.alta)}</div>
           </div>
           <div class="spark">${sparkline(o.cod)}</div></div>
         <div class="foot"><span class="pad ${padraoUnidade(o.cod).tipo} mini" ${T(`<b>${PADLBL[padraoUnidade(o.cod).tipo]}</b><div class="tl">${padraoUnidade(o.cod).txt||"sem histórico"}</div><div class="tl">${o.orc} contas com orçamento no período.</div>`)}>${PADLBL[padraoUnidade(o.cod).tipo]}</span>
@@ -1872,7 +1875,7 @@ function renderDet(){
   rows.sort((x,y)=>{let A,B;
     if(k==="st"){A=STO[x.st];B=STO[y.st];return dir*(A-B)||Math.abs(y.v)-Math.abs(x.v);}
     if(k==="v"){A=Math.abs(x.v);B=Math.abs(y.v);return dir*(B-A);}
-    if(k==="cf"){const O={alta:0,media:1,baixa:2};
+    if(k==="cf"){const O={alta:0,media:1,baixa:2,nd:3};
       return dir*((O[x.cf]??9)-(O[y.cf]??9))||Math.abs(y.v)-Math.abs(x.v);}
     if(k==="fav"){const O={desf:0,neutro:1,fav:2};
       return dir*((O[x.fav]??9)-(O[y.fav]??9))||Math.abs(y.v)-Math.abs(x.v);}
@@ -2303,6 +2306,7 @@ function histDe(d){
 }
 function tipHist(hist,cf){
   const fech=refMeses().length;
+  if(!fech) return `<b>Sem histórico</b><div class="tl">Não há mês fechado antes de ${faixaLbl()} para comparar.</div>`;
   if(!hist.length) return `<b>Nunca lançou</b><div class="tl">Nenhum lançamento nos ${fech} meses de referência. Pode ser conta inativa ou orçamento indevido.</div>`;
   return `<b>Lançou ${hist.length} de ${fech} meses</b>
     <div class="tl">Meses com lançamento: ${hist.join(", ")}</div>
@@ -2498,9 +2502,9 @@ const linhaXLS=r=>[r.a,r.desc,r.nat,r.rec,r.p,r.r,r.v,
 
 // aba de resumo / índice (uma linha por unidade, com link para a aba dela)
 const CAB_RES=["Segmento","Cod. unidade","Unidade","Periodo","Contas com orcamento",
-  "Contas sem lancamento","Lancavam todo mes","Lanca as vezes","Nunca lancou",
+  "Contas sem lancamento","Lancavam todo mes","Lanca as vezes","Nunca lancou","Sem historico",
   "R$ exposto","Planejado","Realizado","Variacao","Efeito"];
-const LARG_RES=[14,12,30,9,13,14,13,13,12,15,15,15,15,13];
+const LARG_RES=[14,12,30,9,13,14,13,13,12,12,15,15,15,15,13];
 const LARG_UNI=[15,42,14,11,15,15,15,11,13,16,16,10,10,26];
 
 function exportaConjunto(uns,nomeArq){
@@ -2515,10 +2519,10 @@ function exportaConjunto(uns,nomeArq){
   const hyper=[];
   uns.sort((x,y)=>y.expo-x.expo).forEach((o,k)=>{
     const rs=linhasUnidade(o.cod).filter(r=>r.st==="sem");
-    const c={alta:0,media:0,baixa:0}; rs.forEach(r=>c[r.cf]++);
+    const c={alta:0,media:0,baixa:0,nd:0}; rs.forEach(r=>c[r.cf]++);
     const v=o.real-o.plan;
     li.push([SEGNM[o.seg],o.cod,o.nome,faixaLbl(),o.orc,o.sem,
-      c.alta,c.media,c.baixa,round2(o.expo),round2(o.plan),round2(o.real),round2(v),FAVLBL[favor(v)]]);
+      c.alta,c.media,c.baixa,c.nd,round2(o.expo),round2(o.plan),round2(o.real),round2(v),FAVLBL[favor(v)]]);
     if(nomes[o.cod]) hyper.push({ref:"C"+(li.length),loc:`'${nomes[o.cod].replace(/'/g,"''")}'!A1`,txt:o.nome});
   });
   const abas=[{nome:"Resumo",linhas:li,hdr:4,larg:LARG_RES,titulos:[1],

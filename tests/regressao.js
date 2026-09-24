@@ -139,6 +139,12 @@ intencional("A4", (o, n) => {
     o.unid[u].hist.forEach((m, i) => { const x = n.unid[u].hist[i]; if (m && x && m.muda && !x.muda) { o.unid[u].hist[i] = n.unid[u].hist[i] = "A4"; mud = true; } });
     if (mud) { delete o.unid[u].pad; delete n.unid[u].pad; } }
 });
+// A6: nos modos Acum./Sem. a confiança passou a olhar os meses ANTES do período
+intencional("A6", (o, n, e) => {
+  if (e.periodo === "mes") return;
+  for (const u in o.met) { delete o.met[u].alta; if (n.met[u]) delete n.met[u].alta; }
+  for (const u in o.unid) for (const s of [o.unid[u], n.unid[u]]) s.linhas.forEach(l => { l[5] = l[6] = "A6"; });
+});
 // A3: "Por conta" deixou de listar receita/dedução como falha
 intencional("A3", (o, n) => { for (const sg in o.porConta) o.porConta[sg] = o.porConta[sg].filter(x => !x.res); });
 
@@ -200,12 +206,16 @@ const APROVADO = path.join(__dirname, "referencia", "snapshot_aprovado.json");
 const hash = o => require("crypto").createHash("sha256").update(JSON.stringify(o)).digest("hex").slice(0, 16);
 async function snapshotAtual() {
   const n = await pagina("novo");
-  const snaps = await n.evaluate(SNAP, ESTADOS), telas = await n.evaluate(TELAS);
-  await n.evaluate(() => { modo = "geral"; periodo = "mes"; corte = 0; M = DB.fechado.lastIndexOf(true); go({ tipo: "hub" }); });
+  const padrao = () => { modo = "geral"; periodo = "mes"; corte = 0; M = DB.fechado.lastIndexOf(true); };
+  const snaps = await n.evaluate(SNAP, ESTADOS);
+  await n.evaluate(`(${padrao})()`); const telas = await n.evaluate(TELAS);
+  await n.evaluate(() => { modo = "rec"; periodo = "acum"; corte = 5000; }); const telasAlt = await n.evaluate(TELAS);
+  await n.evaluate(`(${padrao})();go({tipo:"hub"})`);
   const out = { metricas: {}, telas: {} };
   snaps.forEach(sn => { const k = JSON.stringify(sn.estado); out.metricas[k] = {};
     for (const [c, v] of Object.entries(sn)) if (c !== "estado") out.metricas[k][c] = hash(v); });
   for (const [k, v] of Object.entries(telas)) out.telas[k] = hash(v);
+  for (const [k, v] of Object.entries(telasAlt)) out.telas["rec/acum/5000 " + k] = hash(v);
   return out;
 }
 teste("T06", "métricas e telas idênticas ao snapshot aprovado", async () => {
@@ -322,12 +332,13 @@ teste("A14", "carga robusta: drop fora da área, erro de inicialização e tecla
   await p.context().close();
 });
 
-teste("B1", "carga da base de ~12 MB mais rápida que a original", async () => {
-  const t = async html => { const p = await abre(html); const a = Date.now(); await p.setInputFiles("#_file", CSV("plano_sint.csv"));
-    await p.waitForSelector("#kpis .kpi", { timeout: 90000 }); const ms = Date.now() - a; await p.context().close(); return ms; };
-  const o = await t(ORIG), n = await t(NOVO);
-  console.log(`        carga: original ${o} ms · novo ${n} ms (${(fs.statSync(CSV("plano_sint.csv")).size / 1e6).toFixed(1)} MB)`);
-  ok(n < o, "não ficou mais rápido");
+teste("B1", "processamento da base de ~12 MB mais rápido que o original", async () => {
+  const txt = new TextDecoder("windows-1252").decode(fs.readFileSync(CSV("plano_sint.csv")));
+  const mede = async qual => { const p = await pagina(qual);
+    return p.evaluate(t => { let m = Infinity; for (let k = 0; k < 3; k++) { const a = performance.now(); construirPayload(t); m = Math.min(m, performance.now() - a); } return m; }, txt); };
+  const o = await mede("orig"), n = await mede("novo");
+  console.log(`        processamento: original ${o.toFixed(0)} ms · novo ${n.toFixed(0)} ms (${(txt.length / 1e6).toFixed(1)} MB, melhor de 3)`);
+  ok(n < o * 0.85, "não ficou mais rápido");
 });
 
 teste("A7", "carimbo usa a data do arquivo e avisa base velha", async () => {
@@ -431,6 +442,19 @@ teste("A4", "'parou de lançar' só considera meses ANTERIORES ao analisado", as
   // meses antes de a unidade começar não entram na tendência como "zero pendências"
   ok(r.pad1 === "limpa" && r.pad1t === "sem pendências no período", "tendência da unidade nova: " + r.pad1 + " " + r.pad1t);
   ok(r.cm === 0 && r.cm2 === 2, "contasDoMes: " + r.cm + "/" + r.cm2);
+  await p.context().close();
+});
+
+teste("A6", "confiança nos modos Acum./Sem. usa os meses anteriores ao período", async () => {
+  const p = await abre(NOVO, "estados.csv");
+  const r = await p.evaluate(() => {
+    M = 7; const cf = per => { periodo = per; const d = DB.data.find(d => d.u === "4102A"); return confDe(d); };
+    const out = { mes: cf("mes"), sem: cf("sem"), acum: cf("acum") };
+    periodo = "acum"; go({ tipo: "hub" }); out.sub = document.querySelectorAll(".kpi .sub")[2].textContent;
+    periodo = "mes"; return out; });
+  // 4102A lançou JAN–MAI e parou: em AGO e no 2º semestre é "lançava todo mês"; no acumulado não há mês anterior
+  igual({ mes: "media", sem: "alta", acum: "nd" }, { mes: r.mes, sem: r.sem, acum: r.acum }, "confiança");
+  ok(/sem histórico/.test(r.sub), "subtítulo no acumulado: " + r.sub);
   await p.context().close();
 });
 
