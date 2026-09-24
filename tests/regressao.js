@@ -627,6 +627,90 @@ teste("A15", "detalhes: 999,6 mil, margem sem sentido, link com estado, cabeçal
   await q.context().close();
 });
 
+teste("C3", "teclado: tudo que é clicável recebe foco e abre com Enter/Espaço", async () => {
+  const p = await abre(NOVO, "plano_sint.csv");
+  const semFoco = await p.evaluate(async () => { const segs = SEG.filter(s => DB.units.some(u => u.seg === s && !u.vig)); const out = new Set();
+    const u = Object.keys(met().a)[4];
+    const telas = [() => go({ tipo: "hub" }), () => go({ tipo: "seg", seg: segs[0] }), () => setVseg("ct"), () => setVseg("mp"), () => setVseg("un"),
+      () => { go({ tipo: "det", seg: umap[u].seg, unit: u }); setF("todos"); }, () => go({ tipo: "lastro" }), () => go({ tipo: "exc" })];
+    for (const f of telas) { f(); await Promise.resolve(); document.querySelectorAll("[onclick],th[data-k]").forEach(el => { if (el.tabIndex < 0 && !el.closest("[inert]") && el.getBoundingClientRect().width) out.add(el.tagName + "." + el.className.split(" ")[0]); }); }
+    go({ tipo: "hub" }); return [...out]; });
+  ok(!semFoco.length, "clicáveis sem foco: " + semFoco.join(", "));
+  // Tab chega na navegação; Enter abre o segmento; o foco não se perde no <body>
+  let foco = "";
+  for (let i = 0; i < 20 && !/^A:/.test(foco); i++) { await p.keyboard.press("Tab"); foco = await p.evaluate(() => document.activeElement.tagName + ":" + document.activeElement.textContent.trim().slice(0, 20)); }
+  ok(/^A:/.test(foco), "Tab não chegou à navegação: " + foco);
+  for (let i = 0; i < 3; i++) await p.keyboard.press("Tab");
+  await p.keyboard.press("Enter");
+  let r = await p.evaluate(() => ({ tipo: view.tipo, foco: document.activeElement.id || document.activeElement.tagName }));
+  ok(r.tipo === "seg" && r.foco !== "BODY", "Enter na navegação: " + JSON.stringify(r));
+  // Espaço num card abre a unidade
+  await p.evaluate(() => document.querySelector(".card").focus()); await p.keyboard.press(" ");
+  r = await p.evaluate(() => view.tipo); ok(r === "det", "Espaço no card: " + r);
+  // aba via teclado mantém o foco na aba
+  await p.evaluate(() => document.querySelectorAll(".abas button")[1].focus()); await p.keyboard.press("Enter");
+  r = await p.evaluate(() => ({ aba, foco: document.activeElement.textContent.trim().slice(0, 12) }));
+  ok(r.aba === "var" && /Varia/.test(r.foco), "foco após trocar de aba: " + JSON.stringify(r));
+  await p.context().close();
+});
+
+teste("C4", "tooltip abre por foco do teclado e fecha com Esc/toque fora", async () => {
+  const p = await pagina("novo");
+  const r = await p.evaluate(async () => { go({ tipo: "hub" }); await Promise.resolve(); const k = document.querySelectorAll(".kpi")[1]; k.focus();
+    const tip = document.querySelector(".tip"); const aberto = tip.style.display === "block" && tip.textContent.includes("sem lançamento");
+    const desc = k.getAttribute("aria-describedby"); k.blur(); const fechou = tip.style.display === "none";
+    k.focus(); document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); const esc = tip.style.display === "none";
+    return { foco: k.tabIndex >= 0, aberto, desc, fechou, esc, role: tip.getAttribute("role") }; });
+  igual({ foco: true, aberto: true, desc: "tip", fechou: true, esc: true, role: "tooltip" }, r, "tooltip");
+  await p.evaluate(() => { document.activeElement.blur(); go({ tipo: "hub" }); });
+});
+
+teste("C5", "diálogos: papel, foco inicial, foco preso, Esc e retorno do foco", async () => {
+  const p = await abre(NOVO, "so_orcado.csv");
+  const r = await p.evaluate(async () => { const out = {};
+    const b = document.getElementById("bguia"); b.focus(); b.click();
+    const g = document.querySelector("#guia [role=dialog]"); out.guiaRole = !!g && g.getAttribute("aria-modal") === "true";
+    out.guiaFoco = !!document.activeElement.closest("#guia"); out.fundoInerte = document.querySelector(".app > main").inert === true;
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); out.voltou = document.activeElement === b;
+    out.fundoLivre = !document.querySelector(".app > main").inert;
+    abrePal(); const inp = document.getElementById("palin"); montaPal("a");
+    out.palRole = document.querySelector("#pal [role=dialog]") !== null && inp.getAttribute("role") === "combobox" && !!inp.getAttribute("aria-label");
+    out.ativo = inp.getAttribute("aria-activedescendant") === document.querySelector(".palit.sel").id && document.querySelector(".palit.sel").getAttribute("aria-selected") === "true";
+    fechaPal(); return out; });
+  igual({ guiaRole: true, guiaFoco: true, fundoInerte: true, voltou: true, fundoLivre: true, palRole: true, ativo: true }, r, "diálogos");
+  // foco preso no diálogo
+  await p.evaluate(() => abreGuia());
+  for (let i = 0; i < 12; i++) await p.keyboard.press("Tab");
+  ok(await p.evaluate(() => !!document.activeElement.closest("#guia")), "Tab saiu do diálogo");
+  await p.keyboard.press("Escape");
+  // menu lateral do celular: Esc fecha e devolve o foco ao botão
+  await p.setViewportSize({ width: 390, height: 844 });
+  const m = await p.evaluate(() => { const h = document.getElementById("ham"); h.focus(); h.click();
+    const aberto = document.querySelector(".side").classList.contains("aberta") && h.getAttribute("aria-expanded") === "true" && !!document.activeElement.closest(".side");
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true }));
+    return { aberto, fechou: !document.querySelector(".side").classList.contains("aberta"), foco: document.activeElement === h, inerte: document.querySelector(".side").inert }; });
+  igual({ aberto: true, fechou: true, foco: true, inerte: true }, m, "menu do celular");
+  await p.context().close();
+});
+
+teste("C7", "busca na unidade: não recria o campo, preserva cursor e filtra", async () => {
+  const p = await pagina("novo");
+  await p.evaluate(() => { const u = Object.keys(met().a)[0]; go({ tipo: "det", seg: umap[u].seg, unit: u }); setF("todos"); window.__campo = document.getElementById("busca"); });
+  await p.focus("#busca"); await p.keyboard.type("conta 4.1.1.0");
+  await p.keyboard.press("ArrowLeft"); await p.keyboard.press("ArrowLeft"); await p.keyboard.type("X");
+  await p.waitForTimeout(400);
+  const r = await p.evaluate(() => { const b = document.getElementById("busca");
+    return { mesmo: b === window.__campo, valor: b.value, cursor: b.selectionStart, foco: document.activeElement === b,
+             linhas: document.querySelectorAll(".tw tbody tr.lin").length, cont: document.querySelector(".tabq").textContent }; });
+  ok(r.mesmo && r.foco && r.valor === "conta 4.1.1X.0" && r.cursor === 12, "campo: " + JSON.stringify(r));
+  ok(r.linhas === 0 && /^0 de/.test(r.cont), "filtro não aplicado: " + JSON.stringify(r));
+  await p.evaluate(() => { const b = document.getElementById("busca"); b.value = "conta 4.1.1.0"; b.dispatchEvent(new Event("input")); });
+  await p.waitForTimeout(400);
+  const n = await p.evaluate(() => document.querySelectorAll(".tw tbody tr.lin").length);
+  ok(n > 0, "busca válida sem resultado");
+  await p.evaluate(() => go({ tipo: "hub" }));
+});
+
 /* ================================================================== */
 (async () => {
   const filtro = process.argv.slice(2).filter(a => !a.startsWith("--"));

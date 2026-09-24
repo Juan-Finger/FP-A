@@ -248,7 +248,7 @@ td.r{text-align:right}
   border-radius:12px;box-shadow:0 24px 60px rgba(0,0,0,.55);overflow:hidden}
 .guiah{display:flex;align-items:flex-start;gap:12px;padding:17px 20px 14px;
   border-bottom:1px solid var(--line)}
-.guiah .gt{font-size:17px;font-weight:500}
+.guiah .gt{font-size:17px;font-weight:500;margin:0}
 .guiah .gs{font-size:12px;color:var(--mut);margin-top:3px}
 .gx{margin-left:auto;background:transparent;border:none;color:var(--dim);font-size:15px;
   cursor:pointer;padding:2px 6px}
@@ -644,10 +644,11 @@ table.mini tr.vr td{border-top:1px solid var(--line)}
   </main>
   <div class="guia" id="guia"></div>
   <div class="pal" id="pal">
-    <div class="palbox">
-      <input id="palin" placeholder="Buscar unidade, conta ou segmento…" autocomplete="off">
+    <div class="palbox" role="dialog" aria-modal="true" aria-label="Buscar no painel">
+      <input id="palin" placeholder="Buscar unidade, conta ou segmento…" autocomplete="off" role="combobox"
+        aria-label="Buscar unidade, conta ou segmento" aria-autocomplete="list" aria-expanded="true" aria-controls="pallist">
       <div id="palcab"></div>
-      <div class="pallist" id="pallist"></div>
+      <div class="pallist" id="pallist" role="listbox" aria-label="Resultados"></div>
       <div class="palfoot">↑↓ navegar · Enter abrir · Esc fechar</div>
     </div>
   </div>
@@ -1877,14 +1878,9 @@ function mesATes(d){
     <div class="expl2">Células destacadas: mês com orçamento e sem nenhum lançamento.</div>
   </div></td></tr>`;
 }
-function renderDet(){
-  const u=umap[view.unit];
-  let rows=linhas();
-  const cont={todos:rows.length}; rows.forEach(r=>cont[r.st]=(cont[r.st]||0)+1);
-  const chips=[["todos","Todas"],["sem","Sem lançamento"],["sorc","Sem orçamento"],["ana","Analisar"],["ok","Ok"],["zer","Zerado"]]
-    .filter(([k])=>k==="todos"||cont[k])
-    .map(([k,l])=>`<div class="chip ${view.filtro===k?'on':''}" onclick="setF(${js(k)})">${l}<span class="c num">${cont[k]||0}</span></div>`).join("");
-
+// linhas da tabela da unidade: filtro do chip, busca e ordenação atuais
+function linhasFiltradas(base){
+  let rows=[...base];
   if(view.filtro!=="todos") rows=rows.filter(r=>r.st===view.filtro);
   if(view.busca){const q=view.busca.toLowerCase();
     rows=rows.filter(r=>r.desc.toLowerCase().includes(q)||r.a.includes(q));}
@@ -1899,9 +1895,11 @@ function renderDet(){
     if(k==="a"||k==="desc"||k==="cls"||k==="nat"){return dir*String(x[k]).localeCompare(String(y[k]));}
     A=x[k]??-Infinity;B=y[k]??-Infinity;return dir*(B-A);});
 
+  return rows;
+}
+function corpoDet(rows){
   const mxv=Math.max(...rows.map(r=>Math.abs(r.v)),1);
-  const ar=key=>view.sk===key?`<span class="ar">${view.sd>0?"▼":"▲"}</span>`:"";
-  const body=rows.length?rows.map(r=>`<tr class="lin ${expandida===r.a?'aberta':''}" onclick="toggleExp(${js(r.a)})">
+  return rows.length?rows.map(r=>`<tr class="lin ${expandida===r.a?'aberta':''}" onclick="toggleExp(${js(r.a)})">
       <td class="num" style="color:var(--dim)"><span class="cx">${expandida===r.a?"▾":"▸"}</span>${he(r.a)}</td>
       <td>${he(r.desc)}</td>
       <td class="r num">${fmtC(r.p)}</td>
@@ -1916,8 +1914,29 @@ function renderDet(){
       <td>${r.st==="sem"?`<span class="cf ${r.cf}" ${T(tipHist(r.hist,r.cf))}>${CONF[r.cf]}</span>`:'<span style="color:var(--dim)">—</span>'}</td>
       <td class="cls">${he(r.cls)}</td></tr>`+(expandida===r.a?mesATes(r.d):"")).join("")
     :`<tr><td colspan="11"><div class="empty">Nenhuma conta neste filtro.</div></td></tr>`;
+}
+// busca: atualiza só o corpo da tabela e o contador — o campo não é recriado
+// (cursor, acentos compostos e teclado do celular continuam funcionando)
+let tBusca=null;
+function atualizaTabelaDet(){
+  const tb=document.querySelector(".tw tbody"); if(!tb||view.tipo!=="det") return;
+  const base=linhas(), rows=linhasFiltradas(base);
+  tb.innerHTML=corpoDet(rows);
+  const q=document.querySelector(".tabq"); if(q) q.textContent=rows.length+" de "+base.length;
+}
+function renderDet(){
+  const u=umap[view.unit];
+  const base=linhas();
+  const cont={todos:base.length}; base.forEach(r=>cont[r.st]=(cont[r.st]||0)+1);
+  const chips=[["todos","Todas"],["sem","Sem lançamento"],["sorc","Sem orçamento"],["ana","Analisar"],["ok","Ok"],["zer","Zerado"]]
+    .filter(([k])=>k==="todos"||cont[k])
+    .map(([k,l])=>`<div class="chip ${view.filtro===k?'on':''}" onclick="setF(${js(k)})">${l}<span class="c num">${cont[k]||0}</span></div>`).join("");
 
-  const all=linhas();
+  const rows=linhasFiltradas(base);
+  const body=corpoDet(rows);
+  const ar=key=>view.sk===key?`<span class="ar">${view.sd>0?"▼":"▲"}</span>`:"";
+
+  const all=base;
   // BLOCO 0 — histórico de pendências mês a mês
   const hp=histPendencias(view.unit), pad=padraoUnidade(view.unit);
   const mx0=Math.max(...hp.filter(Boolean).map(m=>m.n),1);
@@ -2032,7 +2051,7 @@ function renderDet(){
        view.filtro!=="todos"?` · <b>${(ST[view.filtro]||"todas").toLowerCase()}</b>`:" · todas"}
        <span class="tabq">${rows.length} de ${all.length}</span></div>
     <div class="toolbar">${chips}
-      <input id="busca" placeholder="Buscar conta ou descrição…" value="${he(view.busca)}">
+      <input id="busca" type="search" aria-label="Buscar conta ou descrição" placeholder="Buscar conta ou descrição…" value="${he(view.busca)}">
       <button class="xbtn" onclick="exportUnidade()">exportar unidade</button>
     </div>
     <div class="tw"><table><thead><tr>
@@ -2046,9 +2065,7 @@ function renderDet(){
     </tr></thead><tbody>${body}</tbody></table></div>`;
 
   const b=document.getElementById("busca");
-  b.oninput=e=>{view.busca=e.target.value;renderDet();
-    const n=document.getElementById("busca");n.focus();
-    n.setSelectionRange(n.value.length,n.value.length);};
+  b.oninput=e=>{ view.busca=e.target.value; clearTimeout(tBusca); tBusca=setTimeout(atualizaTabelaDet,150); };
   document.querySelectorAll(".tw thead th[data-k]").forEach(th=>th.onclick=()=>{
     const kk=th.dataset.k;
     if(view.sk===kk) view.sd*=-1; else {view.sk=kk;view.sd=1;}
@@ -2115,11 +2132,11 @@ const ROTEIRO=[
 ];
 function abreGuia(){
   const el=document.getElementById("guia");
-  el.innerHTML=`<div class="guiabox">
+  el.innerHTML=`<div class="guiabox" role="dialog" aria-modal="true" aria-labelledby="guiat">
     <div class="guiah"><div>
-        <div class="gt">Como analisar seu segmento</div>
+        <h2 class="gt" id="guiat">Como analisar seu segmento</h2>
         <div class="gs">Roteiro sugerido. Cada passo abre onde ele é feito.</div></div>
-      <button class="gx" onclick="fechaGuia()">✕</button></div>
+      <button class="gx" aria-label="Fechar" onclick="fechaGuia()">✕</button></div>
     <div class="guial">${ROTEIRO.map((o,i)=>`<div class="gp">
         <div class="gpt">${o.t}</div>
         <div class="gpd">${o.d}</div>
@@ -2129,9 +2146,9 @@ function abreGuia(){
       <kbd>1</kbd>–<kbd>9</kbd> segmentos · <kbd>R</kbd> recorrentes ·
       <kbd>←</kbd><kbd>→</kbd> abas · <kbd>?</kbd> lista completa</div>
   </div>`;
-  el.classList.add("on");
+  el.classList.add("on"); modal(el,true); el.querySelector(".gx").focus();
 }
-function fechaGuia(){ document.getElementById("guia").classList.remove("on"); }
+function fechaGuia(){ const el=document.getElementById("guia"); if(!el.classList.contains("on")) return; el.classList.remove("on"); modal(el,false); }
 function guiaIr(i){ fechaGuia(); const f=ROTEIRO[i].go; if(f) f(); }
 
 /* ================= BUSCA GLOBAL (Ctrl+K) ================= */
@@ -2146,10 +2163,11 @@ function palEscopo(){
 }
 function abrePal(){
   palGlobal=false;
-  document.getElementById("pal").classList.add("on");
+  const pl=document.getElementById("pal"); if(!pl.classList.contains("on")) modal(pl,true);
+  pl.classList.add("on");
   const i=document.getElementById("palin"); i.value=""; i.focus(); montaPal("");
 }
-function fechaPal(){ document.getElementById("pal").classList.remove("on"); }
+function fechaPal(){ const pl=document.getElementById("pal"); if(!pl.classList.contains("on")) return; pl.classList.remove("on"); modal(pl,false); }
 function alternaEscopo(){
   palGlobal=!palGlobal;
   montaPal(document.getElementById("palin").value);
@@ -2223,7 +2241,7 @@ function pintaPal(){
    </div>`;
   document.getElementById("palcab").innerHTML=cab;
   document.getElementById("pallist").innerHTML=(palItens.length
-    ? palItens.map((o,i)=>`<div class="palit${i===palSel?" sel":""}${o.go?"":" inerte"}"
+    ? palItens.map((o,i)=>`<div class="palit${i===palSel?" sel":""}${o.go?"":" inerte"}" id="palit-${i}" role="option" aria-selected="${i===palSel}"${o.go?"":' aria-disabled="true"'} tabindex="-1"
         onclick="palGo(${i})">
         <span class="pt">${o.t}</span>
         <span class="pn2"><span class="pnn">${he(o.n)}</span>${
@@ -2233,6 +2251,8 @@ function pintaPal(){
         ${o.x?`<span class="px num">${he(o.x)}</span>`:""}</div>`).join("")
     : `<div class="palvazio">Nada encontrado${sg?" em "+(SEGNM[sg]||sg):""}.</div>`);
   const el=document.querySelector(".palit.sel"); if(el) el.scrollIntoView({block:"nearest"});
+  const inp=document.getElementById("palin");
+  if(el) inp.setAttribute("aria-activedescendant",el.id); else inp.removeAttribute("aria-activedescendant");
 }
 function palGo(i){ const o=palItens[i]; if(!o||!o.go)return; fechaPal(); o.go(); }
 // Abre a unidade e deixa a tabela só com a conta indicada.
@@ -2248,6 +2268,8 @@ function abreConta(unidade,conta){
 }
 function buscaConta(desc){ view.busca=desc; if(view.tipo==="det") renderDet(); }
 document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"&&tipAberto()&&!tip.classList.contains("fixo")){ escondeTip(); return; }
+  if(e.key==="Escape"&&window.menuAberto&&menuAberto()){ fechaMenu(); return; }
   const aberto=document.getElementById("pal").classList.contains("on");
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){ e.preventDefault(); aberto?fechaPal():abrePal(); return; }
   if(aberto){
@@ -2293,9 +2315,86 @@ document.addEventListener("keydown",e=>{
   }
 });
 
+/* ================= TECLADO (C3) ================= */
+// Todo elemento clicável recebe foco e responde a Enter/Espaço. Os onclick inline
+// continuam sendo a única fonte da ação — para o mouse nada muda.
+const SEL_CLICAVEL='[onclick]:not(button):not(a[href]):not(input):not(select):not(label):not(.palit),.tw thead th[data-k]';
+function acessivel(){
+  document.querySelectorAll(SEL_CLICAVEL).forEach(el=>{
+    if(!el.hasAttribute("tabindex")) el.tabIndex=0;
+    if(!el.hasAttribute("role")&&!/^(TR|TD|TH)$/.test(el.tagName)) el.setAttribute("role",el.tagName==="A"?"link":"button");
+  });
+  // elementos com explicação (tooltip) também recebem foco
+  document.querySelectorAll(".kpi[data-tip],.fr[data-tip],.cf[data-tip],.cnt[data-tip],.umais[data-tip],.modotag[data-tip],.hpc[data-tip],.gcol[data-tip]")
+    .forEach(el=>{ if(!el.hasAttribute("tabindex")) el.tabIndex=0; });
+}
+new MutationObserver(acessivel).observe(document.body,{childList:true,subtree:true});   // roda uma vez por lote de mudanças
+document.addEventListener("keydown",e=>{
+  if(e.key!=="Enter"&&e.key!==" ") return;
+  const el=e.target;
+  if(!(el instanceof Element)||!el.matches(SEL_CLICAVEL)) return;
+  e.preventDefault(); el.click();
+});
+// Depois de uma ação por teclado a tela é redesenhada: devolve o foco ao mesmo
+// controle (aba, chip, linha) ou, se a tela mudou, ao título da nova tela.
+document.addEventListener("click",e=>{
+  if(e.detail!==0||!(e.target instanceof Element)) return;          // detail 0 = ativação por teclado
+  const el=e.target.closest("[onclick],button,th[data-k]"); if(!el) return;
+  const onde=()=>JSON.stringify([view.tipo,view.seg,view.unit]), antes=onde();
+  const chave={id:el.id,oc:el.getAttribute("onclick"),k:el.dataset?el.dataset.k:null};
+  setTimeout(()=>{
+    const a=document.activeElement;
+    if(a&&a!==document.body&&document.contains(a)) return;         // a ação já cuidou do foco
+    let alvo=null;
+    if(onde()===antes){
+      if(chave.id) alvo=document.getElementById(chave.id);
+      else if(chave.oc) alvo=[...document.querySelectorAll("[onclick]")].find(x=>x.getAttribute("onclick")===chave.oc);
+      else if(chave.k) alvo=document.querySelector(`.tw thead th[data-k="${chave.k}"]`);
+    }
+    (alvo||document.getElementById("title")).focus({preventScroll:true});
+  },0);
+},true);
+
+/* ================= DIÁLOGOS (C5) ================= */
+// Diálogo aberto: o resto da tela fica inerte; ao fechar, o foco volta a quem abriu.
+let _focoAntes=null, _modal=null;
+function modal(el,on){
+  const fora=[document.querySelector(".topbar"),document.querySelector(".side"),document.querySelector(".app > main")];
+  if(on){ if(!_modal) _focoAntes=document.activeElement; _modal=el; fora.forEach(x=>{ if(x) x.inert=true; }); }
+  else if(_modal===el){ _modal=null; fora.forEach(x=>{ if(x) x.inert=false; }); if(window.ajustaMenu) ajustaMenu();
+    if(_focoAntes&&document.contains(_focoAntes)&&!_focoAntes.closest("[inert]")) _focoAntes.focus({preventScroll:true}); _focoAntes=null; }
+}
+document.addEventListener("keydown",e=>{                 // Tab não sai do diálogo (a busca usa Tab para o escopo)
+  if(e.key!=="Tab"||!_modal||_modal.id==="pal") return;
+  const f=[..._modal.querySelectorAll('button,[href],input,select,[tabindex]:not([tabindex="-1"])')].filter(x=>x.getClientRects().length);
+  if(!f.length) return;
+  const i=f.indexOf(document.activeElement);
+  if(e.shiftKey&&i<=0){ e.preventDefault(); f[f.length-1].focus(); }
+  else if(!e.shiftKey&&(i===-1||i===f.length-1)){ e.preventDefault(); f[0].focus(); }
+},true);
+
 /* ================= TOOLTIP ================= */
 const tip=document.createElement("div");
-tip.className="tip"; tip.style.display="none"; document.body.appendChild(tip);
+tip.className="tip"; tip.id="tip"; tip.setAttribute("role","tooltip"); tip.style.display="none"; document.body.appendChild(tip);
+const tipAberto=()=>tip.style.display==="block";
+function escondeTip(){ if(!tip.classList.contains("fixo")) tip.style.display="none"; }
+// teclado: o tooltip abre ao focar o elemento, posicionado junto dele
+function mostraTipEm(el){
+  tip.innerHTML=decodeURIComponent(el.dataset.tip); tip.style.display="block";
+  const r=el.getBoundingClientRect(), t=tip.getBoundingClientRect();
+  let x=r.left, y=r.bottom+8;
+  if(x+t.width>innerWidth-10) x=Math.max(8,innerWidth-t.width-10);
+  if(y+t.height>innerHeight-10) y=Math.max(8,r.top-t.height-8);
+  tip.style.left=x+"px"; tip.style.top=y+"px";
+}
+document.addEventListener("focusin",e=>{
+  if(tip.classList.contains("fixo")||!(e.target instanceof Element)) return;
+  const el=e.target.closest("[data-tip]"); if(!el) return;
+  el.setAttribute("aria-describedby","tip"); mostraTipEm(el);
+});
+document.addEventListener("focusout",e=>{ if(e.target instanceof Element&&e.target.closest("[data-tip]")) escondeTip(); });
+// toque: o tooltip aberto por um toque fecha ao tocar fora
+document.addEventListener("pointerdown",e=>{ if(e.pointerType!=="mouse"&&!(e.target instanceof Element&&e.target.closest("[data-tip]"))) escondeTip(); });
 function moveTip(e){
   const p=14; const r=tip.getBoundingClientRect();
   let x=e.clientX+p, y=e.clientY+p;
@@ -2873,7 +2972,7 @@ function abreCarga(){
         <div class="gpd">São tratadas como não recorrentes. Se alguma deveria ser recorrente, atualize a tabela CLASSIF.</div>${lista(c.semClassif,10)}</div>`:""}
     </div>
     <div class="guiaf">Esc fecha</div></div>`;
-  el.classList.add("on");
+  el.classList.add("on"); modal(el,true); el.querySelector(".gx").focus();
 }
 
 /* ---------- estado na URL (permite salvar o próprio favorito) ---------- */
@@ -2938,8 +3037,20 @@ render=protege(render,"render");
   const pl=document.getElementById("pal");
   if(pl) pl.onclick=e=>{ if(e.target===pl) fechaPal(); };
   const lado=document.querySelector(".side"), fundo=document.getElementById("drawerbg");
-  const abreMenu=v=>{ lado.classList.toggle("aberta",v); fundo.classList.toggle("on",v); };
   const hm=document.getElementById("ham");
+  const mqCel=window.matchMedia?matchMedia("(max-width:820px)"):null;
+  // no celular, o menu fechado fica fora da ordem de foco
+  window.ajustaMenu=()=>{ lado.inert=!!_modal||(!!(mqCel&&mqCel.matches)&&!lado.classList.contains("aberta")); };
+  const abreMenu=v=>{ const eraAberto=lado.classList.contains("aberta");
+    lado.classList.toggle("aberta",v); fundo.classList.toggle("on",v);
+    if(hm) hm.setAttribute("aria-expanded",v?"true":"false"); ajustaMenu();
+    if(v&&!eraAberto){ const f=lado.querySelector("button,select,[tabindex='0']"); if(f) f.focus(); }
+    if(!v&&eraAberto&&hm&&mqCel&&mqCel.matches) hm.focus(); };
+  window.menuAberto=()=>lado.classList.contains("aberta");
+  if(hm){ hm.setAttribute("aria-expanded","false"); hm.setAttribute("aria-controls","menu-lateral"); }
+  lado.id="menu-lateral";
+  if(mqCel) (mqCel.addEventListener?mqCel.addEventListener("change",ajustaMenu):mqCel.addListener(ajustaMenu));
+  ajustaMenu();
   if(hm) hm.onclick=()=>abreMenu(!lado.classList.contains("aberta"));
   if(fundo) fundo.onclick=()=>abreMenu(false);
   const tb=document.getElementById("tbbusca");
