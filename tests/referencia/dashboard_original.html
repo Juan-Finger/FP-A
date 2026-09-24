@@ -1,0 +1,2749 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Análise de Variação — FP&A</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#080F1C; --s1:#0D1829; --s2:#132135; --s3:#1A2B42;
+  --line:rgba(255,255,255,.07); --line2:rgba(255,255,255,.13);
+  --cy:#22D3EE; --cy2:#67E8F9;
+  --red:#F26D6D; --amb:#EFB25C; --grn:#4ADE9B;
+  --tx:#E8EEF5; --mut:#8FA3B8; --dim:#5D7188;
+  --alf:#3B9BC9; --cd:#9B6BC4; --tra:#14B8A6; --fro:#E0628A; --cor:#E0A458; --bko:#7C8DA6;
+  --r:10px;
+}
+body.claro{
+  --bg:#F4F6F9; --s1:#FFFFFF; --s2:#EDF1F6; --s3:#DCE3EC;
+  --line:rgba(12,35,64,.10); --line2:rgba(12,35,64,.20);
+  --cy:#0E7C94; --cy2:#0B6076;
+  --red:#C0392B; --amb:#9A6608; --grn:#1E7D5A;
+  --tx:#132030; --mut:#4E6076; --dim:#7A8A9C;
+  --alf:#2E86AB; --cd:#7A5195; --tra:#0E8C7F; --fro:#C04268; --cor:#B07B25; --bko:#5D7188;
+}
+body.claro .side{background:#FFFFFF}
+body.claro .kpi,body.claro .card,body.claro .worst,body.claro .tw,body.claro .expl{
+  box-shadow:0 1px 2px rgba(12,35,64,.06)}
+body.claro thead th{background:#0C2340;color:#DCE7F2}
+body.claro .segbar button.on,body.claro .chip.on,body.claro .vbar2 button.on{
+  background:#0C2340;color:#fff}
+body.claro .tip{background:#132030;color:#EAF0F7}
+body.claro td.hm{color:#2A1D06}
+body.claro .brand .bar{background:#0E7C94}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:'Space Grotesk',system-ui,sans-serif;background:var(--bg);color:var(--tx);
+     -webkit-font-smoothing:antialiased;font-size:14px;line-height:1.45}
+.num{font-family:'JetBrains Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums;
+     letter-spacing:-.02em}
+.hidden{display:none!important}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:var(--s3);border-radius:6px}
+::-webkit-scrollbar-track{background:transparent}
+
+/* ---------- shell ---------- */
+.app{display:grid;grid-template-columns:230px minmax(0,1fr);min-height:100vh}
+.side{background:var(--s1);border-right:1px solid var(--line);padding:20px 0 0;
+      display:flex;flex-direction:column;position:sticky;top:0;height:100vh;
+      overflow:hidden}
+.sidescroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
+.sidescroll::-webkit-scrollbar{width:6px}
+.brand{display:flex;gap:11px;align-items:flex-start;padding:0 18px 20px}
+.brand .bar{width:3px;height:34px;background:var(--cy);border-radius:2px;flex:none}
+.brand .t{font-size:14px;font-weight:500;line-height:1.2}
+.brand .s{font-size:10px;color:var(--dim);margin-top:3px;letter-spacing:.04em}
+
+.navlbl{font-size:9.5px;color:var(--dim);letter-spacing:.11em;text-transform:uppercase;
+        padding:14px 18px 7px;display:flex;align-items:center}
+.tema{margin-left:auto;background:transparent;border:none;color:var(--dim);cursor:pointer;
+  font-size:14px;line-height:1;padding:0 2px}
+.tema:hover{color:var(--cy)}
+.nav{display:flex;flex-direction:column;gap:1px;padding:0 10px}
+.nav a{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:7px;
+       font-size:12.5px;color:var(--mut);cursor:pointer;transition:background .13s,color .13s;
+       border:1px solid transparent}
+.nav a:hover{background:var(--s2);color:var(--tx)}
+.nav a.on{background:var(--s2);color:var(--tx);border-color:var(--line2)}
+.nav a .dot{width:6px;height:6px;border-radius:50%;flex:none}
+.nav a .n{margin-left:auto;font-size:11px;color:var(--dim)}
+.nav a.on .n,.nav a:hover .n{color:var(--red)}
+
+.sidefoot{flex:none;padding:12px 18px 16px;border-top:1px solid var(--line);
+  background:var(--s1)}
+.mlbl{font-size:9.5px;color:var(--dim);letter-spacing:.11em;text-transform:uppercase;margin-bottom:6px}
+select#mes{width:100%;background:var(--s2);border:1px solid var(--line2);color:var(--cy);
+  font-family:'Space Grotesk';font-size:15px;font-weight:500;padding:7px 10px;border-radius:7px;
+  cursor:pointer;outline:none}
+select#mes option{background:var(--s2);color:var(--tx)}
+.mstatus{font-size:10.5px;margin-top:7px;display:flex;align-items:center;gap:5px;color:var(--dim)}
+.mstatus .pip{width:5px;height:5px;border-radius:50%;background:var(--grn)}
+.mstatus.open .pip{background:var(--amb)} .mstatus.open{color:var(--amb)}
+
+.main{padding:26px 32px 60px;max-width:1760px;min-width:0}
+.crumb{font-size:11.5px;color:var(--dim);margin-bottom:5px;display:flex;gap:6px;align-items:center}
+.crumb span{cursor:pointer} .crumb span:hover{color:var(--cy2)}
+.crumb i{color:var(--s3)}
+.h1{font-size:24px;font-weight:500;letter-spacing:-.015em}
+.h1sub{font-size:12.5px;color:var(--mut);margin-top:3px}
+.head{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;margin-bottom:22px}
+
+/* ---------- kpis ---------- */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:26px}
+.kpi{background:var(--s1);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;
+     position:relative;overflow:hidden}
+.kpi .lbl{font-size:10px;color:var(--dim);letter-spacing:.07em;text-transform:uppercase}
+.kpi .v{font-size:27px;font-weight:500;margin-top:6px;letter-spacing:-.03em}
+.kpi .sub{font-size:11px;color:var(--dim);margin-top:2px}
+.kpi.r .v{color:var(--red)} .kpi.a .v{color:var(--amb)} .kpi.g .v{color:var(--grn)}
+.kpi.c .v{color:var(--cy)}
+
+.sect{font-size:10.5px;color:var(--dim);letter-spacing:.11em;text-transform:uppercase;
+      margin:0 0 12px;display:flex;align-items:center;gap:10px}
+.sect::after{content:"";flex:1;height:1px;background:var(--line)}
+
+/* ---------- cards ---------- */
+.grid{display:grid;gap:12px}
+.g3{grid-template-columns:repeat(3,1fr)}
+.card{background:var(--s1);border:1px solid var(--line);border-radius:var(--r);padding:15px 16px;
+      cursor:pointer;transition:border-color .15s,background .15s,transform .15s;position:relative}
+.card:hover{border-color:var(--line2);background:var(--s2);transform:translateY(-1px)}
+.card .top{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.card .nm{font-size:14px;font-weight:500;line-height:1.25}
+.card .tag{font-size:9.5px;padding:2px 7px;border-radius:5px;flex:none;letter-spacing:.03em}
+.card .mid{display:flex;align-items:flex-end;gap:14px;margin-top:14px}
+.card .big{font-size:30px;font-weight:500;line-height:1.05;letter-spacing:-.035em;color:var(--red);white-space:nowrap}
+.card .big.z{color:var(--grn)}
+.card .biglbl{font-size:10.5px;color:var(--dim);line-height:1.25;padding-bottom:2px;white-space:nowrap}
+.card .spark{margin-left:auto;opacity:.85}
+.card .foot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:13px;
+     padding-top:11px;border-top:1px solid var(--line);font-size:11.5px;color:var(--mut);white-space:nowrap}
+.card.calm{opacity:.55} .card.calm:hover{opacity:1}
+.pos{color:var(--grn)} .neg{color:var(--red)}
+
+/* barra de proporção */
+.pbar{height:3px;background:var(--s3);border-radius:2px;overflow:hidden;margin-top:11px}
+.pbar i{display:block;height:100%;background:var(--red);border-radius:2px;transition:width .3s}
+
+/* ---------- tabela ---------- */
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.chip{background:var(--s1);border:1px solid var(--line);border-radius:20px;padding:5px 13px;
+      font-size:11.5px;color:var(--mut);cursor:pointer;transition:all .13s;white-space:nowrap}
+.chip:hover{border-color:var(--line2);color:var(--tx)}
+.chip.on{background:var(--cy);border-color:var(--cy);color:#06202B;font-weight:500}
+.chip .c{opacity:.65;margin-left:3px}
+input#busca{flex:1;min-width:170px;background:var(--s1);border:1px solid var(--line);
+  border-radius:20px;padding:6px 14px;color:var(--tx);font-family:inherit;font-size:12px;outline:none}
+input#busca:focus{border-color:var(--cy)}
+input#busca::placeholder{color:var(--dim)}
+
+.tw{background:var(--s1);border:1px solid var(--line);border-radius:var(--r);
+  overflow-x:auto;overflow-y:visible;-webkit-overflow-scrolling:touch}
+.tw table{min-width:860px}
+.tw.mapa table{min-width:640px}
+/* barra de rolagem visível: sem ela ninguém descobre que a tabela corre */
+.tw::-webkit-scrollbar{height:10px}
+.tw::-webkit-scrollbar-track{background:var(--s2);border-radius:0 0 var(--r) var(--r)}
+.tw::-webkit-scrollbar-thumb{background:var(--s3);border-radius:6px;border:2px solid var(--s2)}
+.tw::-webkit-scrollbar-thumb:hover{background:var(--line2)}
+/* sombra na borda direita indicando que há mais colunas */
+.tw{background-image:linear-gradient(to right,transparent calc(100% - 26px),rgba(0,0,0,.28));
+  background-repeat:no-repeat;background-attachment:local,scroll}
+table{width:100%;border-collapse:collapse;font-size:12.5px}
+thead th{background:var(--s2);color:var(--mut);text-align:left;padding:10px 12px;font-weight:500;
+  font-size:11px;letter-spacing:.04em;cursor:pointer;white-space:nowrap;
+  border-bottom:1px solid var(--line);user-select:none;position:sticky;top:0;z-index:2}
+thead th:hover{color:var(--tx)}
+thead th .ar{color:var(--cy);margin-left:3px;font-size:9px}
+tbody td{padding:9px 12px;border-bottom:1px solid var(--line)}
+tbody tr:last-child td{border-bottom:none}
+tbody tr{transition:background .1s}
+tbody tr:hover{background:var(--s2)}
+td.r{text-align:right}
+.st{font-size:10px;font-weight:500;padding:3px 9px;border-radius:20px;white-space:nowrap;
+    display:inline-block}
+.st.sem{background:rgba(242,109,109,.13);color:#F79A9A}
+.st.ana{background:rgba(239,178,92,.13);color:#F3C784}
+.st.sorc{background:rgba(167,139,250,.15);color:#C4B5FD}
+.st.ok{background:rgba(74,222,155,.13);color:#7BE8BB}
+.st.zer{background:rgba(143,163,184,.10);color:var(--mut)}
+.st.abr{background:rgba(34,211,238,.11);color:var(--cy2)}
+.cls{color:var(--dim);font-size:11px}
+.empty{padding:44px;text-align:center;color:var(--dim);font-size:13px}
+.vbar{display:inline-block;height:4px;border-radius:2px;vertical-align:middle;margin-left:7px}
+
+/* lista de piores (hub) */
+.worst{background:var(--s1);border:1px solid var(--line);border-radius:var(--r);overflow:hidden}
+.wrow{display:flex;align-items:center;gap:12px;padding:10px 15px;border-bottom:1px solid var(--line);
+      cursor:pointer;transition:background .13s}
+.wrow:last-child{border-bottom:none}
+.wrow:hover{background:var(--s2)}
+.wrow .rk{font-size:11px;color:var(--dim);width:16px;flex:none}
+.wrow .nm{font-size:12.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wrow .sg{font-size:9.5px;padding:2px 7px;border-radius:5px;flex:none}
+.wrow .qt{font-size:13.5px;font-weight:500;color:var(--red);width:78px;text-align:right;flex:none;white-space:nowrap}
+.cols2{display:grid;grid-template-columns:1fr 1fr;gap:22px;align-items:start}
+}
+.xbtn{background:var(--s2);border:1px solid var(--line2);color:var(--mut);
+  font-family:inherit;font-size:10.5px;letter-spacing:.03em;padding:4px 11px;border-radius:14px;
+  cursor:pointer;transition:all .13s;text-transform:none}
+.xbtn:hover{background:var(--cy);border-color:var(--cy);color:#06202B}
+.fv{font-size:9.5px;padding:2px 7px;border-radius:5px;white-space:nowrap}
+.fv.fav{background:rgba(74,222,155,.13);color:#7BE8BB}
+.fv.desf{background:rgba(242,109,109,.13);color:#F79A9A}
+.fv.neutro{background:rgba(143,163,184,.10);color:var(--dim)}
+.nat{font-size:9.5px;color:var(--dim)}
+.legenda{font-size:11px;color:var(--dim);margin:-6px 0 14px;display:flex;gap:16px;flex-wrap:wrap}
+.legenda b{font-weight:400;color:var(--mut)}
+.cf{font-size:9.5px;padding:2px 7px;border-radius:5px;white-space:nowrap}
+.cf.alta{background:rgba(242,109,109,.14);color:#F79A9A}
+.cf.media{background:rgba(239,178,92,.13);color:#F3C784}
+.cf.baixa{background:rgba(143,163,184,.10);color:var(--dim)}
+.expl{background:var(--s1);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;margin-bottom:18px}
+.erow{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:12px}
+.erow .bn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.erow .bb{height:5px;border-radius:3px;flex:none}
+.gerado{font-size:10px;color:var(--dim);margin-top:9px;padding-top:9px;
+  border-top:1px solid var(--line);line-height:1.45}
+.gerado b{color:var(--mut);font-weight:400}
+.gerado.velho{color:var(--amb)}
+.gerado.velho b{color:var(--amb)}
+.segbar{display:flex;gap:3px;background:var(--s2);border:1px solid var(--line);
+  border-radius:8px;padding:3px;margin:0 10px 4px}
+.segbar button{flex:1;background:transparent;border:none;color:var(--mut);font-family:inherit;
+  font-size:11.5px;padding:5px 6px;border-radius:6px;cursor:pointer;transition:all .13s;white-space:nowrap}
+.segbar button:hover{color:var(--tx)}
+.segbar button.on{background:var(--cy);color:#06202B;font-weight:500}
+.segbar.sm{margin:0}
+.segbar.sm button{font-size:11px;padding:4px 3px}
+.modotag{font-size:10px;padding:2px 8px;border-radius:5px;background:rgba(34,211,238,.13);
+  color:var(--cy2);margin-left:8px;vertical-align:2px}
+.acoes{display:flex;gap:6px;margin-top:10px}
+.bt2{flex:1;background:var(--s2);border:1px solid var(--line2);color:var(--mut);
+  font-family:inherit;font-size:11px;padding:6px 8px;border-radius:7px;cursor:pointer;transition:all .13s}
+.bt2:hover{background:var(--cy);border-color:var(--cy);color:#06202B}
+.guia{position:fixed;inset:0;background:rgba(4,10,20,.76);z-index:210;display:none;
+  align-items:flex-start;justify-content:center;padding:7vh 16px;overflow-y:auto}
+.guia.on{display:flex}
+.guiabox{width:min(680px,100%);background:var(--s1);border:1px solid var(--line2);
+  border-radius:12px;box-shadow:0 24px 60px rgba(0,0,0,.55);overflow:hidden}
+.guiah{display:flex;align-items:flex-start;gap:12px;padding:17px 20px 14px;
+  border-bottom:1px solid var(--line)}
+.guiah .gt{font-size:17px;font-weight:500}
+.guiah .gs{font-size:12px;color:var(--mut);margin-top:3px}
+.gx{margin-left:auto;background:transparent;border:none;color:var(--dim);font-size:15px;
+  cursor:pointer;padding:2px 6px}
+.gx:hover{color:var(--tx)}
+.guial{padding:6px 20px 14px;max-height:62vh;overflow-y:auto}
+.gp{padding:13px 0;border-bottom:1px solid var(--line)}
+.gp:last-child{border-bottom:none}
+.gpt{font-size:13.5px;font-weight:500;color:var(--cy2)}
+.gpd{font-size:12.5px;color:var(--mut);margin-top:5px;line-height:1.55}
+.gpd b{color:var(--tx);font-weight:500}
+.gpb{margin-top:9px;background:var(--s2);border:1px solid var(--line2);color:var(--tx);
+  font-family:inherit;font-size:11.5px;padding:5px 12px;border-radius:16px;cursor:pointer}
+.gpb:hover{background:var(--cy);border-color:var(--cy);color:#06202B}
+.guiaf{padding:11px 20px;border-top:1px solid var(--line);font-size:11px;color:var(--dim)}
+.guiaf kbd{background:var(--s2);border:1px solid var(--line2);border-radius:4px;
+  padding:0 4px;font-family:inherit;font-size:10px}
+.pal{position:fixed;inset:0;background:rgba(4,10,20,.72);z-index:200;display:none;
+  align-items:flex-start;justify-content:center;padding:11vh 20px 20px;backdrop-filter:blur(2px)}
+.pal.on{display:flex}
+.palbox{width:min(720px,94vw);background:var(--s1);border:1px solid var(--line2);
+  border-radius:12px;overflow:hidden;box-shadow:0 24px 60px rgba(0,0,0,.55)}
+#palin{width:100%;background:transparent;border:none;border-bottom:1px solid var(--line);
+  color:var(--tx);font-family:inherit;font-size:15px;padding:15px 20px;outline:none}
+#palin::placeholder{color:var(--dim)}
+.pallist{max-height:46vh;overflow:auto}
+.palit{display:flex;align-items:center;gap:11px;padding:9px 20px;cursor:pointer;font-size:13px}
+.palit.sel{background:var(--s2)}
+.palit .pt{font-size:9.5px;color:var(--dim);background:var(--s2);border-radius:4px;
+  padding:1px 7px;flex:none;min-width:74px;text-align:center}
+.palit.sel .pt{background:var(--s3)}
+.palit .pn2{flex:1;min-width:0;display:flex;align-items:baseline;gap:7px;overflow:hidden}
+.palit .pnn{flex:1.15 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.palit .psub{flex:1 1 0;min-width:0;color:var(--mut);font-size:11.5px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.palit .psub::before{content:"—";color:var(--s3);margin-right:6px}
+.palit .pnota{flex:none;color:var(--dim);font-size:11px;font-style:italic;white-space:nowrap}
+.palit.inerte{opacity:.55;cursor:default}
+#palcab{border-bottom:1px solid var(--line);background:var(--s2)}
+.palcab{display:flex;align-items:center;gap:9px;padding:7px 18px;font-size:11px;color:var(--mut)}
+.palcab b{color:var(--cy2);font-weight:500}
+.palbt{margin-left:auto;background:var(--s1);border:1px solid var(--line2);color:var(--mut);
+  font-family:inherit;font-size:10.5px;padding:3px 10px;border-radius:12px;cursor:pointer;white-space:nowrap}
+.palbt:hover{background:var(--cy);border-color:var(--cy);color:#06202B}
+.palit .px{font-size:10.5px;color:var(--dim)}
+.palvazio{padding:24px;text-align:center;color:var(--dim);font-size:13px}
+.palfoot{font-size:10.5px;color:var(--dim);padding:8px 20px;border-top:1px solid var(--line)}
+.dicak{font-size:10px;color:var(--dim);padding:6px 18px 0}
+.dicak kbd{background:var(--s2);border:1px solid var(--line2);border-radius:4px;
+  padding:0 4px;font-family:inherit;font-size:9.5px}
+@media print{
+  body{background:#fff;color:#000}
+  .side,.pal,.tip,.guia,.topbar,.xbtn,.vbar2,.segbar,.chip,.abas{display:none!important}
+  .app{grid-template-columns:1fr}
+  .main{padding:0}
+  .kpi,.card,.tw,.expl,.worst,.faixar,.exbox,.expbox,.par{break-inside:avoid;
+    border:1px solid #ccc!important;background:#fff!important;box-shadow:none!important}
+  .kpi .v,.card .big,.h1,.frv,.rres{color:#000!important}
+  .frl,.frd,.lbl,.sub,.nat,.cls,.expl2{color:#555!important}
+  .fr{border-left:1px solid #ddd!important}
+  .fr:first-child{border-left:none!important}
+  .pos{color:#0a6b48!important} .neg{color:#a32318!important}
+  .st,.cf,.fv,.tp,.pad,.tag,.sg{border:1px solid #ccc!important;background:#f5f5f5!important;
+    color:#333!important}
+  .hpb,.bar2 i,.bb,.gb,.pbar i{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  td.hm{-webkit-print-color-adjust:exact;print-color-adjust:exact;color:#222!important}
+  .main{padding:0}
+  @page{margin:12mm}
+  thead th{background:#eee!important;color:#000!important}
+  td,th{color:#000!important}
+  a{text-decoration:none}
+}
+.tip{position:fixed;z-index:99;max-width:390px;background:#0A1420;border:1px solid var(--line2);
+  border-radius:9px;padding:11px 13px;font-size:12px;line-height:1.5;color:var(--tx);
+  box-shadow:0 10px 34px rgba(0,0,0,.6);pointer-events:none;animation:f .12s ease}
+.tip b{font-weight:500}
+.tip.fixo{max-width:360px;pointer-events:auto}
+.tip .tl{color:var(--mut);font-size:11.5px;margin-top:5px}
+.tip .tsep{height:1px;background:var(--line);margin:9px 0 7px}
+.tip .tr2{display:flex;align-items:center;gap:9px;font-size:11.5px;padding:2.5px 0;color:var(--mut)}
+.tip .tr2 span:first-child{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tip .tr2 b{color:var(--tx);white-space:nowrap}
+.tip .tr2 .tv{color:var(--amb);width:74px;text-align:right}
+.kpi[data-tip],.cf[data-tip],.cnt[data-tip]{cursor:help}
+.cnt[data-tip]{border-bottom:1px dotted var(--dim)}
+.alerta{background:rgba(242,109,109,.09);border:1px solid rgba(242,109,109,.3);
+  border-left:3px solid var(--red);border-radius:var(--r);padding:13px 16px;margin-bottom:18px}
+.alerta .at{font-size:13px;font-weight:500;color:#F79A9A}
+.alerta .ad{font-size:11.5px;color:var(--mut);margin-top:4px}
+.alerta .alist{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.alerta .ac{font-size:11px;background:var(--s2);border:1px solid var(--line2);border-radius:14px;
+  padding:3px 10px;cursor:pointer;color:var(--tx);transition:all .12s}
+.alerta .ac:hover{background:var(--red);color:#2A0E0E;border-color:var(--red)}
+.alerta .ac b{color:var(--red);margin-left:3px} .alerta .ac:hover b{color:#2A0E0E}
+.mudo{font-size:9.5px;background:rgba(242,109,109,.16);color:#F79A9A;padding:2px 7px;
+  border-radius:5px;vertical-align:2px;font-weight:400}
+.mudo.big{font-size:11px;vertical-align:5px}
+.hpbox{border-left:3px solid var(--s3)}
+.hph{display:flex;align-items:center;gap:10px;font-size:10.5px;color:var(--dim);
+  letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
+.pad{font-size:9.5px;padding:2px 8px;border-radius:5px;letter-spacing:0;text-transform:none}
+.pad.piorando{background:rgba(242,109,109,.16);color:#F79A9A}
+.pad.estavel{background:rgba(143,163,184,.12);color:var(--mut)}
+.pad.melhorando{background:rgba(74,222,155,.13);color:#7BE8BB}
+.pad.limpa{background:rgba(74,222,155,.13);color:#7BE8BB}
+.pad.mini{font-size:9px;padding:1px 6px}
+.hpg{display:flex;gap:5px;align-items:flex-end}
+.hpc{flex:1;text-align:center;cursor:help}
+.hpc.off{opacity:.3}
+.hpn{font-size:10px;color:var(--mut);height:13px}
+.hpb{background:var(--amb);border-radius:3px;margin:0 auto;width:78%;transition:height .2s}
+.hpb.zero{background:var(--grn);opacity:.5}
+.hpb.muda{background:var(--red)}
+.hpb.parc{background:var(--amb);opacity:.45;
+  background-image:repeating-linear-gradient(45deg,transparent,transparent 3px,rgba(0,0,0,.35) 3px,rgba(0,0,0,.35) 6px)}
+.hpc.parc .hpm{color:var(--amb)}
+.modotag.parc{background:rgba(239,178,92,.16);color:#F3C784;cursor:help}
+.hpc.off .hpb{background:var(--s3)}
+.hpm{font-size:9.5px;color:var(--dim);margin-top:4px}
+.hpc.atual .hpm{color:var(--cy);font-weight:500}
+.hpc.atual .hpb{outline:1px solid var(--cy2);outline-offset:1px}
+.avisop{font-size:10.5px;color:#F3C784;background:rgba(239,178,92,.10);
+  border-radius:6px;padding:6px 10px;margin-bottom:7px}
+.faixar{display:flex;gap:10px;flex-wrap:wrap;background:var(--s1);border:1px solid var(--line);
+  border-radius:var(--r);padding:11px 14px;margin-bottom:18px}
+.fr{flex:1;min-width:132px;display:flex;flex-direction:column;gap:1px;cursor:help;
+  padding-left:11px;border-left:1px solid var(--line)}
+.fr:first-child{padding-left:0;border-left:none}
+.fr.alerta3{cursor:pointer}
+.frl{font-size:9.5px;color:var(--dim);letter-spacing:.06em;text-transform:uppercase}
+.frv{font-size:17px;font-weight:500;letter-spacing:-.02em}
+.frd{font-size:10.5px}
+.rhead{display:flex;align-items:baseline;gap:12px;font-size:10.5px;color:var(--dim);
+  letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
+.rres{font-size:19px;font-weight:500;letter-spacing:0;text-transform:none;
+  font-family:'JetBrains Mono',monospace}
+.rres.pos{color:var(--grn)} .rres.neg{color:var(--red)}
+.rmar{margin-left:auto;font-size:11px;color:var(--mut);letter-spacing:0;text-transform:none}
+.rtab th{text-align:left}
+.rtab .rtot td{border-top:1px solid var(--line2);color:var(--tx);font-weight:500;padding-top:7px}
+.graf{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
+.glbl{font-size:10.5px;color:var(--mut);margin-bottom:9px}
+.sw{display:inline-block;width:9px;height:9px;border-radius:2px;vertical-align:-1px}
+.sw.rec{background:#4ADE9B} .sw.cus{background:#F26D6D}
+.gwrap{display:flex;gap:8px;align-items:flex-end}
+.gcol{flex:1;text-align:center;cursor:help}
+.gpar{display:flex;gap:2px;justify-content:center;align-items:flex-end;height:56px}
+.gb{width:10px;border-radius:2px 2px 0 0}
+.gb.rec{background:#4ADE9B;opacity:.85} .gb.cus{background:#F26D6D;opacity:.85}
+.gm{font-size:9.5px;color:var(--dim);margin-top:4px}
+.gm.at{color:var(--cy);font-weight:500}
+.gr{font-size:11px;line-height:1}
+.gr.pos{color:var(--grn)} .gr.neg{color:var(--red)}
+.exbox{background:var(--s1);border:1px solid var(--line);border-radius:var(--r);
+  padding:13px 16px;margin-bottom:11px}
+.exbox.alerta2{border-left:3px solid var(--red)}
+.exbox.limpa2{border-left:3px solid var(--grn);opacity:.6}
+.exh{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.exn{font-size:14px;font-weight:500}
+.exq{font-size:11.5px;color:#F79A9A}
+.exok{font-size:11.5px;color:#7BE8BB}
+.exano{margin-left:auto;font-size:10.5px;color:var(--dim)}
+.exT{margin-top:10px}
+.exT th{text-align:left}
+.mapa table{font-size:11.5px}
+.mapa th{padding:7px 6px;text-align:center}
+.mapa th.hmh{font-size:10px;min-width:34px}
+.mapa th.hmh.pc{color:var(--amb)}
+td.hm{text-align:center;padding:0;height:26px;color:#1A1206;font-weight:500;font-size:11px;
+  border:1px solid var(--bg);cursor:help;transition:transform .1s}
+td.hm:hover{transform:scale(1.12);position:relative;z-index:2;outline:1px solid var(--cy2)}
+td.hm.off{background:var(--s2);opacity:.35}
+td.hm.pc{background-image:repeating-linear-gradient(45deg,transparent,transparent 3px,rgba(0,0,0,.22) 3px,rgba(0,0,0,.22) 6px)}
+td.hmu{cursor:pointer;white-space:nowrap;max-width:190px;overflow:hidden;text-overflow:ellipsis}
+td.hmu:hover{color:var(--cy2)}
+.mapa tbody tr:hover td{background:inherit}
+.vbar2{display:inline-flex;gap:2px;background:var(--s2);border:1px solid var(--line);
+  border-radius:7px;padding:2px;margin-right:6px}
+.vbar2 button{background:transparent;border:none;color:var(--mut);font-family:inherit;font-size:10.5px;
+  padding:3px 10px;border-radius:5px;cursor:pointer;letter-spacing:0;text-transform:none}
+.vbar2 button.on{background:var(--cy);color:#06202B;font-weight:500}
+.frac{font-size:12px}.frac b{color:var(--tx)}
+.bar2{display:inline-block;width:42px;height:4px;background:var(--s3);border-radius:2px;
+  margin-left:7px;vertical-align:middle;overflow:hidden}
+.bar2 i{display:block;height:100%;background:var(--amb);border-radius:2px}
+.tp{font-size:9.5px;padding:2px 8px;border-radius:5px;white-space:nowrap}
+.tp.sistemico{background:rgba(242,109,109,.16);color:#F79A9A}
+.tp.varios{background:rgba(239,178,92,.14);color:#F3C784}
+.tp.isolado{background:rgba(143,163,184,.12);color:var(--mut)}
+td.uns{max-width:330px}
+.uc{display:inline-block;font-size:10px;background:var(--s2);border:1px solid var(--line);
+  border-radius:11px;padding:1.5px 8px;margin:1.5px 3px 1.5px 0;cursor:pointer;color:var(--mut)}
+.uc:hover{border-color:var(--cy);color:var(--tx)}
+.uc.m{border-color:rgba(242,109,109,.4);color:#F79A9A}
+.umais{font-size:10px;color:var(--cy2);cursor:help;padding:0 4px}
+.sinal{margin-bottom:11px}
+.sinal:last-child{margin-bottom:0}
+.sh{font-size:11.5px;color:var(--tx);margin-bottom:5px;font-weight:500}
+.par{background:var(--s2);border-radius:7px;padding:7px 11px;margin-bottom:6px}
+.par .pl{font-size:11.5px;color:var(--tx);display:flex;align-items:center;gap:8px;padding:1.5px 0}
+.par .pl b{margin-left:auto;color:var(--mut);font-weight:400}
+.pn{font-size:9px;background:rgba(242,109,109,.16);color:#F79A9A;padding:1px 6px;border-radius:4px;flex:none}
+.pn.pk{background:rgba(239,178,92,.16);color:#F3C784}
+.tabh{font-size:10.5px;color:var(--dim);letter-spacing:.1em;text-transform:uppercase;
+  margin:4px 0 9px;display:flex;align-items:center;gap:8px}
+.tabh b{color:var(--cy2);font-weight:400}
+.tabq{margin-left:auto;letter-spacing:0;text-transform:none;font-size:11px}
+.abas{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:14px;border-bottom:1px solid var(--line);
+  padding-bottom:0}
+.abas button{background:transparent;border:none;border-bottom:2px solid transparent;
+  color:var(--mut);font-family:inherit;font-size:12.5px;padding:8px 12px;cursor:pointer;
+  transition:all .13s;display:flex;align-items:center;gap:6px}
+.abas button:hover{color:var(--tx)}
+.abas button.on{color:var(--cy2);border-bottom-color:var(--cy)}
+.abas .ab{font-size:10px;background:var(--s2);border-radius:9px;padding:1px 7px;color:var(--dim)}
+.abas button.on .ab{background:rgba(34,211,238,.15);color:var(--cy2)}
+.mini tr.clic{cursor:pointer}
+.mini tr.clic:hover td{background:var(--s2)}
+.erow.clicavel{cursor:pointer;border-radius:6px;padding:3px 6px;margin:0 -6px;
+  transition:background .12s}
+.erow.clicavel:hover{background:var(--s2)}
+.lin{cursor:pointer}
+.lin .cx{color:var(--dim);margin-right:5px;font-size:9px}
+.lin.aberta{background:var(--s2)} .lin.aberta .cx{color:var(--cy)}
+tr.exp td{padding:0;background:#0A1420}
+.expbox{padding:13px 16px 15px;border-left:2px solid var(--cy)}
+.expt{font-size:10.5px;color:var(--dim);letter-spacing:.09em;text-transform:uppercase;margin-bottom:8px}
+table.mini{width:100%;font-size:11.5px;border-collapse:collapse}
+table.mini th{background:transparent;color:var(--dim);font-size:10px;padding:3px 7px;
+  border-bottom:1px solid var(--line);position:static;cursor:default;letter-spacing:.03em}
+table.mini td{padding:4px 7px;border-bottom:none;color:var(--mut)}
+table.mini td:first-child{color:var(--tx);font-size:11px}
+table.mini tr:hover td{background:transparent}
+table.mini .b{color:var(--tx);font-weight:500;border-left:1px solid var(--line)}
+table.mini td.falta{background:rgba(242,109,109,.16);color:#F79A9A;border-radius:3px}
+table.mini tr.vr td{border-top:1px solid var(--line)}
+.expl2{font-size:10.5px;color:var(--dim);margin-top:9px}
+.fade{animation:f .22s ease}
+@keyframes f{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
+
+/* ===== telas largas: usa a largura em vez de deixar vazio ===== */
+@media(min-width:1500px){
+  .kpis{grid-template-columns:repeat(4,1fr)}
+  .g3{grid-template-columns:repeat(4,1fr)}
+  .cols2{grid-template-columns:1.15fr 1fr;gap:26px}
+  .segs{grid-template-columns:repeat(3,1fr)}
+  .main .grid[style*="1fr 1fr"]{grid-template-columns:repeat(3,1fr)!important}
+}
+@media(min-width:1800px){
+  .g3{grid-template-columns:repeat(5,1fr)}
+}
+
+/* ===== camada mobile: fica por último para prevalecer ===== */
+/* ---------- barra superior (só no celular) ---------- */
+.topbar{display:none;position:sticky;top:0;z-index:60;background:var(--s1);
+  border-bottom:1px solid var(--line);padding:9px 10px;align-items:center;gap:10px}
+.topbar .ham{background:transparent;border:none;color:var(--tx);font-size:20px;
+  line-height:1;padding:5px 9px;border-radius:8px;cursor:pointer}
+.topbar .ham:active{background:var(--s2)}
+.tbt{flex:1;min-width:0}
+.tbt span{display:block;font-size:14px;font-weight:500;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.tbt small{display:block;font-size:10.5px;color:var(--mut)}
+.drawerbg{display:none;position:fixed;inset:0;background:rgba(4,10,20,.6);z-index:70}
+.drawerbg.on{display:block}
+
+@media(max-width:1050px){
+  .cols2{grid-template-columns:1fr}
+  .g3{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:820px){
+  .topbar{display:flex}
+  .app{grid-template-columns:1fr}
+  .side{position:fixed;left:0;top:0;bottom:0;width:270px;z-index:80;
+    transform:translateX(-100%);transition:transform .22s ease;overflow-y:auto}
+  .side.aberta{transform:none;box-shadow:0 0 40px rgba(0,0,0,.5)}
+  .main{padding:14px 12px 48px;max-width:100%}
+  .head{margin-bottom:14px}
+  .h1{font-size:19px} .h1sub{font-size:11.5px}
+  .crumb{font-size:11px}
+  .kpis{grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:16px}
+  .kpi{padding:10px 12px} .kpi .v{font-size:20px;margin-top:3px}
+  .kpi .lbl{font-size:9px} .kpi .sub{font-size:10px}
+  .g3,.grid[style*="1fr 1fr"]{grid-template-columns:1fr!important}
+  .card .big{font-size:24px}
+  .segs{grid-template-columns:1fr}
+  /* tabelas rolam na horizontal, primeira coluna fixa */
+  .tw{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .tw table{min-width:720px}
+  .tw thead th:first-child,.tw tbody td:first-child{position:sticky;left:0;
+    background:var(--s1);z-index:1}
+  .tw thead th:first-child{background:var(--s2);z-index:3}
+  .mapa table{min-width:560px}
+  .expl{padding:11px 12px}
+  .faixar{gap:8px;padding:10px 11px}
+  .fr{min-width:calc(50% - 6px);padding-left:0;border-left:none}
+  .frv{font-size:15px}
+  .expl .erow{flex-wrap:wrap;gap:5px 8px}
+  .expl .erow .bn{flex:1 1 100%;white-space:normal;overflow:visible;font-size:12px}
+  .expl .erow .bb{order:3}
+  .expl .erow .num{order:2}
+  .main .abas{overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch}
+  .abas button{white-space:nowrap;font-size:12px;padding:7px 9px}
+  .toolbar{gap:6px}
+  .chip{font-size:11px;padding:5px 10px}
+  input#busca{flex:1 1 100%;order:9}
+  .gwrap{overflow-x:auto}
+  .gcol{min-width:26px}
+  .wrow{gap:8px;padding:9px 11px;flex-wrap:wrap}
+  .wrow .nm{flex:1 1 55%;font-size:12px}
+  .wrow .qt{width:auto}
+  .hpg{overflow-x:auto} .hpc{min-width:30px}
+  .palbox{width:94vw} .pal{padding-top:6vh}
+  .dicak{display:none}
+  .acoes{margin-top:8px}
+  td.uns{max-width:none}
+  .exh{gap:6px} .exano{margin-left:0;flex:1 1 100%}
+  .rhead{flex-wrap:wrap} .rmar{margin-left:0;flex:1 1 100%}
+}
+@media(max-width:430px){
+  .kpis{grid-template-columns:1fr 1fr}
+  .kpi .v{font-size:18px}
+  .h1{font-size:17px}
+  .tw table{min-width:640px}
+
+</style>
+</head>
+<body>
+<div class="topbar">
+  <button class="ham" id="ham" aria-label="Menu">☰</button>
+  <div class="tbt"><span id="tbtitulo">Visão geral</span>
+    <small id="tbsub"></small></div>
+  <button class="ham" id="tbbusca" aria-label="Buscar">⌕</button>
+</div>
+<div class="drawerbg" id="drawerbg"></div>
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <aside class="side">
+    <div class="brand">
+      <div class="bar"></div>
+      <div><div class="t">Análise de variação</div>
+           <div class="s">ORÇADO × REALIZADO</div></div>
+    </div>
+    <div class="sidescroll">
+    <div class="navlbl">Visualização
+      <button class="tema" id="btema" title="Alternar tema claro/escuro">◐</button></div>
+    <div class="segbar" id="modobar">
+      <button data-m="geral" class="on">Plano geral</button>
+      <button data-m="rec">Recorrentes</button>
+    </div>
+    <div class="navlbl">Navegação</div>
+    <nav class="nav" id="nav"></nav>
+    </div>
+    <div class="sidefoot">
+      <div class="mlbl">Mês de análise</div>
+      <select id="mes"></select>
+      <div class="mlbl" style="margin-top:11px">Ignorar abaixo de</div>
+      <div class="segbar sm" id="cortebar">
+        <button data-c="0" class="on">tudo</button>
+        <button data-c="1000">1 mil</button>
+        <button data-c="5000">5 mil</button>
+        <button data-c="20000">20 mil</button>
+      </div>
+      <div class="mlbl" style="margin-top:11px">Comparar</div>
+      <div class="segbar sm" id="perbar">
+        <button data-p="mes" class="on">Mês</button>
+        <button data-p="acum">Acum.</button>
+        <button data-p="sem">Sem.</button>
+      </div>
+      <div class="mstatus" id="mstatus"><span class="pip"></span><span id="mstxt">fechado</span></div>
+      <div class="acoes">
+        <button class="bt2" id="bguia">Como analisar</button>
+        <button class="bt2" id="bpdf" title="Imprimir ou salvar em PDF">PDF</button>
+      </div>
+      <div class="dicak"><kbd>Ctrl</kbd>+<kbd>K</kbd> buscar · <kbd>P</kbd> PDF · <kbd>?</kbd> atalhos</div>
+      <div class="gerado" id="gerado"></div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+    <div class="crumb" id="crumb"></div>
+    <div class="head">
+      <div><div class="h1" id="title">Visão geral</div>
+           <div class="h1sub" id="subtitle"></div></div>
+    </div>
+
+    <div class="kpis" id="kpis"></div>
+    <div id="body"></div>
+  </main>
+  <div class="guia" id="guia"></div>
+  <div class="pal" id="pal">
+    <div class="palbox">
+      <input id="palin" placeholder="Buscar unidade, conta ou segmento…" autocomplete="off">
+      <div id="palcab"></div>
+      <div class="pallist" id="pallist"></div>
+      <div class="palfoot">↑↓ navegar · Enter abrir · Esc fechar</div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ===== LOADER: le o CSV do Plano e monta o payload (portado de gerar_dashboard.py) ===== */
+/* ==== Tabelas de referência (embutidas) ==== */
+const CLASSIF={"3.1.1.01.1.06":["Recorrente","—"],"4.1.1.01.1.01":["Não recorrente","Fixo"],"4.1.1.01.1.02":["Não recorrente","Fixo"],"4.1.1.01.1.03":["Não recorrente","Fixo"],"4.1.1.01.1.04":["Não recorrente","Fixo"],"4.1.1.01.1.05":["Não recorrente","Fixo"],"4.1.1.01.1.06":["Não recorrente","Fixo"],"4.1.1.01.1.07":["Não recorrente","Fixo"],"4.1.1.01.1.08":["Não recorrente","Fixo"],"4.1.1.01.1.09":["Não recorrente","Fixo"],"4.1.1.01.1.10":["Não recorrente","Fixo"],"4.1.1.01.1.11":["Não recorrente","Fixo"],"4.1.1.01.1.12":["Não recorrente","Fixo"],"4.1.1.01.1.13":["Não recorrente","Fixo"],"4.1.1.01.1.14":["Não recorrente","Fixo"],"4.1.1.01.1.15":["Recorrente","Fixo"],"4.1.1.01.1.16":["Não recorrente","Fixo"],"4.1.1.01.1.17":["Recorrente","Fixo"],"4.1.1.01.1.18":["Não recorrente","Fixo"],"4.1.1.01.1.19":["Não recorrente","Fixo"],"4.1.1.01.1.20":["Recorrente","Fixo"],"4.1.1.01.1.21":["Não recorrente","Fixo"],"4.1.1.01.1.22":["Não recorrente","Fixo"],"4.1.1.01.1.23":["Recorrente","Fixo"],"4.1.1.01.1.24":["Recorrente","Fixo"],"4.1.1.01.1.25":["Não recorrente","Fixo"],"4.1.1.01.1.26":["Não recorrente","Fixo"],"4.1.1.01.1.27":["Recorrente","Fixo"],"4.1.1.01.1.28":["Não recorrente","Fixo"],"4.1.1.01.1.29":["Não recorrente","Fixo"],"4.1.1.01.1.30":["Não recorrente","Fixo"],"4.1.1.01.1.98":["Recorrente","Fixo"],"4.1.1.01.1.99":["Recorrente","Fixo"],"4.1.1.01.2.02":["Não recorrente","Fixo"],"4.1.1.01.2.04":["Não recorrente","Fixo"],"4.1.1.01.2.08":["Não recorrente","Fixo"],"4.1.1.02.1.01":["Recorrente","Variável"],"4.1.1.02.1.02":["Recorrente","Variável"],"4.1.1.02.1.03":["Não recorrente","Variável"],"4.1.1.02.1.04":["Não recorrente","Variável"],"4.1.1.02.1.05":["Não recorrente","Fixo"],"4.1.1.02.1.06":["Recorrente","Variável"],"4.1.1.02.1.07":["Não recorrente","Fixo"],"4.1.1.02.1.08":["Recorrente","Variável"],"4.1.1.02.1.09":["Não recorrente","Variável"],"4.1.1.02.1.10":["Não recorrente","Fixo"],"4.1.1.02.1.11":["Não recorrente","Variável"],"4.1.1.02.1.12":["Não recorrente","Fixo"],"4.1.1.02.1.13":["Não recorrente","Fixo"],"4.1.1.02.1.14":["Não recorrente","Fixo"],"4.1.1.02.1.15":["Não recorrente","Variável"],"4.1.1.02.1.16":["Não recorrente","Fixo"],"4.1.1.02.1.17":["Não recorrente","Fixo"],"4.1.1.02.1.18":["Não recorrente","Fixo"],"4.1.1.02.1.19":["Não recorrente","Variável"],"4.1.1.02.1.20":["Não recorrente","Variável"],"4.1.1.02.1.21":["Não recorrente","Variável"],"4.1.1.02.1.22":["Recorrente","Variável"],"4.1.1.02.1.23":["Não recorrente","Variável"],"4.1.1.04.1.01":["Recorrente","Fixo"],"4.1.1.04.1.02":["Não recorrente","Fixo"],"4.1.1.04.1.03":["Não recorrente","Fixo"],"4.1.1.04.1.04":["Recorrente","Fixo"],"4.1.1.04.1.05":["Recorrente","Fixo"],"4.1.1.04.1.06":["Recorrente","Fixo"],"4.1.1.04.1.07":["Não recorrente","Fixo"],"4.1.1.04.1.08":["Não recorrente","Fixo"],"4.1.1.04.1.09":["Não recorrente","Fixo"],"4.1.1.04.1.10":["Não recorrente","Fixo"],"4.1.1.04.1.11":["Recorrente","Fixo"],"4.1.1.04.1.12":["Não recorrente","Fixo"],"4.1.1.04.2.01":["Recorrente","Fixo"],"4.1.1.04.2.02":["Recorrente","Fixo"],"4.1.1.04.2.03":["Recorrente","Fixo"],"4.1.1.05.1.01":["Não recorrente","Fixo"],"4.1.1.05.1.02":["Não recorrente","Fixo"],"4.1.1.05.1.03":["Não recorrente","Fixo"],"4.1.1.05.1.04":["Não recorrente","Fixo"],"4.1.1.05.1.05":["Não recorrente","Fixo"],"4.1.1.06.1.01":["Não recorrente","Fixo"],"4.1.1.06.1.02":["Não recorrente","Fixo"],"4.1.1.06.1.03":["Não recorrente","Fixo"],"4.1.1.06.1.04":["Não recorrente","Fixo"],"4.1.1.06.1.05":["Não recorrente","Fixo"],"4.1.1.06.1.06":["Não recorrente","Fixo"],"4.1.1.06.1.07":["Não recorrente","Fixo"],"4.1.1.06.1.08":["Não recorrente","Fixo"],"4.1.1.06.1.09":["Não recorrente","Fixo"],"4.1.1.06.1.11":["Não recorrente","Fixo"],"4.1.1.07.1.01":["Recorrente","Fixo"],"4.1.1.07.1.02":["Recorrente","Fixo"],"4.1.1.07.1.03":["Recorrente","Fixo"],"4.1.1.07.1.04":["Recorrente","Fixo"],"4.1.1.07.1.05":["Recorrente","Fixo"],"4.1.1.07.1.06":["Recorrente","Fixo"],"4.1.1.07.1.07":["Recorrente","Fixo"],"4.1.1.07.1.08":["Não recorrente","Fixo"],"4.1.1.08.1.01":["Recorrente","Fixo"],"4.1.1.08.1.02":["Não recorrente","Fixo"],"4.1.1.08.1.04":["Recorrente","Fixo"],"4.1.1.08.1.05":["Recorrente","Fixo"],"4.1.1.08.1.06":["Recorrente","Fixo"],"4.1.1.08.1.07":["Recorrente","Fixo"],"4.1.1.08.1.09":["Não recorrente","Fixo"],"4.1.1.09.1.02":["Não recorrente","Fixo"],"4.1.1.09.1.03":["Não recorrente","Fixo"],"4.1.1.09.1.04":["Não recorrente","Fixo"],"4.1.1.09.1.05":["Não recorrente","Fixo"],"4.1.1.09.1.06":["Não recorrente","Fixo"],"4.1.1.09.1.07":["Não recorrente","Fixo"],"4.1.1.10.1.01":["Não recorrente","Fixo"],"4.1.1.10.1.02":["Não recorrente","Fixo"],"4.1.1.10.1.03":["Não recorrente","Fixo"],"4.1.1.10.1.04":["Não recorrente","Fixo"],"4.1.1.10.1.05":["Não recorrente","Fixo"],"4.1.1.11.1.01":["Recorrente","Fixo"],"4.1.1.11.1.02":["Não recorrente","Fixo"],"4.1.1.11.1.03":["Recorrente","Fixo"],"4.1.1.11.1.04":["Recorrente","Fixo"],"4.1.1.11.1.05":["Recorrente","Fixo"],"4.1.1.11.1.06":["Recorrente","Fixo"],"4.1.1.11.1.07":["Não recorrente","Fixo"],"4.1.1.11.1.08":["Não recorrente","Fixo"],"4.1.1.12.1.01":["Não recorrente","Fixo"],"4.1.1.12.1.02":["Não recorrente","Fixo"],"4.1.1.12.1.03":["Não recorrente","Fixo"],"4.1.1.12.1.09":["Não recorrente","Fixo"],"4.1.1.12.1.10":["Não recorrente","Fixo"],"4.1.1.12.1.11":["Não recorrente","Fixo"],"4.1.1.90.1.01":["Não recorrente","Fixo"],"4.1.1.90.1.02":["Não recorrente","Fixo"],"4.1.1.90.1.03":["Não recorrente","Fixo"],"4.1.1.90.1.04":["Não recorrente","Fixo"],"4.1.1.90.1.05":["Não recorrente","Fixo"],"4.1.1.90.1.06":["Não recorrente","Fixo"],"4.1.1.90.1.07":["Não recorrente","Fixo"],"4.1.1.90.1.08":["Não recorrente","Fixo"],"4.1.1.90.1.09":["Não recorrente","Fixo"],"4.1.1.90.1.10":["Não recorrente","Fixo"],"4.1.1.90.1.12":["Não recorrente","Fixo"],"4.1.1.90.2.01":["Não recorrente","Fixo"],"4.1.1.90.2.02":["Não recorrente","Fixo"],"4.1.1.90.2.03":["Não recorrente","Fixo"],"4.1.1.99.1.01":["Não recorrente","Fixo"],"4.1.1.99.1.02":["Não recorrente","Fixo"],"4.1.1.99.1.03":["Não recorrente","Fixo"]};
+const SEGMAP={"4101A":"Alfandegados","4102A":"Alfandegados","4103A":"Corporativo","4201A":"CDs","4202A":"CDs","4204A":"CDs","4205A":"Transportes","4401A":"Corporativo","4403A":"Alfandegados","4404A":"Alfandegados","4405A":"Transportes","4406A":"Alfandegados","4407A":"Alfandegados","4408A":"CDs","4409A":"Corporativo","4410A":"CDs","4412A":"Alfandegados","4413A":"Fronteiras","4414A":"Fronteiras","4415A":"Fronteiras","4416A":"Fronteiras","4417A":"CDs","4418A":"CDs","4419A":"Alfandegados","4420A":"Transportes","4421A":"Transportes","4422A":"CDs","4423A":"Fronteiras","4424A":"CDs","4801A":"Alfandegados","5001A":"Transportes","5002A":"CDs","5101A":"Transportes","5102A":"Transportes","5103A":"Corporativo","5104A":"Transportes","5106A":"CDs","5107A":"CDs","5108A":"CDs","5109A":"CDs","5110A":"CDs","5111A":"Transportes","6001A":"Fronteiras","6002A":"Fronteiras","6003A":"Fronteiras","7001A":"CDs","7002A":"CDs","7003A":"CDs","8001A":"Alfandegados","8002A":"Alfandegados","8003A":"Alfandegados","9001A":"Transportes","9002A":"Transportes","9003A":"Transportes"};
+/* ==== Constantes portadas de gerar_dashboard.py ==== */
+const _VIG=new Set(["4801A","4419A","5106A","4402A","5110A","5003A","5103A"]);
+const _UNIFICAR={"4417A":"4418A","5002A":"5001A"};
+const _COD_EQUIV={"4001A":"4103A"};
+const _SEG_MANUAL={"4402A":"CDs","4425A":"Fronteiras","5003A":"Transportes"};
+const _FUNDIR={"4.1.1.01.1.98":"4.1.1.01.1.99"};
+const _REC_EXTRA=new Set(["4.1.1.02.1.09"]);
+const _MESES=["JAN","FEV","MAR","ABR","MAI","JUN","JUL","AGO","SET","OUT","NOV","DEZ"];
+const _PLAN=[8,10,12,14,16,18,20,22,24,26,28,30];
+const _REAL=[9,11,13,15,17,19,21,23,25,27,29,31];
+const _CC=0,_CCD=1,_CU=2,_CUD=3,_COLMIN=32;
+
+function _limpa(v){let t=(v||"").trim();const m=t.match(/^="?([\s\S]*?)"?$/);if(m)t=m[1];return t.replace(/^"+|"+$/g,'').trim();}
+function _num(v){let t=_limpa(v).replace(/\./g,'').replace(',','.');const n=parseFloat(t);return isNaN(n)?0:Math.round(n*100)/100;}
+function _cel(l,i){return (i>=0&&i<l.length)?l[i]:"";}
+function _seg(cod){
+  if(["6","7","8","9"].includes(cod[0])) return "Backoffice";
+  const k=_COD_EQUIV[cod]||cod;
+  if(SEGMAP[k]) return SEGMAP[k];
+  return _SEG_MANUAL[cod]||"Sem segmento";
+}
+function _compacta(v){const r=Math.round(v*100)/100;const i=Math.trunc(r);return r===i?i:r;}
+
+/* Parser CSV: delimitador ';', campos aspados com escape "" (igual csv.reader) */
+function _parseCSV(txt){
+  const rows=[];let row=[];let f="";let q=false;const n=txt.length;
+  for(let i=0;i<n;i++){const ch=txt[i];
+    if(q){ if(ch==='"'){ if(txt[i+1]==='"'){f+='"';i++;} else q=false; } else f+=ch; }
+    else { if(ch==='"')q=true; else if(ch===';'){row.push(f);f="";} else if(ch==='\n'){row.push(f);rows.push(row);row=[];f="";} else if(ch==='\r'){} else f+=ch; }
+  }
+  if(f!==""||row.length){row.push(f);rows.push(row);}
+  return rows;
+}
+
+function construirPayload(txt){
+  const linhas=_parseCSV(txt);
+  if(linhas.length<2) throw new Error("O arquivo não tem linhas de dados.");
+  if(linhas[0].length<_COLMIN) throw new Error("O arquivo tem "+linhas[0].length+" colunas; o esperado são ao menos "+_COLMIN+". Confirme que é o export do Plano com Planejado e Realizado de janeiro a dezembro.");
+  const comb=new Map(), unit_desc={}, acct_desc={};
+  for(let li=1;li<linhas.length;li++){
+    const l=linhas[li]; if(!l||l.length===0)continue;
+    const uo=_limpa(_cel(l,_CU));
+    if(!uo.endsWith("A")||uo==="DUMMYA")continue;
+    const u=_UNIFICAR[uo]||uo;
+    let c=_limpa(_cel(l,_CC)); if(!c)continue;
+    c=_FUNDIR[c]||c;
+    if(!(u in unit_desc)||uo===u) unit_desc[u]=_limpa(_cel(l,_CUD));
+    if(!(c in acct_desc)) acct_desc[c]=_limpa(_cel(l,_CCD));
+    const k=c+"\u0000"+u;
+    let o=comb.get(k); if(!o){o=[new Array(12).fill(0),new Array(12).fill(0)];comb.set(k,o);}
+    for(let i=0;i<12;i++){o[0][i]+=_num(_cel(l,_PLAN[i]));o[1][i]+=_num(_cel(l,_REAL[i]));}
+  }
+  if(comb.size===0) throw new Error("Nenhuma linha aproveitável. Só entram unidades da família analítica (código terminado em 'A').");
+  const data=[];
+  for(const [k,o] of comb){
+    const idx=k.indexOf("\u0000"), c=k.slice(0,idx), u=k.slice(idx+1);
+    const tem=o[0].some(x=>Math.abs(x)>0.005)||o[1].some(x=>Math.abs(x)>0.005);
+    if(tem) data.push({a:c,u:u,p:o[0].map(_compacta),r:o[1].map(_compacta)});
+  }
+  const units=Object.keys(unit_desc).sort().map(u=>({cod:u,nome:unit_desc[u]||u,seg:_VIG.has(u)?"Vigiada":_seg(u),vig:_VIG.has(u)?1:0}));
+  const ehRec=c=>{if(_REC_EXTRA.has(c))return true;return String((CLASSIF[c]||["",""])[0]).toLowerCase().startsWith("recorrente");};
+  const nat=c=>{const pre=c.split(".")[0],sub=c.slice(0,3);
+    if(pre==="3"){const ded=c.slice(0,5)==="3.1.1"&&(acct_desc[c]||"").includes("(-)");return ded?"ded":"rec";}
+    if(pre==="4"){if(sub==="4.2")return "out";if(sub==="4.3")return "fin";return "cd";}
+    if(pre==="5")return "imp";return "out";};
+  const accts=Object.keys(acct_desc).sort().map(c=>({cod:c,desc:acct_desc[c],nat:nat(c),rec:(CLASSIF[c]||["—","—"])[0],fv:(CLASSIF[c]||["—","—"])[1],r:ehRec(c)?1:0}));
+  const mes_abs=new Array(12).fill(0);
+  for(const d of data) for(let i=0;i<12;i++) mes_abs[i]+=Math.abs(d.r[i]);
+  const fechado=mes_abs.map(x=>Math.abs(x)>1);
+  const d=new Date(),z=n=>String(n).padStart(2,"0");
+  const gerado=d.getFullYear()+"-"+z(d.getMonth()+1)+"-"+z(d.getDate())+"T"+z(d.getHours())+":"+z(d.getMinutes());
+  return {meses:_MESES,fechado,units,accts,data,gerado};
+}
+
+/* ==== Tela de carregamento do CSV do Plano ==== */
+(function(){
+  var OV='<div id="_ov" style="position:fixed;inset:0;z-index:99999;background:#0A1220;'
+   +'display:flex;align-items:center;justify-content:center;padding:20px;'
+   +'font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif">'
+   +'<div style="max-width:520px;width:100%;background:#0D1829;border:1px solid rgba(255,255,255,.13);'
+   +'border-radius:14px;padding:26px 28px;color:#E8EEF5">'
+   +'<div style="display:flex;gap:12px;align-items:center;margin-bottom:4px">'
+   +'<div style="width:4px;height:34px;background:#22D3EE;border-radius:2px"></div>'
+   +'<div><div style="font-size:12px;letter-spacing:.14em;color:#22D3EE;text-transform:uppercase;font-weight:600">FP&amp;A · Multilog</div>'
+   +'<div style="font-size:19px;font-weight:500;margin-top:2px">Análise de Variação — Orçado × Realizado</div></div></div>'
+   +'<p style="color:#8FA3B8;font-size:13.5px;line-height:1.6;margin:14px 0 16px">'
+   +'Carregue a base exportada do <b style="color:#E8EEF5">Plano</b> (o arquivo <b style="color:#E8EEF5">.csv</b>) '
+   +'para montar o painel com os números atuais.</p>'
+   +'<label id="_zone" for="_file" style="display:block;cursor:pointer;text-align:center;'
+   +'border:1.6px dashed rgba(255,255,255,.22);border-radius:11px;padding:26px 18px;transition:border-color .15s,background .15s">'
+   +'<div style="font-size:14.5px;color:#E8EEF5;font-weight:500">Arraste o CSV aqui ou clique para escolher</div>'
+   +'<div style="font-size:12px;color:#5D7188;margin-top:8px">O arquivo é lido aqui no seu navegador — nada é enviado para fora.</div>'
+   +'</label>'
+   +'<input id="_file" type="file" accept=".csv,text/csv" style="display:none">'
+   +'<div id="_msg" style="min-height:20px;margin-top:14px;font-size:13px"></div>'
+   +'</div></div>';
+
+  function msg(t,cor){var m=document.getElementById("_msg");if(m)m.innerHTML=t?('<span style="color:'+(cor||"#F87171")+'">'+t+'</span>'):"";}
+  function arranca(pay){
+    window.__DB__=pay;
+    var ov=document.getElementById("_ov");if(ov)ov.remove();
+    var code=document.getElementById("app").textContent;
+    var s=document.createElement("script");s.textContent=code;document.body.appendChild(s);
+  }
+  function processar(file){
+    if(!file)return;
+    if(!/\.csv$/i.test(file.name)) msg("Isso não parece um .csv, mas vou tentar mesmo assim…","#E7B549");
+    else msg("Processando "+file.name+"…","#8FA3B8");
+    setTimeout(function(){
+      var rd=new FileReader();
+      rd.onload=function(){try{arranca(construirPayload(rd.result));}catch(e){msg("Não deu para montar o painel: "+e.message);}};
+      rd.onerror=function(){msg("Não consegui ler o arquivo.");};
+      rd.readAsText(file,"ISO-8859-1");
+    },30);
+  }
+  function wire(){
+    var inp=document.getElementById("_file"),zone=document.getElementById("_zone");
+    inp.addEventListener("change",function(e){processar(e.target.files[0]);});
+    ["dragover","dragenter"].forEach(function(ev){zone.addEventListener(ev,function(e){e.preventDefault();zone.style.borderColor="#22D3EE";zone.style.background="rgba(34,211,238,.06)";});});
+    ["dragleave"].forEach(function(ev){zone.addEventListener(ev,function(e){e.preventDefault();zone.style.borderColor="";zone.style.background="";});});
+    zone.addEventListener("drop",function(e){e.preventDefault();zone.style.borderColor="";zone.style.background="";processar(e.dataTransfer.files[0]);});
+  }
+  function show(){var d=document.createElement("div");d.innerHTML=OV;document.body.appendChild(d.firstChild);wire();}
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",show);else show();
+})();
+
+</script>
+<script id="app" type="text/plain">
+const DB = window.__DB__;
+
+// Se alguém abrir o template direto (sem gerar), DB vem nulo.
+if(!DB){
+  document.body.innerHTML=`<div style="max-width:560px;margin:14vh auto;padding:26px 30px;
+    background:#0D1829;border:1px solid rgba(255,255,255,.13);border-radius:12px;
+    font-family:system-ui,sans-serif;color:#E8EEF5;line-height:1.6">
+    <div style="display:flex;gap:13px;align-items:flex-start">
+      <div style="width:4px;align-self:stretch;background:#22D3EE;border-radius:2px"></div>
+      <div>
+        <div style="font-size:19px;font-weight:500">Este é o modelo, não o painel</div>
+        <p style="color:#8FA3B8;font-size:13.5px;margin-top:9px">
+          O arquivo <b style="color:#E8EEF5">template.html</b> é o código-fonte do painel: ele não
+          contém dados. Abrir direto não funciona.</p>
+        <p style="color:#8FA3B8;font-size:13.5px;margin-top:9px">
+          Para ver o painel, abra o <b style="color:#E8EEF5">dashboard.html</b>. Se ele ainda não
+          existe, gere com:</p>
+        <pre style="background:#132135;padding:11px 13px;border-radius:8px;font-size:12.5px;
+          color:#67E8F9;margin-top:9px;overflow-x:auto">python gerar_dashboard.py</pre>
+        <p style="color:#5D7188;font-size:12px;margin-top:11px">
+          O gerador lê as bases da pasta e substitui os dados aqui dentro.</p>
+      </div></div></div>`;
+  throw new Error("template aberto sem dados");
+}
+
+
+const SEG=["Alfandegados","CDs","Transportes","Fronteiras","Corporativo","Backoffice","Sem segmento"];
+const SEGNM={Alfandegados:"Alfandegados",CDs:"CDs",Transportes:"Transportes",Fronteiras:"Fronteiras",Corporativo:"Corporativo",Backoffice:"Backoffice",Vigiada:"Vigiada","Sem segmento":"Sem segmento"};
+const SEGVAR={Alfandegados:"--alf",CDs:"--cd",Transportes:"--tra",Fronteiras:"--fro",Corporativo:"--cor",Backoffice:"--bko","Sem segmento":"--dim"};
+const cor=s=>getComputedStyle(document.documentElement).getPropertyValue(SEGVAR[s]||"--dim").trim();
+const tint=(s,a)=>{const h=cor(s);return `background:${h}1F;color:${h}`;};
+
+let M = DB.fechado.lastIndexOf(true); if(M<0) M=0;
+let modo="geral";      // "geral" | "rec"
+let vseg="un";
+let expConta=null;   // visão do segmento: "un" unidades | "ct" contas
+let corte=0;           // materialidade: ignora contas abaixo deste valor
+let periodo="mes";     // "mes" | "acum" | "sem"
+const recSet=new Set(DB.accts.filter(a=>a.r).map(a=>a.cod));
+const EPS=0.005;   // meio centavo: abaixo disso o valor é zero
+const natMap=Object.fromEntries(DB.accts.map(a=>[a.cod,a.nat]));
+// Receita e deduções não entram na conta de pendência: não faturar não é
+// falha de lançamento. Elas alimentam a visão de resultado.
+const ehResultado=c=>["rec","ded"].includes(natMap[c]);
+const ehPendencia=c=>!ehResultado(c);
+const UNS_VIG=DB.units.filter(u=>u.vig).map(u=>u.cod);
+const VIG=new Set(UNS_VIG);
+const NATLBL={rec:"Receita",ded:"Dedução",cd:"Custo/Despesa",out:"Outras rec./desp.",
+              fin:"Result. financeiro",imp:"Impostos"};
+const ehRec=c=>recSet.has(c);
+const N_REC=recSet.size;
+
+// meses cobertos pela comparação escolhida
+function faixa(){
+  if(periodo==="acum") return [0,M];
+  if(periodo==="sem")  return M<6?[0,5]:[6,11];
+  return [M,M];
+}
+function mesesAtivos(){                     // só meses já fechados dentro da faixa
+  const [a,b]=faixa(), out=[];
+  for(let i=a;i<=b;i++) if(DB.fechado[i]) out.push(i);
+  return out;
+}
+function faixaLbl(){
+  const ms=mesesAtivos();
+  if(!ms.length) return DB.meses[M]+"/26";
+  if(periodo==="mes") return DB.meses[M]+"/26";
+  return DB.meses[ms[0]]+"–"+DB.meses[ms[ms.length-1]]+"/26";
+}
+const PERLBL={mes:"mês",acum:"acumulado",sem:"semestre"};
+
+// Um mês "fechado" pode estar só parcialmente lançado. Detecta comparando o
+// volume de lançamentos com a mediana dos demais meses fechados.
+const PARCIAL=(()=>{
+  const fech=[...Array(12).keys()].filter(i=>DB.fechado[i]);
+  const tot=fech.map(i=>DB.data.filter(d=>Math.abs(d.r[i])>EPS).length);
+  const ord=[...tot].sort((a,b)=>a-b);
+  const med=ord.length?(ord.length%2?ord[(ord.length-1)/2]:(ord[ord.length/2-1]+ord[ord.length/2])/2):0;
+  const set=new Set();
+  fech.forEach((i,k)=>{ if(med>0 && tot[k]<med*0.7) set.add(i); });
+  return {set,med,tot:Object.fromEntries(fech.map((i,k)=>[i,tot[k]]))};
+})();
+const ehParcial=i=>PARCIAL.set.has(i);
+const MODOLBL={geral:"Plano geral",rec:"Contas recorrentes"};
+let view={tipo:"hub",seg:null,unit:null,filtro:"todos",busca:"",sk:"st",sd:1};
+
+const fmtN=n=>Math.round(n).toLocaleString("pt-BR");
+const pct=(n,d=1)=>n.toFixed(d).replace(".",",")+"%";
+// Valores com centavos, para fechar exatamente com o plano.
+const fmtC=n=>(n<0?"−":"")+Math.abs(n).toLocaleString("pt-BR",
+  {minimumFractionDigits:2,maximumFractionDigits:2});
+// Versão sem centavos, para onde o espaço é curto (barras, listas compactas).
+const fmtI=n=>(n<0?"−":"")+Math.abs(Math.round(n)).toLocaleString("pt-BR");
+const fmtMi=n=>{const a=Math.abs(n);
+  if(a>=1e6)return (n<0?"−":"")+(a/1e6).toFixed(1).replace(".",",")+" mi";
+  if(a>=1e3)return (n<0?"−":"")+(a/1e3).toFixed(0)+" mil"; return fmtC(n);};
+
+const ST={sem:"Sem lançamento",sorc:"Sem orçamento",ana:"Analisar",ok:"Ok com o orçado",zer:"Zerado",abr:"Mês em aberto"};
+const STO={sem:0,sorc:1,ana:2,ok:3,zer:4,abr:5};
+
+const amap={}; DB.accts.forEach(a=>amap[a.cod]=a);
+const umap={}; DB.units.forEach(u=>umap[u.cod]=u);
+
+// est: "ativa" (lançou algo no período) | "muda" (não lançou nada agora, mas já lançou antes)
+//      | "inativa" (nunca lançou nada no ano)
+function statusOf(p,r,aberto,est){
+  if(aberto) return "abr";
+  if(Math.abs(p)>EPS && Math.abs(r)<EPS) return est==="inativa" ? "zer" : "sem";
+  if(Math.abs(p)<EPS && Math.abs(r)<EPS) return "zer";
+  if(Math.abs(p)<EPS && Math.abs(r)>EPS) return "sorc";   // lançou sem ter orçamento
+  return Math.abs(r-p)<EPS ? "ok" : "ana";
+}
+
+// cache de métricas por mês
+// natureza contábil pelo prefixo da conta (4=custo/despesa, 5=impostos)
+function natureza(cod){ return NATLBL[natMap[cod]]||"Outros"; }
+// DRE aditivo: despesa negativa. Logo variação > 0 sempre favorece o resultado.
+const favor = v => Math.abs(v)<EPS ? "neutro" : (v>0 ? "fav" : "desf");
+const FAVLBL={fav:"favorável",desf:"desfavorável",neutro:"—"};
+
+// referência de histórico: no modo mês olha os meses anteriores;
+// nos modos de período olha os próprios meses do período.
+function refMeses(){
+  if(periodo!=="mes") return mesesAtivos();
+  const out=[]; for(let i=0;i<M;i++) if(DB.fechado[i]) out.push(i);
+  return out;
+}
+function confDe(d){
+  const ref=refMeses(); if(!ref.length) return "media";
+  const n=ref.filter(i=>Math.abs(d.r[i])>EPS).length;
+  if(n===0) return "baixa";
+  if(n>=ref.length-1) return "alta";
+  return "media";
+}
+const CONF={alta:"lançava todo mês",media:"lança às vezes",baixa:"nunca lançou"};
+
+const cache={};
+function met(){
+  const key=modo+"|"+periodo+"|"+M+"|"+corte;
+  if(cache[key]) return cache[key];
+  const ms=mesesAtivos(), aberto=ms.length===0;
+  // relevante = respeita o modo e o corte de materialidade
+  const rel=d=>{
+    if(VIG.has(d.u)) return false;              // vigiadas têm tela própria
+    if(!ehPendencia(d.a)) return false;         // receita não vira pendência
+    if(modo==="rec" && !ehRec(d.a)) return false;
+    if(corte>0){
+      const mm=mesesAtivos();
+      let p=0,r=0; mm.forEach(i=>{p+=d.p[i];r+=d.r[i];});
+      if(Math.abs(p)<corte && Math.abs(r)<corte) return false;
+    }
+    return true;
+  };
+  // estado da unidade no período
+  const temR={}, jaLancou={};
+  DB.units.forEach(u=>{temR[u.cod]=false; jaLancou[u.cod]=false;});
+  const antes=[]; for(let i=0;i<12;i++) if(DB.fechado[i] && !ms.includes(i)) antes.push(i);
+  DB.data.forEach(d=>{ if(!rel(d))return;
+    if(ms.some(i=>Math.abs(d.r[i])>EPS)) temR[d.u]=true;
+    if(antes.some(i=>Math.abs(d.r[i])>EPS)) jaLancou[d.u]=true; });
+  const est={};
+  DB.units.forEach(u=>est[u.cod]= temR[u.cod] ? "ativa" : (jaLancou[u.cod] ? "muda" : "inativa"));
+  const a={}; DB.units.filter(u=>!u.vig).forEach(u=>a[u.cod]={sem:0,orc:0,plan:0,real:0,expo:0,alta:0,
+      sorc:0,vsorc:0, seg:u.seg,nome:u.nome,cod:u.cod});
+  DB.data.forEach(d=>{ const o=a[d.u]; if(!o||!rel(d))return;
+    let p=0,r=0; ms.forEach(i=>{p+=d.p[i];r+=d.r[i];});
+    o.plan+=p; o.real+=r;
+    if(Math.abs(p)>EPS) o.orc++;
+    const stt=statusOf(p,r,aberto,est[d.u]);
+    if(stt==="sem"){
+      o.sem++; o.expo+=Math.abs(p);
+      if(confDe(d)==="alta") o.alta++;
+    } else if(stt==="sorc"){ o.sorc++; o.vsorc+=Math.abs(r); }});
+  DB.units.forEach(u=>{ if(a[u.cod]) a[u.cod].est=est[u.cod]; });
+  cache[key]={a,aberto,temR,est,ms}; return cache[key];
+}
+// valores agregados de uma linha no período atual
+function agr(d){ const ms=mesesAtivos(); let p=0,r=0;
+  ms.forEach(i=>{p+=d.p[i];r+=d.r[i];}); return [p,r]; }
+
+// série 12 meses de uma unidade (para sparkline)
+function serie(cod){
+  const p=Array(12).fill(0), r=Array(12).fill(0);
+  DB.data.forEach(d=>{ if(d.u!==cod)return; for(let i=0;i<12;i++){p[i]+=d.p[i];r[i]+=d.r[i];} });
+  return {p,r};
+}
+function sparkline(cod,w=72,h=26){
+  const {p,r}=serie(cod);
+  const upto=DB.fechado.lastIndexOf(true)+1||12;
+  const vals=[...p.slice(0,upto),...r.slice(0,upto)].map(Math.abs);
+  const mx=Math.max(...vals,1);
+  const pt=(arr,n)=>arr.slice(0,n).map((v,i)=>
+    `${(i/(n-1||1)*w).toFixed(1)},${(h-Math.abs(v)/mx*(h-3)).toFixed(1)}`).join(" ");
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">
+    <polyline points="${pt(p,upto)}" fill="none" stroke="#5D7188" stroke-width="1.3" stroke-dasharray="2.5 2"/>
+    <polyline points="${pt(r,upto)}" fill="none" stroke="#22D3EE" stroke-width="1.6"/></svg>`;
+}
+
+/* ---------- SIDEBAR ---------- */
+function renderNav(){
+  const {a}=met();
+  const bys={}; Object.values(a).forEach(o=>{bys[o.seg]=(bys[o.seg]||0)+o.sem;});
+  const segs=SEG.filter(s=>DB.units.some(u=>u.seg===s&&!u.vig));
+  document.getElementById("nav").innerHTML=
+    `<a class="${view.tipo==='hub'?'on':''}" onclick="go({tipo:'hub'})">
+       <span class="dot" style="background:var(--cy)"></span>Visão geral</a>`
+    + segs.map(s=>`<a class="${view.seg===s&&view.tipo!=='hub'?'on':''}" onclick="go({tipo:'seg',seg:'${s}'})">
+       <span class="dot" style="background:${cor(s)}"></span>${SEGNM[s]}
+       <span class="n">${bys[s]||0}</span></a>`).join("")
+    + (UNS_VIG.length?`<a class="${view.tipo==='exc'?'on':''}" onclick="go({tipo:'exc'})">
+       <span class="dot" style="background:var(--red)"></span>Exceções
+       <span class="n">${totalExcecoes()||""}</span></a>`:"")
+    + `<div class="navlbl" style="padding:14px 8px 7px">Diagnóstico do ano</div>
+       <a class="${view.tipo==='lastro'?'on':''}" onclick="go({tipo:'lastro'})">
+       <span class="dot" style="background:#A78BFA"></span>Orçamento sem lastro
+       <span class="n">${semLastro(6).length}</span></a>
+       <a class="${view.tipo==='lsorc'?'on':''}" onclick="go({tipo:'lsorc'})">
+       <span class="dot" style="background:#67E8F9"></span>Lastro sem orçamento
+       <span class="n">${lastroSemOrc(6).length}</span></a>`;
+}
+
+/* ---------- KPIs ---------- */
+function renderKpis(){
+  const {a,aberto}=met();
+  let sem=0,afe=0,plan=0,real=0,un=0,expo=0,alta=0;
+  const scope=Object.values(a).filter(o=>
+      view.tipo==="hub" ? true : view.tipo==="seg" ? o.seg===view.seg : o.cod===view.unit);
+  let mudas=0, expoMudas=0;
+  scope.forEach(o=>{sem+=o.sem;if(o.sem>0)afe++;plan+=o.plan;real+=o.real;
+      expo+=o.expo;alta+=o.alta;un++;
+      if(o.est==="muda"){mudas++;expoMudas+=o.expo;}});
+  const v=real-plan;
+  const pctv=Math.abs(plan)>EPS?(v/Math.abs(plan)*100):null;
+  // detalhamento para os tooltips
+  const sl=semLancEscopo();
+  const cc={alta:0,media:0,baixa:0}, cv={alta:0,media:0,baixa:0};
+  sl.forEach(o=>{cc[o.cf]++; cv[o.cf]+=Math.abs(o.p);});
+  const fech=DB.fechado.filter(Boolean).length;
+  const linhaC=(k,lbl)=>`<div class="tr2"><span>${lbl}</span><b>${cc[k]} contas</b>
+      <span class="tv">R$ ${fmtMi(cv[k])}</span></div>`;
+
+  const tpOrc = view.tipo==="det"
+    ? `<b>Contas com orçamento</b><div class="tl">Quantas contas tinham valor orçado para esta unidade em ${DB.meses[M]}/26. É o universo que deveria ter lançamento no mês.</div>`
+    : `<b>Unidades</b><div class="tl">${un} unidades no escopo atual${view.tipo==="hub"?" (todos os segmentos)":" ("+SEGNM[view.seg]+")"}.</div>`;
+  const tpSem = `<b>${modo==="rec"?"Contas recorrentes sem lançamento":"Contas sem lançamento"}</b>
+     <div class="tl">Contas com orçamento em ${faixaLbl()} e realizado zerado no período, <b>mesmo a unidade tendo lançado outras contas</b>. Indica lançamento faltante, não valor zero real.</div>
+     ${modo==="rec"?`<div class="tl">Escopo: apenas as ${N_REC} contas classificadas como recorrentes (mais Etiquetagem). São as que deveriam aparecer todo mês.</div>`:""}
+     <div class="tsep"></div>${linhaC("alta","Lançavam todo mês")}${linhaC("media","Lançam às vezes")}${linhaC("baixa","Nunca lançaram")}`;
+  const tpExp = `<b>R$ exposto</b>
+     <div class="tl">Soma do valor orçado das ${fmtN(sem)} contas sem lançamento. É o quanto de orçamento ainda não apareceu no realizado.</div>
+     <div class="tsep"></div>${linhaC("alta","Lançavam todo mês")}${linhaC("media","Lançam às vezes")}${linhaC("baixa","Nunca lançaram")}
+     <div class="tl" style="margin-top:6px">As de <b>“lançavam todo mês”</b> são as mais prováveis de serem falha de lançamento.</div>`;
+  const res=resumoResultado(scope.map(o=>o.cod));
+  const tpVar = `<b>Variação de custo e despesa</b>
+     <div class="tl">Este número <b>não inclui receita</b>: mede só o gasto contra o orçado.
+       O resultado do período está na faixa abaixo dos cartões.</div>
+     <div class="tsep"></div>
+     <div class="tr2"><span>Receita líquida</span><b class="num">${fmtC(res.rr)}</b></div>
+     <div class="tr2"><span>Custos e despesas</span><b class="num">${fmtC(res.cr)}</b></div>
+     <div class="tr2"><span>Resultado</span><b class="num ${res.resR<0?'neg':'pos'}">${fmtC(res.resR)}</b></div>
+     <div class="tsep"></div>
+     <div class="tl">Nesta base o DRE é aditivo: receita positiva, despesa negativa. Por isso <b>variação positiva sempre favorece o resultado</b> — gastou menos ou faturou mais.</div>
+     <div class="tsep"></div><div class="tr2"><span>Planejado</span><b class="num">${fmtC(plan)}</b></div>
+     <div class="tr2"><span>Realizado</span><b class="num">${fmtC(real)}</b></div>
+     <div class="tr2"><span>Efeito</span><b class="${v<0?'neg':'pos'}">${FAVLBL[favor(v)]}</b></div>`;
+
+  document.getElementById("kpis").innerHTML=`
+   ${view.tipo==="det"
+     ? `<div class="kpi" ${T(tpOrc)}><div class="lbl">${modo==="rec"?"Recorrentes orçadas":"Contas com orçamento"}</div>
+          <div class="v num">${scope[0]?scope[0].orc:0}</div>
+          <div class="sub">${umap[view.unit].cod}</div></div>`
+     : `<div class="kpi" ${T(tpOrc)}><div class="lbl">Unidades</div><div class="v num">${un}</div>
+          <div class="sub">${view.tipo==="hub"?"todos os segmentos":SEGNM[view.seg]}</div></div>`}
+   <div class="kpi r" ${T(tpSem)}><div class="lbl">${modo==="rec"?"Recorrentes sem lançamento":"Contas sem lançamento"}</div>
+     <div class="v num">${aberto?"—":fmtN(sem)}</div>
+     <div class="sub">${aberto?"mês não fechado":(view.tipo==="det"?"nesta unidade":afe+" unidades afetadas")}</div></div>
+   <div class="kpi a" ${T(tpExp)}><div class="lbl">R$ exposto${modo==="rec"?" (recorrentes)":""}</div><div class="v num">${aberto?"—":fmtMi(expo)}</div>
+     <div class="sub">${aberto?"mês não fechado":alta+" lançavam todo mês"}</div></div>
+   <div class="kpi ${v<0?'r':'g'}" ${T(tpVar)}><div class="lbl">Variação custo/desp.${modo==="rec"?" (recorr.)":""}</div><div class="v num">${fmtMi(v)}</div>
+     <div class="sub">${pctv==null?"—":(pctv>0?"+":"")+pct(pctv)+" vs orçado"}</div></div>`;
+}
+
+// tooltip com as contas sem lançamento de uma unidade (top 10)
+function tipContas(o){
+  const {total,soma,top}=topContasUnidade(o.cod,10);
+  if(!total) return `<b>${o.nome}</b><div class="tl">Sem contas pendentes neste mês.</div>`;
+  return `<b>${o.nome}</b>
+    <div class="tl">${total} contas com orçamento e sem lançamento · R$ ${fmtMi(soma)} exposto</div>
+    <div class="tsep"></div>
+    ${top.map(c=>`<div class="tr2"><span>${(amap[c.a]||{}).desc||c.a}</span>
+       <b class="num">${fmtC(c.p)}</b>
+       <span class="cf ${c.cf}" style="font-size:9px">${CONF[c.cf]}</span></div>`).join("")}
+    ${total>10?`<div class="tl" style="margin-top:5px">…e mais ${total-10} contas. Clique para ver todas.</div>`:""}`;
+}
+
+/* ---------- HUB ---------- */
+function renderHub(){
+  const {a,aberto}=met();
+  const bys={};
+  Object.values(a).forEach(o=>{ if(!bys[o.seg])bys[o.seg]={n:0,sem:0,plan:0,real:0,expo:0,alta:0};
+    const b=bys[o.seg]; b.n++; b.sem+=o.sem; b.plan+=o.plan; b.real+=o.real;
+    b.expo+=o.expo; b.alta+=o.alta;});
+  const ordem=Object.keys(bys).sort((x,y)=>bys[y].expo-bys[x].expo);
+  const maxE=Math.max(...ordem.map(s=>bys[s].expo),1);
+  const cards=ordem.map(s=>{const b=bys[s],v=b.real-b.plan;
+    return `<div class="card fade" onclick="go({tipo:'seg',seg:'${s}'})">
+      <div class="top"><div class="nm">${SEGNM[s]}</div>
+        <span class="tag" style="${tint(s)}">${b.n} un</span></div>
+      <div class="mid" style="display:block"><div class="big num ${b.expo?'':'z'}" style="font-size:25px">${aberto?"—":"R$ "+fmtMi(b.expo)}</div>
+        <div class="biglbl" style="margin-top:3px">exposto · ${aberto?"—":b.alta+" lançavam todo mês"}</div></div>
+      <div class="pbar"><i style="width:${aberto?0:(b.expo/maxE*100)}%"></i></div>
+      <div class="foot"><span>${aberto?"—":b.sem+" contas"}</span>
+        <span class="num ${v<0?'neg':'pos'}">${fmtMi(v)}</span></div></div>`;}).join("");
+
+  // top 8 piores unidades (global)
+  const worst=Object.values(a).filter(o=>o.sem>0)
+    .sort((x,y)=>y.expo-x.expo).slice(0,10);
+  const wl=worst.length?worst.map((o,i)=>`<div class="wrow" onclick="go({tipo:'det',seg:'${o.seg}',unit:'${o.cod}'})">
+      <span class="rk num">${i+1}</span>
+      <span class="sg" style="${tint(o.seg)}">${SEGNM[o.seg]}</span>
+      <span class="nm">${o.nome}</span>
+      <span class="num cnt" style="color:var(--mut);font-size:11px" ${T(tipContas(o))}>${o.sem} contas</span>
+      <span class="qt num" style="width:74px;color:var(--amb)">R$ ${fmtMi(o.expo)}</span></div>`).join("")
+    : `<div class="empty">Nenhuma unidade com pendência neste mês.</div>`;
+
+  const mudas=Object.values(a).filter(o=>o.est==="muda"&&o.orc>0)
+      .sort((x,y)=>y.expo-x.expo);
+  const alerta=(!aberto&&mudas.length)?`<div class="alerta">
+     <div class="at">⚠ ${mudas.length} unidade(s) não lançaram NADA em ${faixaLbl()}</div>
+     <div class="ad">Vinham lançando nos meses anteriores e ficaram sem nenhum lançamento agora.
+       Somam <b>R$ ${fmtMi(mudas.reduce((s,o)=>s+o.expo,0))}</b> de orçamento sem realizado.</div>
+     <div class="alist">${mudas.slice(0,12).map(o=>`<span class="ac" onclick="go({tipo:'det',seg:'${o.seg}',unit:'${o.cod}'})">
+       ${o.nome} <b>${o.sem}</b></span>`).join("")}</div></div>`:"";
+  document.getElementById("body").innerHTML=
+    faixaResultado(Object.keys(a))+alerta+`
+    <div class="cols2">
+      <div><div class="sect">Segmentos · por valor exposto</div>
+        <div class="grid" style="grid-template-columns:1fr 1fr">${cards}</div></div>
+      <div><div class="sect">Top 10 unidades por valor exposto
+              <button class="xbtn" onclick="event.stopPropagation();exportGeral()">exportar</button></div>
+        <div class="worst">${wl}</div></div>
+    </div>`;
+}
+
+/* ---------- AGREGAÇÃO POR CONTA (dentro do segmento) ---------- */
+function contasDoSegmento(sg){
+  const {aberto,est}=met();
+  const uns=DB.units.filter(u=>u.seg===sg).map(u=>u.cod);
+  const set=new Set(uns), mp={};
+  DB.data.forEach(d=>{
+    if(!set.has(d.u)) return;
+    if(modo==="rec" && !ehRec(d.a)) return;
+    const [p,r]=agr(d);
+    if(corte>0 && Math.abs(p)<corte && Math.abs(r)<corte) return;
+    const st=statusOf(p,r,aberto,est[d.u]);
+    const o=mp[d.a]=mp[d.a]||{a:d.a,desc:(amap[d.a]||{}).desc||d.a,rec:ehRec(d.a),
+                              orc:0,sem:0,val:0,uns:[],plan:0,real:0};
+    if(Math.abs(p)>EPS) o.orc++;
+    o.plan+=p; o.real+=r;
+    if(st==="sem"){ o.sem++; o.val+=Math.abs(p);
+      o.uns.push({cod:d.u,nome:(umap[d.u]||{}).nome||d.u,v:Math.abs(p),muda:est[d.u]==="muda"}); }
+  });
+  const tot=uns.length;
+  return Object.values(mp).filter(o=>o.sem>0).map(o=>{
+    o.uns.sort((x,y)=>y.v-x.v);
+    o.tot=tot; o.taxa=o.sem/tot;
+    o.tipo = o.taxa>=0.5 ? "sistemico" : (o.sem>2 ? "varios" : "isolado");
+    return o;
+  }).sort((x,y)=>y.sem-x.sem||y.val-x.val);
+}
+const TIPOLBL={sistemico:"sistêmico",varios:"vários",isolado:"isolado"};
+
+/* ---------- SEGMENTO ---------- */
+function renderSeg(){
+  const s=view.seg;
+  const {a,aberto}=met();
+  const arr=Object.values(a).filter(o=>o.seg===s)
+    .sort((x,y)=>y.expo-x.expo||Math.abs(y.real-y.plan)-Math.abs(x.real-x.plan));
+  document.getElementById("body").innerHTML=
+    faixaResultado(arr.map(o=>o.cod))+`
+    <div class="sect">
+      <span class="vbar2">
+        <button class="${vseg==="un"?"on":""}" onclick="setVseg('un')">Por unidade</button>
+        <button class="${vseg==="ct"?"on":""}" onclick="setVseg('ct')">Por conta</button>
+        <button class="${vseg==="mp"?"on":""}" onclick="setVseg('mp')">Mapa do ano</button>
+      </span>
+      <span style="margin-left:4px">${vseg==="un"?arr.length+" unidades · por valor exposto":vseg==="ct"?"contas com falha · sistêmico primeiro":"pendências por unidade e mês"}</span>
+      <button class="xbtn" onclick="exportSeg()">exportar segmento</button></div>
+    ${vseg==="ct"?renderContasSeg(s):vseg==="mp"?renderMapa(s):""}
+    <div class="grid g3" ${vseg!=="un"?'style="display:none"':""}>`+arr.map(o=>{const v=o.real-o.plan,calm=o.sem===0;
+      return `<div class="card fade ${calm?'calm':''}" onclick="go({tipo:'det',seg:'${s}',unit:'${o.cod}'})">
+        <div class="top"><div class="nm">${o.nome}${o.est==="muda"?' <span class="mudo">parou de lançar</span>':""}</div>
+          <span class="tag" style="${tint(s)}">${o.cod}</span></div>
+        <div class="mid"><div>
+            <div class="big num ${calm?'z':''}" style="font-size:24px">${aberto?"—":"R$ "+fmtMi(o.expo)}</div>
+            <div class="biglbl" style="margin-top:3px">${aberto?"":o.sem+" contas · "+o.alta+" lançavam todo mês"}</div>
+          </div>
+          <div class="spark">${sparkline(o.cod)}</div></div>
+        <div class="foot"><span class="pad ${padraoUnidade(o.cod).tipo} mini" ${T(`<b>${PADLBL[padraoUnidade(o.cod).tipo]}</b><div class="tl">${padraoUnidade(o.cod).txt||"sem histórico"}</div><div class="tl">${o.orc} contas com orçamento no período.</div>`)}>${PADLBL[padraoUnidade(o.cod).tipo]}</span>
+          <span class="num ${v<0?'neg':'pos'}">${fmtMi(v)}</span></div></div>`;}).join("")+`</div>`;
+}
+
+/* ---------- RESULTADO AGREGADO (hub e segmento) ---------- */
+// A receita fica fora da conta de pendência, mas precisa aparecer no
+// resultado — senão a variação de custo sozinha dá impressão errada.
+function resumoResultado(codigos){
+  const set=new Set(codigos), ms=mesesAtivos();
+  let rp=0,rr=0,cp=0,cr=0,sorcN=0,sorcV=0;
+  DB.data.forEach(d=>{
+    if(!set.has(d.u)) return;
+    let p=0,r=0; ms.forEach(i=>{p+=d.p[i];r+=d.r[i];});
+    if(ehResultado(d.a)){ rp+=p; rr+=r; }
+    else {
+      cp+=p; cr+=r;
+      if(Math.abs(p)<EPS&&Math.abs(r)>EPS){ sorcN++; sorcV+=Math.abs(r); }
+    }});
+  const resP=rp+cp, resR=rr+cr;
+  return {rp,rr,cp,cr,resP,resR,
+          margem: rr>0?(resR/rr*100):null, margemP: rp>0?(resP/rp*100):null,
+          sorcN,sorcV};
+}
+function faixaResultado(codigos){
+  const o=resumoResultado(codigos);
+  if(!mesesAtivos().length) return "";
+  const cel=(lbl,p,r,cor)=>{
+    const v=r-p;
+    return `<div class="fr" ${T(`<b>${lbl}</b>
+       <div class="tr2"><span>Orçado</span><b class="num">${fmtC(p)}</b></div>
+       <div class="tr2"><span>Realizado</span><b class="num">${fmtC(r)}</b></div>
+       <div class="tr2"><span>Variação</span><b class="num ${v<0?'neg':'pos'}">${fmtC(v)}</b></div>`)}>
+      <span class="frl">${lbl}</span>
+      <span class="frv num" style="color:${cor}">${fmtMi(r)}</span>
+      <span class="frd num ${v<0?'neg':'pos'}">${v<0?"":"+"}${fmtMi(v)}</span></div>`;
+  };
+  return `<div class="faixar">
+    ${cel("Receita líquida",o.rp,o.rr,"var(--grn)")}
+    ${cel("Custos e despesas",o.cp,o.cr,"var(--red)")}
+    ${cel("Resultado",o.resP,o.resR,o.resR>=0?"var(--cy)":"var(--red)")}
+    <div class="fr" ${T(`<b>Margem</b><div class="tl">Resultado dividido pela receita líquida.</div>
+        ${o.margemP!=null?`<div class="tr2"><span>Orçada</span><b>${pct(o.margemP)}</b></div>`:""}`)}>
+      <span class="frl">Margem</span>
+      <span class="frv num">${o.margem==null?"—":pct(o.margem,1)}</span>
+      <span class="frd num" style="color:var(--dim)">${o.margemP==null?"":"orç. "+pct(o.margemP,1)}</span></div>
+    ${o.sorcN?`<div class="fr alerta3" onclick="${codigos.length===1?`setAba('var')`:``}"
+        ${T(`<b>Gasto fora do orçado</b><div class="tl">${o.sorcN} contas tiveram lançamento sem nenhum orçamento no período.</div>`)}>
+      <span class="frl">Fora do orçado</span>
+      <span class="frv num" style="color:#C4B5FD">${fmtMi(o.sorcV)}</span>
+      <span class="frd num" style="color:var(--dim)">${o.sorcN} contas</span></div>`:""}
+  </div>`;
+}
+
+/* ---------- RESULTADO DA UNIDADE (receita × custo) ---------- */
+// A receita não serve para cobrar lançamento, mas serve para medir a unidade.
+const ORDEM_NAT=["rec","ded","cd","out","fin","imp"];
+function resultado(cod){
+  const ms=mesesAtivos(), g={};
+  ORDEM_NAT.forEach(n=>g[n]={p:0,r:0,linhas:[]});
+  DB.data.forEach(d=>{
+    if(d.u!==cod) return;
+    const n=natMap[d.a]; if(!g[n]) return;
+    let p=0,r=0; ms.forEach(i=>{p+=d.p[i];r+=d.r[i];});
+    if(Math.abs(p)<EPS&&Math.abs(r)<EPS) return;
+    g[n].p+=p; g[n].r+=r;
+    g[n].linhas.push({a:d.a,desc:(amap[d.a]||{}).desc||d.a,p,r,v:r-p});
+  });
+  const tp=ORDEM_NAT.reduce((s,n)=>s+g[n].p,0);
+  const tr=ORDEM_NAT.reduce((s,n)=>s+g[n].r,0);
+  return {g,tp,tr};
+}
+// série mensal de receita e resultado, para o gráfico
+function serieResultado(cod){
+  const rec=Array(12).fill(0), res=Array(12).fill(0), cus=Array(12).fill(0);
+  DB.data.forEach(d=>{
+    if(d.u!==cod) return;
+    const n=natMap[d.a];
+    for(let i=0;i<12;i++){
+      res[i]+=d.r[i];
+      if(n==="rec"||n==="ded") rec[i]+=d.r[i]; else cus[i]+=d.r[i];
+    }});
+  return {rec,cus,res};
+}
+function renderResultado(cod){
+  const {g,tp,tr}=resultado(cod);
+  const ms=mesesAtivos();
+  if(!ms.length) return `<div class="empty">Mês em aberto: sem realizado para comparar.</div>`;
+  const linha=(n)=>{
+    const o=g[n], v=o.r-o.p;
+    if(Math.abs(o.p)<EPS&&Math.abs(o.r)<EPS) return "";
+    const pc=Math.abs(o.p)>EPS?((v/Math.abs(o.p))*100):null;
+    return `<tr><td>${NATLBL[n]}</td>
+      <td class="r num">${fmtC(o.p)}</td><td class="r num">${fmtC(o.r)}</td>
+      <td class="r num ${v<0?'neg':'pos'}">${fmtC(v)}</td>
+      <td class="r num" style="color:var(--mut)">${pc==null||Math.abs(o.p)<1000?"—":pct(pc,0)}</td>
+      <td>${Math.abs(v)<EPS?"":`<span class="fv ${favor(v)}">${FAVLBL[favor(v)]}</span>`}</td></tr>`;
+  };
+  const marg = (rr)=>{ const receita=g.rec.r+g.ded.r; return receita>0?(rr/receita*100):null; };
+  const mr=marg(tr), mp=(g.rec.p+g.ded.p)>0?(tp/(g.rec.p+g.ded.p)*100):null;
+  // gráfico de barras mensal
+  const sr=serieResultado(cod);
+  const fech=[...Array(12).keys()].filter(i=>DB.fechado[i]);
+  const mx=Math.max(...fech.map(i=>Math.max(Math.abs(sr.rec[i]),Math.abs(sr.cus[i]))),1);
+  const H=54;
+  const barras=fech.map(i=>{
+    const hr=Math.max(1,Math.abs(sr.rec[i])/mx*H), hc=Math.max(1,Math.abs(sr.cus[i])/mx*H);
+    const pos=sr.res[i]>=0;
+    return `<div class="gcol" ${T(`<b>${DB.meses[i]}/26</b>
+        <div class="tr2"><span>Receita líquida</span><b class="num">${fmtC(sr.rec[i])}</b></div>
+        <div class="tr2"><span>Custos e despesas</span><b class="num">${fmtC(sr.cus[i])}</b></div>
+        <div class="tr2"><span>Resultado</span><b class="num ${pos?'pos':'neg'}">${fmtC(sr.res[i])}</b></div>`)}>
+      <div class="gpar"><div class="gb rec" style="height:${hr}px"></div>
+        <div class="gb cus" style="height:${hc}px"></div></div>
+      <div class="gm${i===M?" at":""}">${DB.meses[i]}</div>
+      <div class="gr ${pos?"pos":"neg"}">${pos?"+":"−"}</div></div>`;}).join("");
+
+  return `<div class="expl" style="border-left:3px solid var(--grn)">
+      <div class="rhead"><span>Resultado em ${faixaLbl()}</span>
+        <span class="rres ${tr>=0?'pos':'neg'}">${fmtC(tr)}</span>
+        ${mr!=null?`<span class="rmar">margem ${pct(mr)}${mp!=null?` · orçada ${pct(mp)}`:""}</span>`:""}</div>
+      <table class="mini rtab"><thead><tr><th>Natureza</th><th class="r">Orçado</th>
+        <th class="r">Realizado</th><th class="r">Variação</th><th class="r">%</th><th>Efeito</th></tr></thead>
+        <tbody>${ORDEM_NAT.map(linha).join("")}
+        <tr class="rtot"><td>Resultado</td><td class="r num">${fmtC(tp)}</td>
+          <td class="r num">${fmtC(tr)}</td>
+          <td class="r num ${tr-tp<0?'neg':'pos'}">${fmtC(tr-tp)}</td><td></td>
+          <td><span class="fv ${favor(tr-tp)}">${FAVLBL[favor(tr-tp)]}</span></td></tr>
+        </tbody></table>
+      <div class="graf"><div class="glbl">Receita líquida <i class="sw rec"></i>
+        &nbsp; Custos e despesas <i class="sw cus"></i> &nbsp;
+        <span style="color:var(--dim)">sinal abaixo = resultado do mês</span></div>
+        <div class="gwrap">${barras}</div></div>
+    </div>`;
+}
+
+/* ---------- EXCEÇÕES: lançamentos em unidades que não deveriam ter ---------- */
+// Estas unidades saíram da operação. Não têm lançamento recorrente previsto,
+// então qualquer movimento nelas é exceção e precisa ser repassado.
+function excecoes(){
+  const ms=mesesAtivos(), out=[];
+  DB.units.filter(u=>u.vig).forEach(u=>{
+    const linhas=[];
+    DB.data.forEach(d=>{
+      if(d.u!==u.cod) return;
+      let p=0,r=0; ms.forEach(i=>{p+=d.p[i];r+=d.r[i];});
+      if(Math.abs(r)<EPS) return;                       // só interessa o que foi lançado
+      const meses=[];
+      for(let i=0;i<12;i++) if(DB.fechado[i]&&Math.abs(d.r[i])>EPS) meses.push(DB.meses[i]);
+      linhas.push({a:d.a,desc:(amap[d.a]||{}).desc||d.a,nat:natureza(d.a),
+                   p,r,ano:d.r.reduce((s,x)=>s+Math.abs(x),0),meses});
+    });
+    linhas.sort((x,y)=>Math.abs(y.r)-Math.abs(x.r));
+    const anoN=DB.data.filter(d=>d.u===u.cod)
+      .reduce((s,d)=>s+d.r.filter((v,i)=>DB.fechado[i]&&Math.abs(v)>EPS).length,0);
+    out.push({u,linhas,val:linhas.reduce((s,l)=>s+Math.abs(l.r),0),anoN});
+  });
+  return out.sort((a,b)=>b.val-a.val);
+}
+function totalExcecoes(){ return excecoes().reduce((s,o)=>s+o.linhas.length,0); }
+
+function renderExcecoes(){
+  const lst=excecoes();
+  const comMov=lst.filter(o=>o.linhas.length);
+  const tot=lst.reduce((s,o)=>s+o.val,0);
+  document.getElementById("kpis").innerHTML=`
+   <div class="kpi ${comMov.length?"r":"g"}"><div class="lbl">Unidades com movimento</div>
+     <div class="v num">${comMov.length}</div><div class="sub">de ${lst.length} vigiadas</div></div>
+   <div class="kpi a"><div class="lbl">Lançamentos no período</div>
+     <div class="v num">${lst.reduce((s,o)=>s+o.linhas.length,0)}</div>
+     <div class="sub">contas movimentadas</div></div>
+   <div class="kpi r"><div class="lbl">Valor lançado</div><div class="v num">${fmtMi(tot)}</div>
+     <div class="sub">${faixaLbl()}</div></div>
+   <div class="kpi"><div class="lbl">Unidades vigiadas</div><div class="v num">${lst.length}</div>
+     <div class="sub">fora da operação</div></div>`;
+  document.getElementById("body").innerHTML=`
+   <div class="expl" style="border-left:3px solid var(--red);margin-bottom:18px">
+     <div class="expl2" style="margin:0;font-size:12px;color:var(--mut)">
+     Estas unidades foram retiradas da operação e não aparecem nos segmentos.
+     Como não têm lançamento previsto, <b style="color:var(--tx)">qualquer movimento aqui é exceção</b>
+     e deve ser repassado. Elas funcionam como sentinela: se algo aparecer, algum lançamento
+     foi para o lugar errado ou a unidade ainda está ativa sem que o cadastro reflita isso.</div></div>
+   ${lst.map(o=>`<div class="exbox ${o.linhas.length?"alerta2":"limpa2"}">
+      <div class="exh"><span class="exn">${o.u.nome}</span>
+        <span class="tag" style="background:rgba(143,163,184,.12);color:var(--mut)">${o.u.cod}</span>
+        ${o.linhas.length
+          ? `<span class="exq">${o.linhas.length} conta(s) · R$ ${fmtMi(o.val)} em ${faixaLbl()}</span>`
+          : `<span class="exok">sem movimento no período</span>`}
+        <span class="exano">${o.anoN} lançamentos no ano</span></div>
+      ${o.linhas.length?`<table class="mini exT"><thead><tr><th>Conta</th><th>Descrição</th>
+         <th>Natureza</th><th class="r">Orçado</th><th class="r">Lançado</th><th>Meses com lançamento</th></tr></thead>
+         <tbody>${o.linhas.slice(0,12).map(l=>`<tr>
+           <td class="num" style="color:var(--dim)">${l.a}</td><td>${l.desc}</td>
+           <td class="nat">${l.nat}</td>
+           <td class="r num">${Math.abs(l.p)<EPS?"—":fmtC(l.p)}</td>
+           <td class="r num" style="color:#F79A9A">${fmtC(l.r)}</td>
+           <td class="nat">${l.meses.join(" ")}</td></tr>`).join("")}
+         </tbody></table>
+         ${o.linhas.length>12?`<div class="expl2">…e mais ${o.linhas.length-12} contas.</div>`:""}`:""}
+    </div>`).join("")}`;
+}
+
+/* ---------- ORÇAMENTO SEM LASTRO (visão do ano) ---------- */
+// Linhas orçadas em vários meses e que nunca tiveram lançamento nenhum no ano.
+// Não é falha de lançamento: é orçamento que não se sustenta. Insumo do próximo ciclo.
+function semLastro(minMeses){
+  const fech=[...Array(12).keys()].filter(i=>DB.fechado[i] && !ehParcial(i));
+  const out=[];
+  DB.data.forEach(d=>{
+    if(!ehPendencia(d.a)) return;
+    if(modo==="rec" && !ehRec(d.a)) return;
+    const mo=fech.filter(i=>Math.abs(d.p[i])>EPS).length;
+    const mr=fech.filter(i=>Math.abs(d.r[i])>EPS).length;
+    if(mo<minMeses || mr>0) return;
+    const val=fech.reduce((s,i)=>s+Math.abs(d.p[i]),0);
+    if(corte>0 && val<corte) return;
+    out.push({u:d.u,nome:(umap[d.u]||{}).nome||d.u,seg:(umap[d.u]||{}).seg,
+              a:d.a,desc:(amap[d.a]||{}).desc||d.a,meses:mo,val,
+              media:val/(mo||1), rec:ehRec(d.a)});
+  });
+  return out.sort((x,y)=>y.val-x.val);
+}
+
+/* ---------- HISTÓRICO DE PENDÊNCIAS POR MÊS ---------- */
+const cacheHist={};
+function histPendencias(cod){
+  const key=cod+"|"+modo;
+  if(cacheHist[key]) return cacheHist[key];
+  const linhas=DB.data.filter(d=>d.u===cod && ehPendencia(d.a) && (modo!=="rec"||ehRec(d.a)));
+  const out=[];
+  for(let i=0;i<12;i++){
+    if(!DB.fechado[i]){ out.push(null); continue; }
+    const lancouAgora=linhas.some(d=>Math.abs(d.r[i])>EPS);
+    const lancouAntes=linhas.some(d=>[...Array(12).keys()]
+        .some(j=>DB.fechado[j]&&j!==i&&Math.abs(d.r[j])>EPS));
+    const est=lancouAgora?"ativa":(lancouAntes?"muda":"inativa");
+    let n=0,val=0;
+    linhas.forEach(d=>{
+      const p=d.p[i],r=d.r[i];
+      if(statusOf(p,r,false,est)==="sem"){n++;val+=Math.abs(p);}
+    });
+    out.push({mes:DB.meses[i],n,val,muda:est==="muda",parcial:ehParcial(i),i});
+  }
+  cacheHist[key]=out; return out;
+}
+// Tendência das pendências. Quase toda unidade tem pendência todo mês,
+// então "crônico" não separa nada — o que informa é se está piorando.
+// Meses em que a unidade não lançou nada ficam de fora (já têm alerta próprio).
+// Há quantos meses seguidos a conta está orçada e sem nenhum lançamento.
+// Diz onde a falha virou crônica, em vez de só contar quantas são.
+function semLancarHa(cod){
+  const fech=[...Array(12).keys()].filter(i=>DB.fechado[i]);
+  const out=[];
+  DB.data.forEach(d=>{
+    if(d.u!==cod) return;
+    if(!ehPendencia(d.a)) return;
+    if(modo==="rec" && !ehRec(d.a)) return;
+    let seq=0,val=0,ult=null,desde=null;
+    for(let k=fech.length-1;k>=0;k--){
+      const i=fech[k];
+      if(ehParcial(i)) continue;                 // mês parcial não conta nem interrompe
+      const temO=Math.abs(d.p[i])>EPS, temR=Math.abs(d.r[i])>EPS;
+      if(temR){ ult=DB.meses[i]; break; }
+      if(temO){ seq++; val+=Math.abs(d.p[i]); desde=DB.meses[i]; }
+      else if(seq>0) break;
+    }
+    if(seq>=2) out.push({a:d.a,desc:(amap[d.a]||{}).desc||d.a,seq,val,ult,desde,rec:ehRec(d.a)});
+  });
+  return out.sort((x,y)=>y.seq-x.seq||y.val-x.val);
+}
+function renderSemLancarHa(cod){
+  const lst=semLancarHa(cod);
+  if(!lst.length) return `<div class="expl2" style="margin-top:12px">Nenhuma conta acumula dois meses ou mais sem lançamento.</div>`;
+  const mx=Math.max(...lst.map(o=>o.seq),1);
+  return `<div class="expl" style="border-left:3px solid var(--amb);margin-top:12px">
+     <div style="font-size:10.5px;color:var(--dim);letter-spacing:.1em;text-transform:uppercase;margin-bottom:9px">
+       Há mais tempo sem lançamento${modo==="rec"?" · contas recorrentes":""}
+       <span style="text-transform:none;letter-spacing:0"> — orçadas e sem nenhum realizado</span></div>
+     <table class="mini"><thead><tr><th>Conta</th><th class="r">Meses seguidos</th>
+       <th class="r">Orçado acumulado</th><th>Desde</th><th>Último lançamento</th></tr></thead>
+     <tbody>${lst.slice(0,15).map(o=>`<tr>
+       <td>${o.desc}${o.rec&&modo!=="rec"?' <span class="cf alta" style="font-size:8.5px">recorrente</span>':""}</td>
+       <td class="r"><span class="frac"><b>${o.seq}</b></span>
+         <span class="bar2"><i style="width:${(o.seq/mx*100).toFixed(0)}%;background:${o.seq>=4?"var(--red)":"var(--amb)"}"></i></span></td>
+       <td class="r num" style="color:var(--amb)">${fmtC(o.val)}</td>
+       <td class="nat">${o.desde||"—"}</td>
+       <td class="nat">${o.ult||"nunca lançou"}</td></tr>`).join("")}
+     </tbody></table>
+     ${lst.length>15?`<div class="expl2">…e mais ${lst.length-15} contas.</div>`:""}
+   </div>`;
+}
+
+function padraoUnidade(cod){
+  const h=histPendencias(cod).filter(m=>m && !m.muda && !m.parcial);
+  if(!h.length) return {tipo:"limpa",txt:"sem base de comparação"};
+  if(h.every(m=>m.n===0)) return {tipo:"limpa",txt:"sem pendências no período"};
+  if(h.length<6) return {tipo:"estavel",txt:"histórico curto"};
+  const med=a=>a.reduce((s,m)=>s+m.n,0)/a.length;
+  const ant=med(h.slice(-6,-3)), rec=med(h.slice(-3));
+  const txt=`média ${ant.toFixed(0)} → ${rec.toFixed(0)} contas/mês`;
+  if(ant===0&&rec===0) return {tipo:"limpa",txt:"sem pendências recentes"};
+  if(rec>ant*1.3 && rec-ant>=1) return {tipo:"piorando",txt};
+  if(rec<ant*0.7) return {tipo:"melhorando",txt};
+  return {tipo:"estavel",txt};
+}
+const PADLBL={piorando:"piorando",melhorando:"melhorando",estavel:"estável",limpa:"sem pendências"};
+
+/* ---------- SINAIS DE ATENÇÃO (anomalia e conta trocada) ---------- */
+const mediana=xs=>{const a=[...xs].sort((x,y)=>x-y),n=a.length;
+  return n?(n%2?a[(n-1)/2]:(a[n/2-1]+a[n/2])/2):0;};
+const madv=xs=>{const m=mediana(xs);return mediana(xs.map(x=>Math.abs(x-m)));};
+
+// histórico mensal (meses fechados fora do período analisado)
+function baseHist(){
+  const ms=mesesAtivos();
+  return [...Array(12).keys()].filter(i=>DB.fechado[i] && !ms.includes(i));
+}
+// valor médio por mês no período atual (comparável com a mediana histórica)
+function medioPeriodo(d){
+  const ms=mesesAtivos(); if(!ms.length) return 0;
+  return ms.reduce((s,i)=>s+Math.abs(d.r[i]),0)/ms.length;
+}
+function perfil(d,hist){
+  const h=hist.map(i=>Math.abs(d.r[i])).filter(v=>v>EPS);
+  return {n:h.length, med:mediana(h), mad:madv(h)};
+}
+
+// contas com valor fora do padrão da própria série
+function anomalias(cod){
+  const hist=baseHist(), out=[];
+  DB.data.forEach(d=>{
+    if(d.u!==cod) return;
+    if(!ehPendencia(d.a)) return;
+    if(modo==="rec" && !ehRec(d.a)) return;
+    const {n,med,mad}=perfil(d,hist);
+    if(n<4 || med<=0) return;
+    const at=medioPeriodo(d); if(at<EPS) return;
+    let dv=mad; if(dv<1) dv=med*0.15||1;
+    const z=(at-med)/dv;
+    if(Math.abs(z)>=4 && Math.abs(at-med)>20000)
+      out.push({a:d.a,desc:(amap[d.a]||{}).desc||d.a,med,at,z,raz:med?at/med:0});
+  });
+  return out.sort((x,y)=>Math.abs(y.z)-Math.abs(x.z));
+}
+
+// pares: conta que sumiu × conta com pico de valor parecido (possível troca)
+function paresTrocados(cod){
+  const hist=baseHist(), ms=mesesAtivos(), faltam=[], picos=[];
+  DB.data.forEach(d=>{
+    if(d.u!==cod) return;
+    if(!ehPendencia(d.a)) return;
+    if(modo==="rec" && !ehRec(d.a)) return;
+    const [p,r]=agr(d), {n,med}=perfil(d,hist);
+    const at=medioPeriodo(d);
+    if(Math.abs(p)>EPS && Math.abs(r)<EPS && n>=4 && med>5000)
+      faltam.push({a:d.a,med});
+    if(at>EPS){
+      const exc=at-med;
+      if((med>0 && exc>Math.max(5000,med*0.8)) || (med===0 && at>5000))
+        picos.push({a:d.a,exc:med>0?exc:at});
+    }
+  });
+  const grupo=c=>String(c).split(".").slice(0,4).join(".");
+  const parcial=ms.some(ehParcial);
+  const out=[];
+  faltam.forEach(f=>picos.forEach(pk=>{
+    if(f.a===pk.a) return;
+    const raz=Math.min(f.med,pk.exc)/Math.max(f.med,pk.exc);
+    const mesmo=grupo(f.a)===grupo(pk.a);
+    // em fechamento parcial muita conta está "sumida" só porque ainda não lançaram:
+    // qualquer coincidência de valor vira par. Aí só aceitamos o mesmo grupo contábil.
+    if(parcial && !mesmo) return;
+    if(raz<(mesmo?0.75:0.95)) return;               // fora do grupo, exige quase exato
+    out.push({fa:f.a,fdesc:(amap[f.a]||{}).desc||f.a,fmed:f.med,
+              pa:pk.a,pdesc:(amap[pk.a]||{}).desc||pk.a,pexc:pk.exc,
+              mesmo,score:raz*(mesmo?1:0.6)});
+  }));
+  // um par por conta que sumiu: fica só o candidato mais forte
+  out.sort((x,y)=>y.score-x.score);
+  const vistos=new Set(), fin=[];
+  out.forEach(o=>{ if(vistos.has(o.fa))return; vistos.add(o.fa); fin.push(o); });
+  return fin.slice(0,5);
+}
+
+// mapa de calor: unidades x meses, intensidade = pendências
+// contas com orçamento e sem lançamento de uma unidade num mês específico
+function contasDoMes(cod,i){
+  const out=[];
+  const linhas=DB.data.filter(d=>d.u===cod && ehPendencia(d.a) && (modo!=="rec"||ehRec(d.a)));
+  const lancou=linhas.some(d=>Math.abs(d.r[i])>EPS);
+  const antes=linhas.some(d=>[...Array(12).keys()].some(j=>DB.fechado[j]&&j!==i&&Math.abs(d.r[j])>EPS));
+  const est=lancou?"ativa":(antes?"muda":"inativa");
+  linhas.forEach(d=>{
+    const p=d.p[i], r=d.r[i];
+    if(statusOf(p,r,false,est)!=="sem") return;
+    out.push({a:d.a,desc:(amap[d.a]||{}).desc||d.a,v:Math.abs(p),rec:ehRec(d.a)});
+  });
+  return out.sort((x,y)=>y.v-x.v);
+}
+
+function renderMapa(sg){
+  const uns=DB.units.filter(u=>u.seg===sg).map(u=>u.cod);
+  const linhas=uns.map(c=>({cod:c,nome:(umap[c]||{}).nome||c,h:histPendencias(c)}));
+  const todos=linhas.flatMap(l=>l.h.filter(Boolean).map(m=>m.n));
+  const mx=Math.max(...todos,1);
+  linhas.sort((a,b)=>{
+    const sa=a.h.filter(Boolean).reduce((s,m)=>s+m.n,0);
+    const sb=b.h.filter(Boolean).reduce((s,m)=>s+m.n,0);
+    return sb-sa;});
+  const meses=[...Array(12).keys()].filter(i=>DB.fechado[i]);
+  const cel=(m,i,cod)=>{
+    if(!m) return `<td class="hm off"></td>`;
+    const t=m.n/mx;
+    const bg = m.muda ? "rgba(242,109,109,.85)"
+             : m.n===0 ? "rgba(74,222,155,.16)"
+             : `rgba(239,178,92,${(0.12+t*0.78).toFixed(2)})`;
+    const cs=m.n?contasDoMes(cod,i):[];
+    const lista=cs.slice(0,8).map(c=>`<div class="tr2"><span>${c.desc}</span>
+        <b class="num">${fmtC(c.v)}</b></div>`).join("");
+    return `<td class="hm${m.parcial?" pc":""}" style="background:${bg}"
+      ${T(`<b>${m.mes}/26</b>${m.parcial?' <span style="color:#F3C784">(fechamento parcial)</span>':""}
+        <div class="tl">${m.n} conta(s) com orçamento e sem lançamento · R$ ${fmtMi(m.val)}</div>
+        ${m.muda?'<div class="tl" style="color:#F79A9A">A unidade não lançou nada neste mês.</div>':""}
+        ${lista?`<div class="tsep"></div>${lista}`:""}
+        ${cs.length>8?`<div class="tl">…e mais ${cs.length-8} contas</div>`:""}`)}
+      >${m.n||""}</td>`;
+  };
+  return `<div class="expl" style="border-left:3px solid var(--cy);margin-bottom:14px">
+      <div class="expl2" style="margin:0;font-size:12px;color:var(--mut)">
+      Cada linha é uma unidade, cada coluna um mês. Quanto mais forte a cor, mais contas
+      ficaram sem lançamento. <span style="color:#F79A9A">Vermelho cheio</span> = a unidade não
+      lançou nada naquele mês. Faixas hachuradas são meses em fechamento parcial.</div></div>
+    <div class="tw mapa"><table><thead><tr><th>Unidade</th>
+      ${meses.map(i=>`<th class="hmh${ehParcial(i)?" pc":""}">${DB.meses[i]}</th>`).join("")}
+      <th class="r">Total</th></tr></thead>
+    <tbody>${linhas.map(l=>{
+      const tot=l.h.filter(Boolean).reduce((s,m)=>s+m.n,0);
+      return `<tr><td class="hmu" onclick="go({tipo:'det',seg:'${sg}',unit:'${l.cod}'})">${l.nome}</td>
+        ${meses.map(i=>cel(l.h[i],i,l.cod)).join("")}
+        <td class="r num" style="color:var(--mut)">${tot}</td></tr>`;}).join("")}
+    </tbody></table></div>`;
+}
+
+// tabela de contas do segmento
+// Uma conta, todas as unidades ativas do segmento, orçado x realizado no período.
+function contaNoSegmento(sg,conta){
+  const {aberto,est}=met();
+  const uns=DB.units.filter(u=>u.seg===sg&&!u.vig);
+  const linhas=[];
+  uns.forEach(u=>{
+    const d=DB.data.find(x=>x.u===u.cod&&x.a===conta);
+    let p=0,r=0;
+    if(d){ const [pp,rr]=agr(d); p=pp; r=rr; }
+    if(Math.abs(p)<EPS&&Math.abs(r)<EPS&&!d) return;   // conta nem existe nessa unidade
+    const st=statusOf(p,r,aberto,est[u.cod]);
+    linhas.push({cod:u.cod,nome:u.nome,p,r,v:r-p,st,
+                 cf:d?confDe(d):"baixa"});
+  });
+  // ordem: pendências primeiro, depois maior orçado
+  linhas.sort((x,y)=>(x.st==="sem"?0:1)-(y.st==="sem"?0:1)||Math.abs(y.p)-Math.abs(x.p));
+  return linhas;
+}
+function detalheContaSeg(sg,conta,desc){
+  const ls=contaNoSegmento(sg,conta);
+  const tp=ls.reduce((a,o)=>a+o.p,0), tr=ls.reduce((a,o)=>a+o.r,0);
+  const mx=Math.max(...ls.map(o=>Math.abs(o.p)||Math.abs(o.r)),1);
+  return `<tr class="exp"><td colspan="6"><div class="expbox">
+    <div class="expt">${desc} · conta ${conta} · todas as unidades de ${SEGNM[sg]} em ${faixaLbl()}</div>
+    <table class="mini"><thead><tr><th>Unidade</th><th class="r">Orçado</th>
+      <th class="r">Realizado</th><th class="r">Variação</th><th></th><th>Status</th></tr></thead>
+    <tbody>${ls.map(o=>`<tr class="clic" onclick="event.stopPropagation();abreConta('${o.cod}','${conta}')">
+      <td>${o.nome}</td>
+      <td class="r num">${Math.abs(o.p)<EPS?"—":fmtC(o.p)}</td>
+      <td class="r num">${Math.abs(o.r)<EPS?"—":fmtC(o.r)}</td>
+      <td class="r num ${o.v<0?'neg':'pos'}">${Math.abs(o.v)<EPS?"—":fmtC(o.v)}</td>
+      <td class="r"><span class="bb" style="display:inline-block;height:5px;border-radius:3px;
+        width:${(Math.abs(o.p)/mx*60).toFixed(0)}px;background:${o.st==="sem"?"var(--red)":"var(--s3)"}"></span></td>
+      <td><span class="st ${o.st}">${ST[o.st]}</span></td></tr>`).join("")}
+      <tr class="rtot"><td>Total do segmento</td>
+        <td class="r num">${fmtC(tp)}</td><td class="r num">${fmtC(tr)}</td>
+        <td class="r num ${tr-tp<0?'neg':'pos'}">${fmtC(tr-tp)}</td><td></td><td></td></tr>
+    </tbody></table>
+    <div class="expl2">Clique numa unidade para abri-la nesta conta.</div>
+  </div></td></tr>`;
+}
+
+function renderContasSeg(sg){
+  const lst=contasDoSegmento(sg);
+  if(!lst.length) return `<div class="empty">Nenhuma conta com falha neste recorte.</div>`;
+  const sist=lst.filter(o=>o.tipo==="sistemico");
+  const resumo=`<div class="expl" style="border-left:3px solid var(--amb);margin-bottom:14px">
+     <div class="expl2" style="margin:0;font-size:12px;color:var(--mut)">
+     <b style="color:var(--tx)">${lst.length} contas</b> com falha no segmento.
+     ${sist.length?`<b style="color:#F79A9A">${sist.length}</b> falham em metade ou mais das unidades —
+       esse padrão costuma ser processo ou premissa de orçamento, não esquecimento de unidade.`
+      :"Nenhuma falha atinge metade das unidades: o padrão é pontual, unidade a unidade."}</div></div>`;
+  return resumo+`<div class="tw" style="margin-bottom:18px"><table><thead><tr>
+      <th>Conta</th><th>Descrição</th><th class="r">Unidades c/ falha</th>
+      <th class="r">R$ exposto</th><th>Alcance</th><th>Quais unidades</th>
+    </tr></thead><tbody>${lst.map(o=>`<tr class="lin ${expConta===o.a?'aberta':''}"
+        onclick="toggleConta('${o.a}')">
+      <td class="num" style="color:var(--dim)"><span class="cx">${expConta===o.a?"▾":"▸"}</span>${o.a}</td>
+      <td>${o.desc}${o.rec&&modo!=="rec"?' <span class="cf alta" style="font-size:8.5px">recorrente</span>':""}</td>
+      <td class="r"><span class="frac"><b>${o.sem}</b>/${o.tot}</span>
+        <span class="bar2"><i style="width:${(o.taxa*100).toFixed(0)}%"></i></span></td>
+      <td class="r num" style="color:var(--amb)">${fmtC(o.val)}</td>
+      <td><span class="tp ${o.tipo}">${TIPOLBL[o.tipo]}</span></td>
+      <td class="uns">${o.uns.slice(0,4).map(u=>`<span class="uc${u.muda?" m":""}"
+          onclick="go({tipo:'det',seg:'${sg}',unit:'${u.cod}'})">${u.nome}</span>`).join("")}
+        ${o.uns.length>4?`<span class="umais" ${T(o.uns.slice(4).map(u=>`<div class="tr2"><span>${u.nome}</span><b class="num">${fmtC(u.v)}</b></div>`).join(""))}>+${o.uns.length-4}</span>`:""}</td>
+    </tr>`+(expConta===o.a?detalheContaSeg(sg,o.a,o.desc):"")).join("")}</tbody></table></div>`;
+}
+
+/* ---------- DETALHE ---------- */
+function linhas(){
+  const {aberto,est}=met(), u=view.unit, out=[];
+  DB.data.forEach(d=>{
+    if(d.u!==u) return;
+    if(!ehPendencia(d.a)) return;                 // receita fica na aba Resultado
+    if(modo==="rec" && !ehRec(d.a)) return;
+    const [p,r]=agr(d);
+    if(Math.abs(p)<EPS && Math.abs(r)<EPS) return;
+    if(corte>0 && Math.abs(p)<corte && Math.abs(r)<corte) return;
+    const ac=amap[d.a]||{desc:"",rec:"—",fv:"—"};
+    out.push({a:d.a,desc:ac.desc,p,r,v:r-p,
+      pct:Math.abs(p)>EPS?(r-p)/Math.abs(p):null,
+      st:statusOf(p,r,aberto,est[u]), cf:confDe(d),
+      nat:natureza(d.a), fav:favor(r-p), hist:histDe(d),
+      rec:ehRec(d.a), d,
+      cls:(ac.fv||"—")+" · "+(ac.rec||"—")});});
+  return out;
+}
+// tabela mês a mês de uma conta (expansão da linha)
+function mesATes(d){
+  const ms=[]; for(let i=0;i<12;i++) if(DB.fechado[i]) ms.push(i);
+  const cel=i=>{const p=d.p[i],r=d.r[i],v=r-p;
+    const falta=Math.abs(p)>EPS&&Math.abs(r)<EPS;
+    return `<td class="r num${falta?" falta":""}">${fmtC(r)}</td>`;};
+  return `<tr class="exp"><td colspan="11"><div class="expbox">
+    <div class="expt">Orçado × realizado mês a mês${modo==="rec"?" · conta recorrente":""}</div>
+    <table class="mini"><thead><tr><th></th>${ms.map(i=>`<th class="r">${DB.meses[i]}</th>`).join("")}<th class="r">Total</th></tr></thead>
+    <tbody>
+      <tr><td>Orçado</td>${ms.map(i=>`<td class="r num">${fmtC(d.p[i])}</td>`).join("")}
+          <td class="r num b">${fmtC(ms.reduce((s,i)=>s+d.p[i],0))}</td></tr>
+      <tr><td>Realizado</td>${ms.map(cel).join("")}
+          <td class="r num b">${fmtC(ms.reduce((s,i)=>s+d.r[i],0))}</td></tr>
+      <tr class="vr"><td>Variação</td>${ms.map(i=>{const v=d.r[i]-d.p[i];
+          return `<td class="r num ${v<0?'neg':'pos'}">${Math.abs(v)<EPS?"—":fmtC(v)}</td>`;}).join("")}
+          <td class="r num b">${fmtC(ms.reduce((s,i)=>s+d.r[i]-d.p[i],0))}</td></tr>
+    </tbody></table>
+    <div class="expl2">Células destacadas: mês com orçamento e sem nenhum lançamento.</div>
+  </div></td></tr>`;
+}
+function renderDet(){
+  const u=umap[view.unit];
+  let rows=linhas();
+  const cont={todos:rows.length}; rows.forEach(r=>cont[r.st]=(cont[r.st]||0)+1);
+  const chips=[["todos","Todas"],["sem","Sem lançamento"],["sorc","Sem orçamento"],["ana","Analisar"],["ok","Ok"],["zer","Zerado"]]
+    .filter(([k])=>k==="todos"||cont[k])
+    .map(([k,l])=>`<div class="chip ${view.filtro===k?'on':''}" onclick="setF('${k}')">${l}<span class="c num">${cont[k]||0}</span></div>`).join("");
+
+  if(view.filtro!=="todos") rows=rows.filter(r=>r.st===view.filtro);
+  if(view.busca){const q=view.busca.toLowerCase();
+    rows=rows.filter(r=>r.desc.toLowerCase().includes(q)||r.a.includes(q));}
+  const k=view.sk,dir=view.sd;
+  rows.sort((x,y)=>{let A,B;
+    if(k==="st"){A=STO[x.st];B=STO[y.st];return dir*(A-B)||Math.abs(y.v)-Math.abs(x.v);}
+    if(k==="v"){A=Math.abs(x.v);B=Math.abs(y.v);return dir*(B-A);}
+    if(k==="cf"){const O={alta:0,media:1,baixa:2};
+      return dir*((O[x.cf]??9)-(O[y.cf]??9))||Math.abs(y.v)-Math.abs(x.v);}
+    if(k==="fav"){const O={desf:0,neutro:1,fav:2};
+      return dir*((O[x.fav]??9)-(O[y.fav]??9))||Math.abs(y.v)-Math.abs(x.v);}
+    if(k==="a"||k==="desc"||k==="cls"||k==="nat"){return dir*String(x[k]).localeCompare(String(y[k]));}
+    A=x[k]??-Infinity;B=y[k]??-Infinity;return dir*(B-A);});
+
+  const mxv=Math.max(...rows.map(r=>Math.abs(r.v)),1);
+  const ar=key=>view.sk===key?`<span class="ar">${view.sd>0?"▼":"▲"}</span>`:"";
+  const body=rows.length?rows.map(r=>`<tr class="lin ${expandida===r.a?'aberta':''}" onclick="toggleExp('${r.a}')">
+      <td class="num" style="color:var(--dim)"><span class="cx">${expandida===r.a?"▾":"▸"}</span>${r.a}</td>
+      <td>${r.desc}</td>
+      <td class="r num">${fmtC(r.p)}</td>
+      <td class="r num">${fmtC(r.r)}</td>
+      <td class="r num ${r.v<0?'neg':'pos'}">${fmtC(r.v)}
+        <span class="vbar" style="width:${(Math.abs(r.v)/mxv*26).toFixed(0)}px;
+        background:${r.v<0?'var(--red)':'var(--grn)'};opacity:.75"></span></td>
+      <td class="r num" style="color:var(--mut)">${(r.pct==null||Math.abs(r.p)<1000)?"—":(r.pct*100).toFixed(0)+"%"}</td>
+      <td class="nat">${r.nat}</td>
+      <td>${r.st==="sem"?'<span style="color:var(--s3)">—</span>':`<span class="fv ${r.fav}">${FAVLBL[r.fav]}</span>`}</td>
+      <td><span class="st ${r.st}">${ST[r.st]}</span></td>
+      <td>${r.st==="sem"?`<span class="cf ${r.cf}" ${T(tipHist(r.hist,r.cf))}>${CONF[r.cf]}</span>`:'<span style="color:var(--s3)">—</span>'}</td>
+      <td class="cls">${r.cls}</td></tr>`+(expandida===r.a?mesATes(r.d):"")).join("")
+    :`<tr><td colspan="11"><div class="empty">Nenhuma conta neste filtro.</div></td></tr>`;
+
+  const all=linhas();
+  // BLOCO 0 — histórico de pendências mês a mês
+  const hp=histPendencias(view.unit), pad=padraoUnidade(view.unit);
+  const mx0=Math.max(...hp.filter(Boolean).map(m=>m.n),1);
+  const b0=`<div class="expl hpbox">
+     <div class="hph"><span>Histórico de pendências por mês</span>
+       <span class="pad ${pad.tipo}">${PADLBL[pad.tipo]}${pad.txt?" · "+pad.txt:""}</span></div>
+     <div class="hpg">${hp.map((m,i)=>{
+        if(!m) return `<div class="hpc off"><div class="hpb"></div><div class="hpm">${DB.meses[i]}</div></div>`;
+        const alt=Math.max(3,Math.round(m.n/mx0*46));
+        return `<div class="hpc${i===M?" atual":""}${m.parcial?" parc":""}" ${T(`<b>${m.mes}/26</b>${m.parcial?' <span style="color:#F3C784">(fechamento parcial)</span>':""}
+           <div class="tl">${m.n} conta(s) com orçamento e sem lançamento</div>
+           <div class="tl">R$ ${fmtMi(m.val)} exposto</div>
+           ${m.muda?'<div class="tl" style="color:#F79A9A">A unidade não lançou NADA neste mês.</div>':""}`)}>
+           <div class="hpn">${m.n||""}</div>
+           <div class="hpb ${m.muda?"muda":(m.parcial?"parc":(m.n?"":"zero"))}" style="height:${m.n?alt:3}px"></div>
+           <div class="hpm">${m.mes}</div></div>`;}).join("")}</div>
+   </div>`;
+  // BLOCO 1 — prioridade: contas com orçamento e sem nenhum realizado, por valor
+  const semL=all.filter(r=>r.st==="sem").sort((x,y)=>Math.abs(y.p)-Math.abs(x.p));
+  const expoT=semL.reduce((s,r)=>s+Math.abs(r.p),0);
+  const mx1=Math.max(...semL.map(r=>Math.abs(r.p)),1);
+  const b1=semL.length?`<div class="expl" style="border-left:3px solid var(--red)">
+     <div style="font-size:10.5px;color:var(--dim);letter-spacing:.1em;text-transform:uppercase;
+          margin-bottom:9px">1 · Orçado sem nenhum realizado &nbsp;·&nbsp;
+          <b style="color:var(--amb)">${semL.length} contas · R$ ${fmtMi(expoT)}</b></div>
+     ${semL.slice(0,5).map(r=>`<div class="erow">
+        <span class="bn">${r.desc}<span class="nat"> · ${r.nat}</span></span>
+        <span class="bb" style="width:${(Math.abs(r.p)/mx1*80).toFixed(0)}px;background:var(--amb)"></span>
+        <span class="num" style="width:92px;text-align:right;color:var(--amb)">${fmtC(Math.abs(r.p))}</span>
+        <span class="cf ${r.cf}" style="width:104px;text-align:center" ${T(tipHist(r.hist,r.cf))}>${CONF[r.cf]}</span></div>`).join("")}
+     ${semL.length>5?`<div style="font-size:11px;color:var(--dim);margin-top:7px;cursor:pointer"
+        onclick="setF('sem')">ver as ${semL.length} contas →</div>`:""}
+     </div>`:"";
+
+  // BLOCO 2 — variação de quem teve orçado E realizado
+  const amb=all.filter(r=>r.st==="ana"||r.st==="ok");
+  const sorc=all.filter(r=>r.st==="sorc").sort((x,y)=>Math.abs(y.r)-Math.abs(x.r));
+  const top=[...amb].sort((x,y)=>Math.abs(y.v)-Math.abs(x.v)).slice(0,5);
+  const totV=amb.reduce((s,r)=>s+r.v,0);
+  const mx2=Math.max(...top.map(r=>Math.abs(r.v)),1);
+  const b2=top.length?`<div class="expl" style="border-left:3px solid var(--cy)">
+     <div style="font-size:10.5px;color:var(--dim);letter-spacing:.1em;text-transform:uppercase;
+          margin-bottom:9px">2 · Maiores variações (orçado e realizado lançados) &nbsp;·&nbsp;
+          <b class="${totV<0?'neg':'pos'}">total ${fmtMi(totV)} ${FAVLBL[favor(totV)]}</b></div>
+     ${top.map(r=>`<div class="erow">
+        <span class="bn">${r.desc}<span class="nat"> · ${r.nat}</span></span>
+        <span class="bb" style="width:${(Math.abs(r.v)/mx2*80).toFixed(0)}px;
+              background:${r.v<0?'var(--red)':'var(--grn)'}"></span>
+        <span class="num ${r.v<0?'neg':'pos'}" style="width:92px;text-align:right">${fmtC(r.v)}</span>
+        <span class="fv ${r.fav}" style="width:104px;text-align:center">${FAVLBL[r.fav]}</span></div>`).join("")}
+     </div>`:"";
+  // BLOCO 2b — lançou sem ter orçamento
+  const tSorc=sorc.reduce((a,r)=>a+Math.abs(r.r),0);
+  const mxS=Math.max(...sorc.map(r=>Math.abs(r.r)),1);
+  const b2b=sorc.length?`<div class="expl" style="border-left:3px solid #A78BFA">
+     <div style="font-size:10.5px;color:var(--dim);letter-spacing:.1em;text-transform:uppercase;margin-bottom:9px">
+       Lançou sem ter orçamento &nbsp;·&nbsp; <b style="color:#C4B5FD">${sorc.length} contas · R$ ${fmtMi(tSorc)}</b></div>
+     ${sorc.slice(0,5).map(r=>`<div class="erow">
+        <span class="bn">${r.desc}<span class="nat"> · ${r.nat}</span></span>
+        <span class="bb" style="width:${(Math.abs(r.r)/mxS*80).toFixed(0)}px;background:#A78BFA"></span>
+        <span class="num" style="width:92px;text-align:right;color:#C4B5FD">${fmtC(r.r)}</span></div>`).join("")}
+     ${sorc.length>5?`<div style="font-size:11px;color:var(--dim);margin-top:7px;cursor:pointer"
+        onclick="setF('sorc')">ver as ${sorc.length} contas →</div>`:""}
+     <div class="expl2">Gasto que não estava previsto no orçamento do período.</div>
+     </div>`:"";
+
+  // BLOCO 3 — sinais de atenção
+  const an=anomalias(view.unit), pr=paresTrocados(view.unit);
+  const b3=(an.length||pr.length)?`<div class="expl" style="border-left:3px solid var(--amb)">
+     <div style="font-size:10.5px;color:var(--dim);letter-spacing:.1em;text-transform:uppercase;margin-bottom:9px">
+       3 · Sinais de atenção <span style="text-transform:none;letter-spacing:0">— hipóteses a confirmar, não conclusões</span></div>
+     ${an.length?`<div class="sinal"><div class="sh">Valor fora do padrão da própria conta</div>
+       ${an.slice(0,4).map(o=>`<div class="erow">
+          <span class="bn">${o.desc}</span>
+          <span style="color:var(--dim);font-size:10.5px">típico ${fmtC(o.med)}</span>
+          <span class="num ${o.raz>1?'neg':'pos'}" style="width:96px;text-align:right">${fmtC(o.at)}</span>
+          <span class="cf ${o.raz>1?'alta':'media'}" style="width:74px;text-align:center">${
+            o.raz>1?(o.raz>=10?"10x+":o.raz.toFixed(1)+"x"):"−"+(100-o.raz*100).toFixed(0)+"%"}</span></div>`).join("")}
+       </div>`:""}
+     ${pr.length?`<div class="sinal"><div class="sh">Possível lançamento em conta trocada</div>
+       ${mesesAtivos().some(ehParcial)?`<div class="avisop">Mês em fechamento parcial: muitas contas ainda não foram lançadas, então esses pares têm mais chance de ser coincidência. Só estão listados pares do mesmo grupo contábil.</div>`:""}
+       ${pr.map(o=>`<div class="par">
+          <div class="pl"><span class="pn">sumiu</span> ${o.fdesc}
+            <b class="num">${fmtC(o.fmed)}</b></div>
+          <div class="pl"><span class="pn pk">pico</span> ${o.pdesc}
+            <b class="num">${fmtC(o.pexc)}</b>
+            ${o.mesmo?'<span class="cf alta" style="font-size:9px">mesmo grupo contábil</span>':'<span class="cf baixa" style="font-size:9px">grupos diferentes</span>'}</div>
+         </div>`).join("")}
+       <div class="expl2">Uma conta que deveria lançar ficou zerada e outra teve valor a mais na mesma unidade e período. Pode ser classificação errada — confira o lançamento antes de concluir.</div>
+       </div>`:""}
+     </div>`:"";
+  const abas=[["pend","Pendências",semL.length],
+              ["var","Variações e gastos fora do orçado",amb.length+sorc.length],
+              ["res","Resultado da unidade",null],
+              ["sin","Sinais de atenção",an.length+pr.length],
+              ["hist","Histórico mês a mês",null]];
+  const painel = aba==="pend" ? b1
+    : aba==="var" ? b2+b2b
+    : aba==="res" ? renderResultado(view.unit)
+    : aba==="sin" ? (b3||`<div class="empty">Nenhum sinal de atenção neste recorte.</div>`)
+    : b0+renderSemLancarHa(view.unit);
+  const expl=`<div class="abas">${abas.map(([k,l,n])=>
+      `<button class="${aba===k?"on":""}" onclick="setAba('${k}')">${l}${
+        n?`<span class="ab">${n}</span>`:""}</button>`).join("")}</div>`
+    +painel+`<div class="legenda">
+      <span><b>Como ler:</b> variação positiva favorece o resultado</span>
+      <span>· receita acima do orçado = <span class="pos">favorável</span></span>
+      <span>· despesa abaixo do orçado = <span class="pos">favorável</span></span></div>`;
+
+  document.getElementById("body").innerHTML=expl+`
+    <div class="tabh">Contas da unidade${
+       view.filtro!=="todos"?` · <b>${(ST[view.filtro]||"todas").toLowerCase()}</b>`:" · todas"}
+       <span class="tabq">${rows.length} de ${all.length}</span></div>
+    <div class="toolbar">${chips}
+      <input id="busca" placeholder="Buscar conta ou descrição…" value="${view.busca}">
+      <button class="xbtn" onclick="exportUnidade()">exportar unidade</button>
+    </div>
+    <div class="tw"><table><thead><tr>
+      <th data-k="a">Conta${ar("a")}</th><th data-k="desc">Descrição${ar("desc")}</th>
+      <th data-k="p" class="r">Planejado${ar("p")}</th><th data-k="r" class="r">Realizado${ar("r")}</th>
+      <th data-k="v" class="r">Variação${ar("v")}</th><th data-k="pct" class="r">%${ar("pct")}</th>
+      <th data-k="nat">Natureza${ar("nat")}</th>
+      <th data-k="fav">Efeito${ar("fav")}</th>
+      <th data-k="st">Status${ar("st")}</th><th data-k="cf">Confiança${ar("cf")}</th>
+      <th data-k="cls">Classificação${ar("cls")}</th>
+    </tr></thead><tbody>${body}</tbody></table></div>`;
+
+  const b=document.getElementById("busca");
+  b.oninput=e=>{view.busca=e.target.value;renderDet();
+    const n=document.getElementById("busca");n.focus();
+    n.setSelectionRange(n.value.length,n.value.length);};
+  document.querySelectorAll("thead th").forEach(th=>th.onclick=()=>{
+    const kk=th.dataset.k;
+    if(view.sk===kk) view.sd*=-1; else {view.sk=kk;view.sd=1;}
+    renderDet();});
+}
+let aba="pend";
+const ABA_FILTRO={pend:"sem", var:"ana", res:"todos", sin:"todos", hist:"todos"};
+function setAba(k){
+  aba=k;
+  // a aba escolhe o recorte da tabela: mostrar contagem e não filtrar confunde
+  const f=ABA_FILTRO[k]||"todos";
+  view.filtro = f;
+  view.busca="";
+  expandida=null;
+  renderDet();
+}
+let expandida=null;
+function toggleExp(a){ expandida = (expandida===a?null:a); renderDet(); }
+function setVseg(v){vseg=v;expConta=null;renderSeg();}
+function toggleConta(a){expConta=expConta===a?null:a;renderSeg();}
+function setF(k){view.filtro=k;expandida=null;renderDet();}
+
+// Lista de atalhos mostrada com a tecla ?
+function ajuda(){
+  const segs=SEG.filter(x=>DB.units.some(u=>u.seg===x&&!u.vig));
+  return `<b>Atalhos</b>
+    <div class="tr2"><span>Buscar</span><b>Ctrl K</b></div>
+    <div class="tr2"><span>Visão geral</span><b>H</b></div>
+    <div class="tr2"><span>Segmentos</span><b>1 … ${segs.length}</b></div>
+    <div class="tr2"><span>Exceções</span><b>E</b></div>
+    <div class="tr2"><span>Orçamento sem lastro</span><b>L</b></div>
+    <div class="tr2"><span>Alternar recorrentes</span><b>R</b></div>
+    <div class="tr2"><span>Abas da unidade</span><b>← →</b></div>
+    <div class="tr2"><span>Imprimir / PDF</span><b>P</b></div>
+    <div class="tr2"><span>Guia de análise</span><b>G</b></div>
+    <div class="tr2"><span>Voltar</span><b>Esc</b></div>
+    <div class="tr2"><span>Esta ajuda</span><b>?</b></div>`;
+}
+
+/* ================= GUIA DE ANÁLISE ================= */
+// Roteiro sugerido. Cada passo leva à tela onde ele é feito.
+const ROTEIRO=[
+ {t:"1. Veja o tamanho do problema no seu segmento",
+  d:"Abra o seu segmento e olhe a faixa de resultado e o cartão <b>R$ exposto</b>. Ele diz quanto de orçamento está em contas que não tiveram lançamento. É por valor que se prioriza, não por quantidade.",
+  b:"Abrir meu segmento", go:()=>abrePal()},
+ {t:"2. Separe problema de processo de esquecimento",
+  d:"Na visão <b>Por conta</b>, uma conta que falha em metade ou mais das unidades costuma ser processo ou premissa de orçamento. Falhar em uma ou duas é esquecimento daquelas unidades. São conversas diferentes.",
+  b:"Entendi", go:null},
+ {t:"3. Confirme no mapa do ano se é novo ou crônico",
+  d:"A visão <b>Mapa do ano</b> mostra unidade por mês. Coluna inteira escura é um mês ruim para todos. Linha escura é uma unidade com problema contínuo. Passe o mouse numa célula para ver quais contas são.",
+  b:"Entendi", go:null},
+ {t:"4. Entre na unidade e comece pelas pendências",
+  d:"A aba <b>Pendências</b> já abre a tabela filtrada. Use a coluna <b>Confiança</b>: quem <i>lançava todo mês</i> e parou é falha quase certa; quem <i>nunca lançou</i> pode ser conta inativa.",
+  b:"Entendi", go:null},
+ {t:"5. Veja há quanto tempo a falha existe",
+  d:"Na aba <b>Histórico mês a mês</b>, o bloco “Há mais tempo sem lançamento” mostra as contas com mais meses seguidos sem movimento. Conta parada há muitos meses raramente é esquecimento.",
+  b:"Entendi", go:null},
+ {t:"6. Só depois olhe as variações",
+  d:"A aba <b>Variações</b> compara quem lançou orçado e realizado. Lembre: variação positiva favorece o resultado. Ali também aparece o gasto que não tinha orçamento nenhum.",
+  b:"Entendi", go:null},
+ {t:"7. Feche com as exceções e o diagnóstico do ano",
+  d:"<b>Exceções</b> mostra lançamento em unidades que já saíram da operação — qualquer movimento ali deve ser repassado. <b>Orçamento sem lastro</b> lista linhas orçadas o ano todo e nunca lançadas: insumo do próximo ciclo.",
+  b:"Ver exceções", go:()=>go({tipo:"exc"})}
+];
+function abreGuia(){
+  const el=document.getElementById("guia");
+  el.innerHTML=`<div class="guiabox">
+    <div class="guiah"><div>
+        <div class="gt">Como analisar seu segmento</div>
+        <div class="gs">Roteiro sugerido. Cada passo abre onde ele é feito.</div></div>
+      <button class="gx" onclick="fechaGuia()">✕</button></div>
+    <div class="guial">${ROTEIRO.map((o,i)=>`<div class="gp">
+        <div class="gpt">${o.t}</div>
+        <div class="gpd">${o.d}</div>
+        ${o.go?`<button class="gpb" onclick="guiaIr(${i})">${o.b} →</button>`:""}
+      </div>`).join("")}</div>
+    <div class="guiaf">Atalhos: <kbd>Ctrl</kbd>+<kbd>K</kbd> buscar ·
+      <kbd>1</kbd>–<kbd>9</kbd> segmentos · <kbd>R</kbd> recorrentes ·
+      <kbd>←</kbd><kbd>→</kbd> abas · <kbd>?</kbd> lista completa</div>
+  </div>`;
+  el.classList.add("on");
+}
+function fechaGuia(){ document.getElementById("guia").classList.remove("on"); }
+function guiaIr(i){ fechaGuia(); const f=ROTEIRO[i].go; if(f) f(); }
+
+/* ================= BUSCA GLOBAL (Ctrl+K) ================= */
+let palSel=0, palItens=[], palGlobal=false;
+
+// Escopo: se o usuário está dentro de um segmento, a busca começa por ele.
+function palEscopo(){
+  if(palGlobal) return null;
+  if(view.tipo==="seg") return view.seg;
+  if(view.tipo==="det" && umap[view.unit]) return umap[view.unit].seg;
+  return null;
+}
+function abrePal(){
+  palGlobal=false;
+  document.getElementById("pal").classList.add("on");
+  const i=document.getElementById("palin"); i.value=""; i.focus(); montaPal("");
+}
+function fechaPal(){ document.getElementById("pal").classList.remove("on"); }
+function alternaEscopo(){
+  palGlobal=!palGlobal;
+  montaPal(document.getElementById("palin").value);
+  document.getElementById("palin").focus();
+}
+const semAcento=t=>String(t||"").normalize("NFD").replace(/[\u0300-\u036f]/g,"").toLowerCase();
+
+function montaPal(q){
+  const termo=semAcento(q).trim();
+  const sg=palEscopo();
+  const unsEscopo=DB.units.filter(u=>!sg||u.seg===sg);
+  const res=[];
+
+  // segmentos
+  SEG.concat(UNS_VIG.length?["Vigiada"]:[]).forEach(x=>{
+    if(!DB.units.some(u=>u.seg===x)) return;
+    const nome=SEGNM[x]||x;
+    if(termo && !semAcento(nome).includes(termo)) return;
+    res.push({t:"Segmento",n:nome,
+      go:()=>x==="Vigiada"?go({tipo:"exc"}):go({tipo:"seg",seg:x})});
+  });
+
+  // unidades
+  unsEscopo.forEach(u=>{
+    if(termo && !semAcento(u.nome).includes(termo) && !u.cod.toLowerCase().includes(termo)) return;
+    res.push({t:SEGNM[u.seg]||u.seg,n:u.nome,x:u.cod,
+      go:()=>u.vig?go({tipo:"exc"}):go({tipo:"det",seg:u.seg,unit:u.cod})});
+  });
+
+  // contas: devolve a conta E em qual unidade ela está, dentro do escopo
+  if(termo){
+    const codsEscopo=new Set(unsEscopo.filter(u=>!u.vig).map(u=>u.cod));
+    const achadas=DB.accts.filter(a=>
+      semAcento(a.desc).includes(termo) || a.cod.includes(termo));
+    const {aberto,est}=met();
+    achadas.slice(0,12).forEach(a=>{
+      const ocor=[];
+      DB.data.forEach(d=>{
+        if(d.a!==a.cod || !codsEscopo.has(d.u)) return;
+        const [p,r]=agr(d);
+        if(Math.abs(p)<EPS && Math.abs(r)<EPS) return;
+        ocor.push({u:d.u,nome:(umap[d.u]||{}).nome||d.u,
+                   st:statusOf(p,r,aberto,est[d.u]),v:Math.abs(p)||Math.abs(r)});
+      });
+      // pendências primeiro, depois maior valor
+      ocor.sort((x,y)=>(x.st==="sem"?0:1)-(y.st==="sem"?0:1)||y.v-x.v);
+      const pend=ocor.filter(o=>o.st==="sem").length;
+      if(!ocor.length){
+        res.push({t:"Conta",n:a.desc,x:a.cod,nota:"sem movimento no escopo",go:null});
+        return;
+      }
+      ocor.slice(0,6).forEach(o=>{
+        res.push({t:"Conta",n:a.desc,sub:o.nome,x:a.cod,
+          tagsem:o.st==="sem",
+          go:()=>{ go({tipo:"det",seg:umap[o.u].seg,unit:o.u});
+                   view.filtro="todos"; view.busca=a.desc; aba="pend"; renderDet(); }});
+      });
+      if(ocor.length>6) res.push({t:"Conta",n:a.desc,
+        nota:`e mais ${ocor.length-6} unidade(s)${pend?` · ${pend} com pendência`:""}`,go:null});
+    });
+  }
+
+  palItens=res.slice(0,50); palSel=0; pintaPal();
+}
+function pintaPal(){
+  const sg=palEscopo();
+  const cab=`<div class="palcab">
+     <span>${sg?`Buscando em <b>${SEGNM[sg]||sg}</b>`:"Buscando em <b>todos os segmentos</b>"}</span>
+     ${(view.tipo==="seg"||view.tipo==="det")?`<button class="palbt" onclick="alternaEscopo()">${
+        palGlobal?"restringir ao segmento":"buscar em todos"}</button>`:""}
+   </div>`;
+  document.getElementById("palcab").innerHTML=cab;
+  document.getElementById("pallist").innerHTML=(palItens.length
+    ? palItens.map((o,i)=>`<div class="palit${i===palSel?" sel":""}${o.go?"":" inerte"}"
+        onclick="palGo(${i})">
+        <span class="pt">${o.t}</span>
+        <span class="pn2"><span class="pnn">${o.n}</span>${
+          o.sub?`<span class="psub">${o.sub}</span>`:""}${
+          o.nota?`<span class="pnota">${o.nota}</span>`:""}</span>
+        ${o.tagsem?'<span class="cf alta" style="font-size:8.5px">sem lançamento</span>':""}
+        ${o.x?`<span class="px num">${o.x}</span>`:""}</div>`).join("")
+    : `<div class="palvazio">Nada encontrado${sg?" em "+(SEGNM[sg]||sg):""}.</div>`);
+  const el=document.querySelector(".palit.sel"); if(el) el.scrollIntoView({block:"nearest"});
+}
+function palGo(i){ const o=palItens[i]; if(!o||!o.go)return; fechaPal(); o.go(); }
+// Abre a unidade e deixa a tabela só com a conta indicada.
+function abreConta(unidade,conta){
+  const u=umap[unidade]; if(!u) return;
+  const ac=amap[conta];
+  go({tipo:"det",seg:u.seg,unit:unidade});
+  view.filtro="todos";
+  view.busca=ac?ac.desc:conta;
+  aba="pend";
+  renderDet();
+}
+function buscaConta(desc){ view.busca=desc; if(view.tipo==="det") renderDet(); }
+document.addEventListener("keydown",e=>{
+  const aberto=document.getElementById("pal").classList.contains("on");
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="k"){ e.preventDefault(); aberto?fechaPal():abrePal(); return; }
+  if(aberto){
+    if(e.key==="Escape"){ fechaPal(); return; }
+    if(e.key==="ArrowDown"){ e.preventDefault();
+      do{ palSel=Math.min(palSel+1,palItens.length-1); }while(palItens[palSel]&&!palItens[palSel].go&&palSel<palItens.length-1);
+      pintaPal(); return; }
+    if(e.key==="ArrowUp"){ e.preventDefault();
+      do{ palSel=Math.max(palSel-1,0); }while(palItens[palSel]&&!palItens[palSel].go&&palSel>0);
+      pintaPal(); return; }
+    if(e.key==="Enter"){ e.preventDefault(); palGo(palSel); return; }
+    if(e.key==="Tab"){ e.preventDefault(); alternaEscopo(); return; }
+    return;
+  }
+  // atalhos globais
+  const digitando=["INPUT","TEXTAREA","SELECT"].includes((e.target.tagName||""));
+  if(digitando||e.ctrlKey||e.metaKey||e.altKey) return;
+  const k=e.key.toLowerCase();
+  const segs=SEG.filter(x=>DB.units.some(u=>u.seg===x&&!u.vig));
+  if(/^[1-9]$/.test(k)){ const sg=segs[+k-1]; if(sg){ e.preventDefault(); go({tipo:"seg",seg:sg}); } return; }
+  if(k==="h"){ e.preventDefault(); go({tipo:"hub"}); return; }
+  if(k==="e"&&UNS_VIG.length){ e.preventDefault(); go({tipo:"exc"}); return; }
+  if(k==="l"){ e.preventDefault(); go({tipo:"lastro"}); return; }
+  if(k==="p"){ e.preventDefault(); window.print(); return; }
+  if(k==="g"){ e.preventDefault(); abreGuia(); return; }
+  if(k==="r"){ e.preventDefault(); modo=modo==="rec"?"geral":"rec"; sincronizaBotoes(); render(); return; }
+  if(k==="?"||(e.shiftKey&&k==="/")){ e.preventDefault();
+    tip.innerHTML=ajuda(); tip.classList.add("fixo"); tip.style.display="block";
+    tip.style.left=Math.max(16,innerWidth/2-170)+"px"; tip.style.top="80px";
+    const fecha=()=>{ tip.classList.remove("fixo"); tip.style.display="none";
+      document.removeEventListener("click",fecha); document.removeEventListener("keydown",fecha,true); };
+    setTimeout(()=>{ document.addEventListener("click",fecha);
+      document.addEventListener("keydown",fecha,true); },80);
+    return; }
+  if(view.tipo==="det"&&(e.key==="ArrowRight"||e.key==="ArrowLeft")){
+    const ord=["pend","var","res","sin","hist"], i=ord.indexOf(aba);
+    const j=e.key==="ArrowRight"?Math.min(i+1,ord.length-1):Math.max(i-1,0);
+    if(i!==j){ e.preventDefault(); setAba(ord[j]); } return; }
+  if(e.key==="Escape"){
+    if(document.getElementById("guia").classList.contains("on")){ fechaGuia(); return; }
+    if(view.tipo==="det") go({tipo:"seg",seg:view.seg});
+    else if(view.tipo!=="hub") go({tipo:"hub"});
+  }
+});
+
+/* ================= TOOLTIP ================= */
+const tip=document.createElement("div");
+tip.className="tip"; tip.style.display="none"; document.body.appendChild(tip);
+function moveTip(e){
+  const p=14; const r=tip.getBoundingClientRect();
+  let x=e.clientX+p, y=e.clientY+p;
+  if(x+r.width>innerWidth-10) x=e.clientX-r.width-p;
+  if(y+r.height>innerHeight-10) y=Math.max(8,e.clientY-r.height-p);
+  tip.style.left=x+"px"; tip.style.top=y+"px";
+}
+document.addEventListener("mouseover",e=>{
+  if(tip.classList.contains("fixo")) return;
+  const el=e.target.closest("[data-tip]");
+  if(!el) return;
+  tip.innerHTML=decodeURIComponent(el.dataset.tip);
+  tip.style.display="block"; moveTip(e);
+});
+document.addEventListener("mousemove",e=>{
+  if(tip.style.display==="block" && !tip.classList.contains("fixo")) moveTip(e); });
+document.addEventListener("mouseout",e=>{
+  if(tip.classList.contains("fixo")) return;
+  if(e.target.closest("[data-tip]")) tip.style.display="none"; });
+const T=o=>`data-tip="${encodeURIComponent(o)}"`;
+
+/* ============ HISTÓRICO DE LANÇAMENTO ============ */
+// meses fechados em que a conta x unidade teve realizado
+function histDe(d){
+  return refMeses().filter(i=>Math.abs(d.r[i])>EPS).map(i=>DB.meses[i]);
+}
+function tipHist(hist,cf){
+  const fech=refMeses().length;
+  if(!hist.length) return `<b>Nunca lançou</b><div class="tl">Nenhum lançamento nos ${fech} meses de referência. Pode ser conta inativa ou orçamento indevido.</div>`;
+  return `<b>Lançou ${hist.length} de ${fech} meses</b>
+    <div class="tl">Meses com lançamento: ${hist.join(", ")}</div>
+    <div class="tl">Último lançamento: <b>${hist[hist.length-1]}</b></div>
+    ${cf==="alta"?`<div class="tl" style="color:#F79A9A">Lançava com regularidade e parou — falha provável.</div>`:""}`;
+}
+
+/* ====== contas sem lançamento no escopo atual ====== */
+function escopoUnidades(){
+  const {a}=met();
+  return Object.values(a).filter(o=>
+    view.tipo==="hub"?true: view.tipo==="seg"? o.seg===view.seg : o.cod===view.unit);
+}
+function semLancEscopo(){
+  const {aberto,est}=met();
+  const un=new Set(escopoUnidades().map(o=>o.cod));
+  const out=[];
+  DB.data.forEach(d=>{
+    if(!un.has(d.u)) return;
+    const p=d.p[M], r=d.r[M];
+    if(statusOf(p,r,aberto,est[d.u])!=="sem") return;
+    out.push({u:d.u,a:d.a,p,cf:confDe(d),hist:histDe(d)});
+  });
+  return out;
+}
+// top contas sem lançamento de UMA unidade (para o hover do ranking)
+function topContasUnidade(cod,n){
+  const {aberto,est}=met(), out=[];
+  DB.data.forEach(d=>{
+    if(d.u!==cod) return;
+    const p=d.p[M], r=d.r[M];
+    if(statusOf(p,r,aberto,est[cod])!=="sem") return;
+    out.push({a:d.a,p:Math.abs(p),cf:confDe(d)});
+  });
+  out.sort((x,y)=>y.p-x.p);
+  return {total:out.length, soma:out.reduce((s,o)=>s+o.p,0), top:out.slice(0,n)};
+}
+
+/* ============ GERADOR DE XLSX (multi-aba) ============ */
+const _crcT=(()=>{const t=new Uint32Array(256);
+  for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1);t[n]=c>>>0;}
+  return t;})();
+function crc32(b){let c=0xFFFFFFFF;for(let i=0;i<b.length;i++)c=_crcT[(c^b[i])&0xFF]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+function zipar(files){
+  const enc=new TextEncoder(), locais=[], centrais=[]; let off=0, total=0;
+  files.forEach(f=>{
+    const nb=enc.encode(f.name), data=f.data, crc=crc32(data), sz=data.length;
+    const lh=new Uint8Array(30+nb.length), dv=new DataView(lh.buffer);
+    dv.setUint32(0,0x04034b50,true); dv.setUint16(4,20,true);
+    dv.setUint32(14,crc,true); dv.setUint32(18,sz,true); dv.setUint32(22,sz,true);
+    dv.setUint16(26,nb.length,true);
+    lh.set(nb,30);
+    locais.push(lh,data); total+=lh.length+sz;
+    const ch=new Uint8Array(46+nb.length), d2=new DataView(ch.buffer);
+    d2.setUint32(0,0x02014b50,true); d2.setUint16(4,20,true); d2.setUint16(6,20,true);
+    d2.setUint32(16,crc,true); d2.setUint32(20,sz,true); d2.setUint32(24,sz,true);
+    d2.setUint16(28,nb.length,true); d2.setUint32(42,off,true);
+    ch.set(nb,46); centrais.push(ch);
+    off+=lh.length+sz;
+  });
+  const cdSize=centrais.reduce((s,c)=>s+c.length,0);
+  const eocd=new Uint8Array(22), de=new DataView(eocd.buffer);
+  de.setUint32(0,0x06054b50,true);
+  de.setUint16(8,files.length,true); de.setUint16(10,files.length,true);
+  de.setUint32(12,cdSize,true); de.setUint32(16,total,true);
+  const out=new Uint8Array(total+cdSize+22); let pos=0;
+  locais.forEach(b=>{out.set(b,pos);pos+=b.length;});
+  centrais.forEach(b=>{out.set(b,pos);pos+=b.length;});
+  out.set(eocd,pos);
+  return out;
+}
+const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+function colL(n){let s="";while(n>0){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=(n-m-1)/26;}return s;}
+function abaXML(a){
+  const linhas=a.linhas, hdr=a.hdr||0, pct=new Set(a.pct||[]), link=a.link||false;
+  const rows=linhas.map((row,i)=>{
+    const nr=i+1;
+    const cs=row.map((v,j)=>{
+      const ref=colL(j+1)+nr;
+      let st=0;
+      if(nr===hdr) st=1;
+      else if(a.titulos&&a.titulos.includes(nr)) st=4;
+      else if(typeof v==="number") st=pct.has(j)?3:2;
+      else if(link&&hdr&&nr>hdr&&j===0) st=5;
+      if(typeof v==="number" && isFinite(v)) return `<c r="${ref}" s="${st}"><v>${v}</v></c>`;
+      if(v===null||v===undefined||v==="") return "";
+      return `<c r="${ref}" s="${st}" t="inlineStr"><is><t xml:space="preserve">${esc(v)}</t></is></c>`;
+    }).join("");
+    return `<row r="${nr}">${cs}</row>`;
+  }).join("");
+  const cols=(a.larg||[]).map((w,i)=>`<col min="${i+1}" max="${i+1}" width="${w}" customWidth="1"/>`).join("");
+  const nC=Math.max(...linhas.map(r=>r.length),1);
+  const filtro=hdr?`<autoFilter ref="A${hdr}:${colL(nC)}${linhas.length}"/>`:"";
+  const painel=hdr?`<sheetViews><sheetView workbookViewId="0"><pane ySplit="${hdr}" topLeftCell="A${hdr+1}" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>`:"";
+  const links=(a.hyper||[]).map(h=>`<hyperlink ref="${h.ref}" location="${esc(h.loc)}" display="${esc(h.txt||"")}"/>`).join("");
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">${painel}${cols?`<cols>${cols}</cols>`:""}<sheetData>${rows}</sheetData>${filtro}${links?`<hyperlinks>${links}</hyperlinks>`:""}</worksheet>`;
+}
+function nomeAba(s,usados){
+  let n=String(s).replace(/[\\\/\*\?\[\]:]/g,"-").slice(0,28).trim()||"Aba";
+  let base=n,i=2; while(usados.has(n.toLowerCase())){ n=(base.slice(0,25)+" "+i); i++; }
+  usados.add(n.toLowerCase()); return n;
+}
+function baixaXLSX(nome,abas){ // abas: [{nome, linhas:[[...]]}]
+  const enc=new TextEncoder(), usados=new Set();
+  abas=abas.map(a=>({...a,nome:nomeAba(a.nome,usados)}));
+  const files=[];
+  files.push({name:"[Content_Types].xml",data:enc.encode(
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+<Default Extension="xml" ContentType="application/xml"/>
+<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>
+${abas.map((a,i)=>`<Override PartName="/xl/worksheets/sheet${i+1}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>`).join("")}
+</Types>`)});
+  files.push({name:"_rels/.rels",data:enc.encode(
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>`)});
+  files.push({name:"xl/workbook.xml",data:enc.encode(
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>
+${abas.map((a,i)=>`<sheet name="${esc(a.nome)}" sheetId="${i+1}" r:id="rId${i+1}"/>`).join("")}
+</sheets></workbook>`)});
+  files.push({name:"xl/_rels/workbook.xml.rels",data:enc.encode(
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+${abas.map((a,i)=>`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet${i+1}.xml"/>`).join("")}
+<Relationship Id="rId${abas.length+1}" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>
+</Relationships>`)});
+  files.push({name:"xl/styles.xml",data:enc.encode(
+    `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+<numFmts count="2"><numFmt numFmtId="164" formatCode="#,##0.00;[Red]-#,##0.00"/><numFmt numFmtId="165" formatCode="0.0&quot;%&quot;"/></numFmts>
+<fonts count="4"><font><sz val="11"/><name val="Calibri"/></font>
+<font><b/><color rgb="FFFFFFFF"/><sz val="11"/><name val="Calibri"/></font>
+<font><b/><sz val="13"/><name val="Calibri"/></font>
+<font><color rgb="FF1F5FA8"/><u/><sz val="11"/><name val="Calibri"/></font></fonts>
+<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>
+<fill><patternFill patternType="solid"><fgColor rgb="FF0C2340"/><bgColor indexed="64"/></patternFill></fill></fills>
+<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>
+<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>
+<cellXfs count="6"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
+<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/>
+<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+<xf numFmtId="165" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>
+<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>
+<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs>
+</styleSheet>`)});
+  abas.forEach((a,i)=>files.push({name:`xl/worksheets/sheet${i+1}.xml`,data:enc.encode(abaXML(a))}));
+  const blob=new Blob([zipar(files)],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"});
+  const el=document.createElement("a");
+  el.href=URL.createObjectURL(blob); el.download=nome;
+  document.body.appendChild(el); el.click(); document.body.removeChild(el);
+  URL.revokeObjectURL(el.href);
+}
+
+/* ---------- exportação ---------- */
+const round2=n=>Math.round(n*100)/100;
+const hoje=()=>new Date().toISOString().slice(0,10);
+const limpaNome=t=>t.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^\w-]+/g,"_");
+
+const CAB=["Conta","Descricao da conta","Natureza","Recorrente","Planejado","Realizado","Variacao",
+           "Variacao %","Efeito","Status","Confianca","Meses que lancou","Ultimo lancamento",
+           "Classificacao"];
+
+// Todas as contas de uma unidade no período e no modo atuais.
+// Lista completa: ignora filtro/busca da tela, mas RESPEITA modo e período.
+function linhasUnidade(cod){
+  const {aberto,est}=met(), out=[];
+  DB.data.forEach(d=>{
+    if(d.u!==cod) return;
+    if(modo==="rec" && !ehRec(d.a)) return;      // só recorrentes no modo recorrentes
+    const [p,r]=agr(d);                          // agrega os meses do período
+    if(Math.abs(p)<EPS && Math.abs(r)<EPS) return;
+    const ac=amap[d.a]||{desc:"",rec:"—",fv:"—"};
+    out.push({a:d.a,desc:ac.desc,nat:natureza(d.a),p,r,v:r-p,
+      pct:Math.abs(p)>EPS?((r-p)/Math.abs(p)*100):null,
+      fav:favor(r-p),
+      st:statusOf(p,r,aberto,est[cod]), cf:confDe(d), hist:histDe(d),
+      rec:ehRec(d.a)?"Sim":"Nao",
+      cls:(ac.fv||"—")+" · "+(ac.rec||"—")});
+  });
+  out.sort((x,y)=>(STO[x.st]-STO[y.st])||Math.abs(y.p)-Math.abs(x.p));
+  return out;
+}
+const linhaXLS=r=>[r.a,r.desc,r.nat,r.rec,r.p,r.r,r.v,
+   r.pct==null?"":+r.pct.toFixed(1), r.st==="sem"?"":FAVLBL[r.fav],
+   ST[r.st], r.st==="sem"?CONF[r.cf]:"",
+   r.hist.length, r.hist.length?r.hist[r.hist.length-1]:"", r.cls];
+
+// aba de resumo / índice (uma linha por unidade, com link para a aba dela)
+const CAB_RES=["Segmento","Cod. unidade","Unidade","Periodo","Contas com orcamento",
+  "Contas sem lancamento","Lancavam todo mes","Lanca as vezes","Nunca lancou",
+  "R$ exposto","Planejado","Realizado","Variacao","Efeito"];
+const LARG_RES=[14,12,30,9,13,14,13,13,12,15,15,15,15,13];
+const LARG_UNI=[15,42,14,11,15,15,15,11,13,16,16,10,10,26];
+
+function exportaConjunto(uns,nomeArq){
+  const comAba=uns.filter(o=>o.sem>0).sort((x,y)=>y.expo-x.expo);
+  const usados=new Set(); const nomes={};
+  comAba.forEach(o=>{ nomes[o.cod]=nomeAba(o.nome,usados); });
+
+  // --- índice ---
+  const li=[[`Análise de variação · ${faixaLbl()} · ${MODOLBL[modo]}`],
+            [`${uns.length} unidades · ${comAba.length} com contas pendentes${modo==="rec"?" nas "+N_REC+" contas recorrentes":""} · clique no nome para abrir a aba`],
+            [], CAB_RES];
+  const hyper=[];
+  uns.sort((x,y)=>y.expo-x.expo).forEach((o,k)=>{
+    const rs=linhasUnidade(o.cod).filter(r=>r.st==="sem");
+    const c={alta:0,media:0,baixa:0}; rs.forEach(r=>c[r.cf]++);
+    const v=o.real-o.plan;
+    li.push([SEGNM[o.seg],o.cod,o.nome,faixaLbl(),o.orc,o.sem,
+      c.alta,c.media,c.baixa,round2(o.expo),round2(o.plan),round2(o.real),round2(v),FAVLBL[favor(v)]]);
+    if(nomes[o.cod]) hyper.push({ref:"C"+(li.length),loc:`'${nomes[o.cod]}'!A1`,txt:o.nome});
+  });
+  const abas=[{nome:"Resumo",linhas:li,hdr:4,larg:LARG_RES,titulos:[1],
+               hyper,link:false}];
+  // marca a coluna C como link (estilo) — feito via hyper acima
+  comAba.forEach(o=>{
+    const rs=linhasUnidade(o.cod);
+    const l=[[`${o.nome} (${o.cod}) — ${SEGNM[o.seg]} — ${faixaLbl()} (${PERLBL[periodo]})`],
+             [`${MODOLBL[modo]}${modo==="rec"?" — só as "+N_REC+" contas recorrentes":""} · ${o.sem} contas com orçamento e sem lançamento · R$ ${Math.round(o.expo).toLocaleString("pt-BR")} exposto`],
+             [], CAB];
+    rs.forEach(r=>l.push(linhaXLS(r)));
+    l.push([]); l.push(["« voltar ao Resumo"]);
+    abas.push({nome:nomes[o.cod],linhas:l,hdr:4,pct:[7],larg:LARG_UNI,titulos:[1],
+               hyper:[{ref:"A"+l.length,loc:"Resumo!A4",txt:"« voltar ao Resumo"}]});
+  });
+  baixaXLSX(nomeArq,abas);
+}
+function exportUnidade(){
+  const {a}=met(), o=a[view.unit];
+  exportaConjunto([o],`variacao_${modo==="rec"?"recorrentes_":""}${limpaNome(o.nome)}_${limpaNome(faixaLbl())}_${hoje()}.xlsx`);
+}
+function exportSeg(){
+  const {a}=met();
+  const uns=Object.values(a).filter(o=>o.seg===view.seg).sort((x,y)=>y.expo-x.expo);
+  exportaConjunto(uns,`variacao_${modo==="rec"?"recorrentes_":""}${limpaNome(SEGNM[view.seg])}_${limpaNome(faixaLbl())}_${hoje()}.xlsx`);
+}
+function exportGeral(){
+  const {a}=met();
+  const uns=Object.values(a).sort((x,y)=>y.expo-x.expo);
+  exportaConjunto(uns,`variacao_${modo==="rec"?"recorrentes":"geral"}_${limpaNome(faixaLbl())}_${hoje()}.xlsx`);
+}
+
+/* ---------- LASTRO SEM ORÇAMENTO (visão do ano) ---------- */
+// Espelho do orçamento sem lastro: contas lançadas mês após mês e nunca
+// orçadas. É gasto recorrente fora do orçamento — insumo do próximo ciclo.
+function lastroSemOrc(minMeses){
+  const fech=[...Array(12).keys()].filter(i=>DB.fechado[i] && !ehParcial(i));
+  const out=[];
+  DB.data.forEach(d=>{
+    if(!ehPendencia(d.a)) return;
+    if(modo==="rec" && !ehRec(d.a)) return;
+    const mr=fech.filter(i=>Math.abs(d.r[i])>EPS).length;
+    const mo=fech.filter(i=>Math.abs(d.p[i])>EPS).length;
+    if(mr<minMeses || mo>0) return;
+    const val=fech.reduce((s,i)=>s+Math.abs(d.r[i]),0);
+    if(corte>0 && val<corte) return;
+    out.push({u:d.u,nome:(umap[d.u]||{}).nome||d.u,seg:(umap[d.u]||{}).seg,
+              a:d.a,desc:(amap[d.a]||{}).desc||d.a,meses:mr,val,
+              media:val/(mr||1), rec:ehRec(d.a)});
+  });
+  return out.sort((x,y)=>y.val-x.val);
+}
+function renderLastroSemOrc(){
+  const lst=lastroSemOrc(6);
+  const tot=lst.reduce((s,o)=>s+o.val,0);
+  const porUn={};
+  lst.forEach(o=>{ (porUn[o.u]=porUn[o.u]||{nome:o.nome,seg:o.seg,n:0,val:0});
+                   porUn[o.u].n++; porUn[o.u].val+=o.val; });
+  const uns=Object.entries(porUn).sort((a,b)=>b[1].val-a[1].val).slice(0,10);
+  document.getElementById("kpis").innerHTML=`
+   <div class="kpi" ${T(`<b>Linhas sem orçamento</b><div class="tl">Combinações conta × unidade lançadas em 6 meses ou mais e sem nenhum orçamento no ano.</div>`)}>
+     <div class="lbl">Linhas sem orçamento</div><div class="v num">${lst.length}</div>
+     <div class="sub">conta × unidade</div></div>
+   <div class="kpi a"><div class="lbl">Gasto sem previsão</div><div class="v num">${fmtMi(tot)}</div>
+     <div class="sub">realizado no ano, sem orçar</div></div>
+   <div class="kpi c"><div class="lbl">Unidades envolvidas</div><div class="v num">${Object.keys(porUn).length}</div>
+     <div class="sub">de ${DB.units.filter(u=>!u.vig).length}</div></div>
+   <div class="kpi g"><div class="lbl">Média por linha</div><div class="v num">${fmtMi(lst.length?tot/lst.length:0)}</div>
+     <div class="sub">realizado no ano</div></div>`;
+  const mx=Math.max(...lst.map(o=>o.val),1);
+  document.getElementById("body").innerHTML=`
+    <div class="expl" style="border-left:3px solid #A78BFA;margin-bottom:18px">
+      <div class="expl2" style="margin:0;font-size:12px;color:var(--mut)">
+      Estas linhas tiveram lançamento mês após mês e <b>nunca</b> foram orçadas em 2026.
+      É gasto recorrente que ficou de fora do orçamento — o oposto do orçamento sem lastro.
+      Serve de insumo para o próximo ciclo: incluir a previsão.
+      ${mesesAtivos().some(ehParcial)?" Meses em fechamento parcial ficam fora desta conta.":""}</div>
+    </div>
+    <div class="cols2" style="margin-bottom:18px">
+      <div><div class="sect">Unidades com mais gasto não orçado</div>
+        <div class="worst">${uns.map(([c,o],i)=>`<div class="wrow" onclick="go({tipo:'det',seg:'${o.seg}',unit:'${c}'})">
+          <span class="rk num">${i+1}</span>
+          <span class="sg" style="${tint(o.seg)}">${SEGNM[o.seg]}</span>
+          <span class="nm">${o.nome}</span>
+          <span class="num" style="color:var(--dim);font-size:11px">${o.n} linhas</span>
+          <span class="qt num" style="width:78px;color:#C4B5FD">R$ ${fmtMi(o.val)}</span></div>`).join("")}</div></div>
+      <div><div class="sect">Concentração</div>
+        <div class="worst" style="padding:14px 16px">
+          ${lst.slice(0,6).map(o=>`<div class="erow clicavel" onclick="abreConta('${o.u}','${o.a}')">
+            <span class="bn">${o.desc}<span class="nat"> · ${o.nome} · ${o.a}</span></span>
+            <span class="bb" style="width:${(o.val/mx*70).toFixed(0)}px;background:#A78BFA"></span>
+            <span class="num" style="width:104px;text-align:right;color:#C4B5FD">${fmtC(o.val)}</span></div>`).join("")}
+        </div></div>
+    </div>
+    <div class="sect">Todas as linhas · ${lst.length}
+      <button class="xbtn" onclick="exportLastroSemOrc()">exportar</button></div>
+    <div class="tw"><table><thead><tr>
+      <th>Unidade</th><th>Segmento</th><th>Conta</th><th>Descrição</th>
+      <th class="r">Meses lançados</th><th class="r">Média/mês</th><th class="r">Total no ano</th><th>Recorrente</th>
+    </tr></thead><tbody>${lst.slice(0,300).map(o=>`<tr class="lin" onclick="abreConta('${o.u}','${o.a}')">
+      <td>${o.nome}</td><td><span class="sg" style="${tint(o.seg)}">${SEGNM[o.seg]}</span></td>
+      <td class="num" style="color:var(--dim)">${o.a}</td><td>${o.desc}</td>
+      <td class="r num">${o.meses}</td><td class="r num">${fmtC(o.media)}</td>
+      <td class="r num" style="color:#C4B5FD">${fmtC(o.val)}</td>
+      <td>${o.rec?'<span class="cf alta" style="font-size:9px">recorrente</span>':'<span style="color:var(--s3)">—</span>'}</td>
+    </tr>`).join("")}</tbody></table></div>
+    ${lst.length>300?`<div class="expl2">Mostrando as 300 maiores. A exportação traz todas.</div>`:""}`;
+}
+function exportLastroSemOrc(){
+  const lst=lastroSemOrc(6);
+  const l=[[`Lastro sem orçamento · 2026 · ${MODOLBL[modo]}`],
+           [`${lst.length} linhas lançadas 6+ meses e nunca orçadas · R$ ${Math.round(lst.reduce((s,o)=>s+o.val,0)).toLocaleString("pt-BR")}`],
+           [],
+           ["Unidade","Cod. unidade","Segmento","Conta","Descricao da conta",
+            "Meses lancados","Media por mes","Total no ano","Recorrente"]];
+  lst.forEach(o=>l.push([o.nome,o.u,SEGNM[o.seg],o.a,o.desc,o.meses,
+     round2(o.media),round2(o.val),o.rec?"Sim":"Nao"]));
+  baixaXLSX(`lastro_sem_orcamento_2026_${hoje()}.xlsx`,
+    [{nome:"Sem orcamento",linhas:l,hdr:4,larg:[30,12,14,15,42,14,15,16,12],titulos:[1]}]);
+}
+
+/* ---------- ORÇAMENTO SEM LASTRO: tela ---------- */
+function renderLastro(){
+  const lst=semLastro(6);
+  const tot=lst.reduce((s,o)=>s+o.val,0);
+  const porUn={};
+  lst.forEach(o=>{ (porUn[o.u]=porUn[o.u]||{nome:o.nome,seg:o.seg,n:0,val:0}); 
+                   porUn[o.u].n++; porUn[o.u].val+=o.val; });
+  const uns=Object.entries(porUn).sort((a,b)=>b[1].val-a[1].val).slice(0,10);
+  document.getElementById("kpis").innerHTML=`
+   <div class="kpi" ${T(`<b>Linhas sem lastro</b><div class="tl">Combinações conta × unidade orçadas em 6 meses ou mais dos meses fechados e que não tiveram nenhum lançamento no ano.</div>`)}>
+     <div class="lbl">Linhas sem lastro</div><div class="v num">${lst.length}</div>
+     <div class="sub">conta × unidade</div></div>
+   <div class="kpi a"><div class="lbl">Orçamento parado</div><div class="v num">${fmtMi(tot)}</div>
+     <div class="sub">no ano, sem contrapartida</div></div>
+   <div class="kpi c"><div class="lbl">Unidades envolvidas</div><div class="v num">${Object.keys(porUn).length}</div>
+     <div class="sub">de ${DB.units.length}</div></div>
+   <div class="kpi g"><div class="lbl">Média por linha</div><div class="v num">${fmtMi(lst.length?tot/lst.length:0)}</div>
+     <div class="sub">orçado no ano</div></div>`;
+  const mx=Math.max(...lst.map(o=>o.val),1);
+  document.getElementById("body").innerHTML=`
+    <div class="expl" style="border-left:3px solid #A78BFA;margin-bottom:18px">
+      <div class="expl2" style="margin:0;font-size:12px;color:var(--mut)">
+      Estas linhas foram orçadas mês após mês e <b>nunca</b> tiveram lançamento em 2026.
+      Não é falha de lançamento — é orçamento sem contrapartida real. Serve de insumo para o
+      próximo ciclo orçamentário: revisar a premissa ou zerar a linha.
+      ${mesesAtivos().some(ehParcial)?" Meses em fechamento parcial ficam fora desta conta.":""}</div>
+    </div>
+    <div class="cols2" style="margin-bottom:18px">
+      <div><div class="sect">Unidades com mais orçamento parado</div>
+        <div class="worst">${uns.map(([c,o],i)=>`<div class="wrow" onclick="go({tipo:'det',seg:'${o.seg}',unit:'${c}'})">
+          <span class="rk num">${i+1}</span>
+          <span class="sg" style="${tint(o.seg)}">${SEGNM[o.seg]}</span>
+          <span class="nm">${o.nome}</span>
+          <span class="num" style="color:var(--dim);font-size:11px">${o.n} linhas</span>
+          <span class="qt num" style="width:78px;color:#C4B5FD">R$ ${fmtMi(o.val)}</span></div>`).join("")}</div></div>
+      <div><div class="sect">Concentração</div>
+        <div class="worst" style="padding:14px 16px">
+          ${lst.slice(0,6).map(o=>`<div class="erow clicavel"
+              onclick="abreConta('${o.u}','${o.a}')"
+              ${T(`<b>${o.desc}</b><div class="tl">${o.nome} · conta ${o.a}</div>
+                 <div class="tl">Orçada em ${o.meses} meses, sem nenhum lançamento.</div>
+                 <div class="tl" style="color:var(--cy2)">Clique para abrir a unidade nesta conta.</div>`)}>
+            <span class="bn">${o.desc}<span class="nat"> · ${o.nome} · ${o.a}</span></span>
+            <span class="bb" style="width:${(o.val/mx*70).toFixed(0)}px;background:#A78BFA"></span>
+            <span class="num" style="width:104px;text-align:right;color:#C4B5FD">${fmtC(o.val)}</span></div>`).join("")}
+        </div></div>
+    </div>
+    <div class="sect">Todas as linhas · ${lst.length}
+      <button class="xbtn" onclick="exportLastro()">exportar</button></div>
+    <div class="tw"><table><thead><tr>
+      <th>Unidade</th><th>Segmento</th><th>Conta</th><th>Descrição</th>
+      <th class="r">Meses orçados</th><th class="r">Média/mês</th><th class="r">Total no ano</th><th>Recorrente</th>
+    </tr></thead><tbody>${lst.slice(0,300).map(o=>`<tr class="lin"
+      onclick="abreConta('${o.u}','${o.a}')">
+      <td>${o.nome}</td><td><span class="sg" style="${tint(o.seg)}">${SEGNM[o.seg]}</span></td>
+      <td class="num" style="color:var(--dim)">${o.a}</td><td>${o.desc}</td>
+      <td class="r num">${o.meses}</td><td class="r num">${fmtC(o.media)}</td>
+      <td class="r num" style="color:#C4B5FD">${fmtC(o.val)}</td>
+      <td>${o.rec?'<span class="cf alta" style="font-size:9px">recorrente</span>':'<span style="color:var(--s3)">—</span>'}</td>
+    </tr>`).join("")}</tbody></table></div>
+    ${lst.length>300?`<div class="expl2">Mostrando as 300 maiores. A exportação traz todas.</div>`:""}`;
+}
+function exportLastro(){
+  const lst=semLastro(6);
+  const l=[[`Orçamento sem lastro · 2026 · ${MODOLBL[modo]}`],
+           [`${lst.length} linhas orçadas 6+ meses e nunca lançadas · R$ ${Math.round(lst.reduce((s,o)=>s+o.val,0)).toLocaleString("pt-BR")}`],
+           [],
+           ["Unidade","Cod. unidade","Segmento","Conta","Descricao da conta",
+            "Meses orcados","Media por mes","Total no ano","Recorrente"]];
+  lst.forEach(o=>l.push([o.nome,o.u,SEGNM[o.seg],o.a,o.desc,o.meses,
+     Math.round(o.media),Math.round(o.val),o.rec?"Sim":"Nao"]));
+  baixaXLSX(`orcamento_sem_lastro_2026_${hoje()}.xlsx`,
+    [{nome:"Sem lastro",linhas:l,hdr:4,larg:[30,12,14,15,42,14,15,16,12],titulos:[1]}]);
+}
+
+/* ---------- roteamento ---------- */
+function go(v){
+  view={...view,...v};
+  if(v.tipo==="det"){ aba="pend"; view.filtro="sem"; view.busca=""; view.sk="st"; view.sd=1; }
+  else { view.filtro="todos"; view.busca=""; view.sk="st"; view.sd=1; aba="pend"; }
+  expandida=null;
+  render();
+  window.scrollTo({top:0,behavior:"smooth"});
+}
+var render=function(){
+  const aberto=met().aberto;
+  renderNav();
+  if(!["lastro","lsorc","exc"].includes(view.tipo)) renderKpis();
+  gravaURL();
+  const tt=document.getElementById("tbtitulo"), ts=document.getElementById("tbsub");
+  if(tt){ tt.textContent=document.getElementById("title").textContent;
+          ts.textContent=document.getElementById("subtitle").innerText.replace(/\s+/g," ").trim(); }
+  const cb=document.getElementById("crumb");
+  if(view.tipo==="exc"){
+    document.getElementById("title").textContent="Exceções";
+    cb.innerHTML=`<span onclick="go({tipo:'hub'})">Visão geral</span><i>›</i>Unidades vigiadas`;
+  }else if(view.tipo==="lsorc"){
+    document.getElementById("title").textContent="Lastro sem orçamento";
+    cb.innerHTML=`<span onclick="go({tipo:'hub'})">Visão geral</span><i>›</i>Diagnóstico do ano`;
+  }else if(view.tipo==="lastro"){
+    document.getElementById("title").textContent="Orçamento sem lastro";
+    cb.innerHTML=`<span onclick="go({tipo:'hub'})">Visão geral</span><i>›</i>Diagnóstico do ano`;
+  }else if(view.tipo==="hub"){
+    document.getElementById("title").textContent="Visão geral";
+    cb.innerHTML="";
+  }else if(view.tipo==="seg"){
+    document.getElementById("title").textContent=SEGNM[view.seg];
+    cb.innerHTML=`<span onclick="go({tipo:'hub'})">Visão geral</span><i>›</i>${SEGNM[view.seg]}`;
+  }else{
+    const u=umap[view.unit];
+    const e2=met().a[view.unit];
+    document.getElementById("title").innerHTML=u.nome
+      +(e2&&e2.est==="muda"?' <span class="mudo big">não lançou nada no período</span>':"");
+    cb.innerHTML=`<span onclick="go({tipo:'hub'})">Visão geral</span><i>›</i>`
+      +`<span onclick="go({tipo:'seg',seg:'${view.seg}'})">${SEGNM[view.seg]}</span><i>›</i>${u.cod}`;
+  }
+  document.getElementById("subtitle").innerHTML=
+    `${faixaLbl()} · ${aberto?"sem realizado importado":PERLBL[periodo]}`
+    +(modo==="rec"?` <span class="modotag">${N_REC} contas recorrentes</span>`:"")
+    +(corte>0?` <span class="modotag" style="background:rgba(143,163,184,.14);color:var(--mut)">ignorando abaixo de R$ ${fmtN(corte)}</span>`:"")
+    +(mesesAtivos().some(ehParcial)?` <span class="modotag parc" ${T(`<b>Fechamento parcial</b>
+        <div class="tl">Este mês tem bem menos lançamentos que os demais (${PARCIAL.tot[M]||0} contra ~${PARCIAL.med} de mediana).
+        Provavelmente ainda está sendo lançado, então as pendências tendem a cair.</div>
+        <div class="tl">Meses parciais ficam fora do cálculo de tendência.</div>`)}>fechamento parcial</span>`:"");
+  const ms2=document.getElementById("mstatus");
+  ms2.classList.toggle("open",aberto);
+  document.getElementById("mstxt").textContent=aberto?"em aberto":`${met().ms.length} mês(es)`;
+  if(view.tipo==="exc"){ renderExcecoes(); return; }
+  if(view.tipo==="lastro"){ renderLastro(); return; }
+  if(view.tipo==="lsorc"){ renderLastroSemOrc(); return; }
+  if(view.tipo==="hub") renderHub();
+  else if(view.tipo==="seg") renderSeg();
+  else renderDet();
+}
+// carimbo de geração: no fluxo de pasta sincronizada é fácil abrir versão velha
+function carimbo(){
+  try{
+  const el=document.getElementById("gerado");
+  if(!el||!DB.gerado){ return; }
+  const g=new Date(DB.gerado);
+  const dias=Math.floor((Date.now()-g.getTime())/86400000);
+  const dt=g.toLocaleDateString("pt-BR")+" "+g.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+  const velho=dias>35;
+  el.className="gerado"+(velho?" velho":"");
+  el.innerHTML=`Dados gerados em<br><b>${dt}</b>`
+    +(velho?`<br><b>há ${dias} dias — pode estar desatualizado</b>`:"");
+  }catch(e){}
+}
+
+/* ---------- estado na URL (permite salvar o próprio favorito) ---------- */
+let urlOk=true;   // alguns navegadores barram alterar a URL em arquivo local
+function gravaURL(){
+  if(!urlOk) return;
+  try{
+  const p=new URLSearchParams();
+  if(view.tipo!=="hub") p.set("v",view.tipo);
+  if(view.seg) p.set("seg",view.seg);
+  if(view.unit) p.set("un",view.unit);
+  if(modo!=="geral") p.set("m",modo);
+  if(periodo!=="mes") p.set("p",periodo);
+  if(corte>0) p.set("c",corte);
+  p.set("mes",M);
+  history.replaceState(null,"","#"+p.toString());
+  }catch(e){ urlOk=false; }   // segue funcionando, só não guarda o estado no endereço
+}
+function leURL(){
+  try{
+  const h=location.hash.replace(/^#/,"");
+  if(!h) return false;
+  const p=new URLSearchParams(h);
+  if(p.has("m")) modo=p.get("m")==="rec"?"rec":"geral";
+  if(p.has("p")) periodo=["acum","sem"].includes(p.get("p"))?p.get("p"):"mes";
+  if(p.has("c")) corte=+p.get("c")||0;
+  if(p.has("mes")){ const i=+p.get("mes"); if(i>=0&&i<12) M=i; }
+  const v=p.get("v"), sg=p.get("seg"), un=p.get("un");
+  if(v==="lastro") view.tipo="lastro";
+  else if(v==="seg"&&sg&&DB.units.some(u=>u.seg===sg)){ view.tipo="seg"; view.seg=sg; }
+  else if(v==="det"&&un&&umap[un]){ view.tipo="det"; view.unit=un; view.seg=umap[un].seg; }
+  return true;
+  }catch(e){ return false; }
+}
+function sincronizaBotoes(){
+  document.querySelectorAll("#modobar button").forEach(b=>b.classList.toggle("on",b.dataset.m===modo));
+  document.querySelectorAll("#perbar button").forEach(b=>b.classList.toggle("on",b.dataset.p===periodo));
+  document.querySelectorAll("#cortebar button").forEach(b=>b.classList.toggle("on",+b.dataset.c===corte));
+  const sel=document.getElementById("mes"); if(sel) sel.value=M;
+}
+
+function protege(fn,nome){
+  return function(){ try{ return fn.apply(this,arguments); }
+    catch(e){
+      const el=document.getElementById("body");
+      if(el) el.innerHTML=`<div class="empty">Não foi possível montar esta tela.<br>
+        <span style="font-size:11px;color:var(--dim)">${nome}: ${e.message}</span></div>`;
+      console.error(nome,e);
+    }};
+}
+render=protege(render,"render");
+
+(function init(){
+  const sel=document.getElementById("mes");
+  sel.innerHTML=DB.meses.map((m,i)=>
+    `<option value="${i}" ${i===M?"selected":""}>${m}/26${DB.fechado[i]?"":" ·"}</option>`).join("");
+  // se veio link com estado, aplica antes do primeiro render
+  sel.onchange=()=>{M=+sel.value;render();};
+  const pi=document.getElementById("palin");
+  if(pi) pi.oninput=e=>montaPal(e.target.value);
+  const pl=document.getElementById("pal");
+  if(pl) pl.onclick=e=>{ if(e.target===pl) fechaPal(); };
+  const lado=document.querySelector(".side"), fundo=document.getElementById("drawerbg");
+  const abreMenu=v=>{ lado.classList.toggle("aberta",v); fundo.classList.toggle("on",v); };
+  const hm=document.getElementById("ham");
+  if(hm) hm.onclick=()=>abreMenu(!lado.classList.contains("aberta"));
+  if(fundo) fundo.onclick=()=>abreMenu(false);
+  const tb=document.getElementById("tbbusca");
+  if(tb) tb.onclick=()=>abrePal();
+  // navegar fecha o menu no celular
+  lado.addEventListener("click",e=>{ if(e.target.closest("a")) abreMenu(false); });
+  window.fechaMenu=()=>abreMenu(false);
+  const bg2=document.getElementById("bguia");
+  if(bg2) bg2.onclick=()=>{ abreGuia(); if(window.fechaMenu) fechaMenu(); };
+  const bp=document.getElementById("bpdf");
+  if(bp) bp.onclick=()=>{ if(window.fechaMenu) fechaMenu(); setTimeout(()=>window.print(),120); };
+  const gel=document.getElementById("guia");
+  if(gel) gel.onclick=e=>{ if(e.target===gel) fechaGuia(); };
+  const bt=document.getElementById("btema");
+  if(bt) bt.onclick=()=>{ document.body.classList.toggle("claro");
+    try{ localStorage.setItem("tema",document.body.classList.contains("claro")?"claro":"escuro"); }catch(e){} };
+  try{ if(localStorage.getItem("tema")==="claro") document.body.classList.add("claro"); }catch(e){}
+  try{ leURL(); }catch(e){}
+  try{ sincronizaBotoes(); }catch(e){}
+  try{ carimbo(); }catch(e){}
+  document.querySelectorAll("#modobar button").forEach(b=>b.onclick=()=>{
+    modo=b.dataset.m;
+    document.querySelectorAll("#modobar button").forEach(x=>x.classList.toggle("on",x===b));
+    render();});
+  document.querySelectorAll("#cortebar button").forEach(b=>b.onclick=()=>{
+    corte=+b.dataset.c;
+    document.querySelectorAll("#cortebar button").forEach(x=>x.classList.toggle("on",x===b));
+    render();});
+  document.querySelectorAll("#perbar button").forEach(b=>b.onclick=()=>{
+    periodo=b.dataset.p;
+    document.querySelectorAll("#perbar button").forEach(x=>x.classList.toggle("on",x===b));
+    render();});
+  render();
+})();
+</script>
+</body>
+</html>
