@@ -372,6 +372,7 @@ teste("D2", "resumo da carga: conciliação e avisos", async () => {
     let real = 0; DB.data.forEach(d => real += d.r[7]);
     return { t, real: fmtC(real), usadas: DB.carga.usadas, ign: DB.carga.naoA + DB.carga.dummy + DB.carga.semConta + DB.carga.vazias, linhas: DB.carga.linhas }; });
   ok(r.t.includes(r.real), "total de AGO ausente do resumo");
+  ok(/Nome\s+plano_sint\.csv/.test(r.t) && /Aproveitadas \(família A\)\s+[\d.]+/.test(r.t), "rótulo e valor colados no resumo");
   ok(r.usadas + r.ign === r.linhas, "linhas não fecham: " + JSON.stringify(r));
   const q = await abre(NOVO, "num_invalido.csv");
   const aberto = await q.evaluate(() => document.getElementById("guia").classList.contains("on") && document.getElementById("guia").innerText);
@@ -745,6 +746,21 @@ teste("B3", "render de todas as telas mais rápido que o original", async () => 
   const to = await o.evaluate(SEQUENCIA_TELAS), tn = await n.evaluate(SEQUENCIA_TELAS);
   console.log(`        render (2 modos × hub, 6 segmentos × 4 visões, 12 unidades × 5 abas, diagnósticos): original ${to.toFixed(0)} ms · novo ${tn.toFixed(0)} ms`);
   ok(tn < to * 0.7, "não ficou mais rápido");
+});
+
+teste("F1", "trocar base volta à tela de carga mantendo a tela atual; cópia de negativos vai com '-' comum", async () => {
+  const p = await abre(NOVO, "plano_sint.csv");
+  await p.evaluate(() => { const s = SEG.find(s => DB.units.some(u => u.seg === s && !u.vig)); go({ tipo: "seg", seg: s }); });
+  const copia = await p.evaluate(() => { const el = [...document.querySelectorAll(".frd")].find(x => x.textContent.includes("−"));
+    const r = document.createRange(); r.selectNodeContents(el); getSelection().removeAllRanges(); getSelection().addRange(r);
+    const dt = new DataTransfer(); document.dispatchEvent(new ClipboardEvent("copy", { clipboardData: dt, bubbles: true, cancelable: true }));
+    return { tela: el.textContent, copiado: dt.getData("text/plain") }; });
+  ok(copia.copiado && !copia.copiado.includes("−") && copia.copiado === copia.tela.replace(/−/g, "-"), JSON.stringify(copia));
+  await Promise.all([p.waitForEvent("load"), p.click("#btroca")]);
+  ok(await p.evaluate(() => !!document.getElementById("_ov") && /v=seg/.test(location.hash)), "não voltou à tela de carga");
+  await p.setInputFiles("#_file", CSV("plano_sint.csv")); await p.waitForSelector("#kpis .kpi", { timeout: 90000 });
+  ok(await p.evaluate(() => view.tipo) === "seg", "tela atual não foi mantida");
+  await p.context().close();
 });
 
 /* ================================================================== */
