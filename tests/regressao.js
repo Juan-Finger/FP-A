@@ -170,6 +170,20 @@ teste("T04", "todas as telas renderizam sem erro de script", async () => {
   ok(!p._erros.length, "erros: " + p._erros.join(" | "));
 });
 
+teste("C0", "offline: nenhuma requisição de rede e CSP bloqueia exfiltração", async () => {
+  const p = await pagina("novo");
+  ok(!p._rede.length, "requisições externas: " + p._rede.join(", "));
+  const html = fs.readFileSync(NOVO, "utf8");
+  ok(!/https?:\/\/(?!www\.w3\.org|schemas\.openxmlformats\.org)/.test(html.replace(/xmlns(:\w+)?="[^"]+"/g, "")), "há URL externa no HTML");
+  ok(/Content-Security-Policy[^>]+connect-src 'none'/.test(html), "CSP ausente");
+  const r = await p.evaluate(async () => { const r = {};
+    try { await fetch("https://example.com/?d=1"); r.fetch = "passou"; } catch (e) { r.fetch = "bloqueado"; }
+    await new Promise(res => { const i = new Image(); i.onload = () => { r.img = "passou"; res(); }; i.onerror = () => { r.img = "bloqueado"; res(); }; i.src = "https://example.com/x.png"; });
+    return r; });
+  igual({ fetch: "bloqueado", img: "bloqueado" }, r, "CSP não bloqueou");
+  p._erros = p._erros.filter(e => !/example\.com|Content Security Policy/.test(e));
+});
+
 /* ================================================================== */
 (async () => {
   const filtro = process.argv.slice(2);

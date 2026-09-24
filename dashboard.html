@@ -4,7 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Análise de Variação — FP&A</title>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<!-- Arquivo 100% offline: a CSP abaixo proíbe qualquer conexão de rede (fetch, XHR,
+     beacon, imagens, fontes e folhas de estilo externas). Não remover. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; form-action 'none'; base-uri 'none'">
 <style>
 :root{
   --bg:#080F1C; --s1:#0D1829; --s2:#132135; --s3:#1A2B42;
@@ -14,6 +16,8 @@
   --tx:#E8EEF5; --mut:#8FA3B8; --dim:#5D7188;
   --alf:#3B9BC9; --cd:#9B6BC4; --tra:#14B8A6; --fro:#E0628A; --cor:#E0A458; --bko:#7C8DA6;
   --r:10px;
+  --fs:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
+  --fm:ui-monospace,'Cascadia Mono','Segoe UI Mono',Consolas,'SF Mono',Menlo,monospace;
 }
 body.claro{
   --bg:#F4F6F9; --s1:#FFFFFF; --s2:#EDF1F6; --s3:#DCE3EC;
@@ -34,9 +38,9 @@ body.claro td.hm{color:#2A1D06}
 body.claro .brand .bar{background:#0E7C94}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
-body{font-family:'Space Grotesk',system-ui,sans-serif;background:var(--bg);color:var(--tx);
+body{font-family:var(--fs);background:var(--bg);color:var(--tx);
      -webkit-font-smoothing:antialiased;font-size:14px;line-height:1.45}
-.num{font-family:'JetBrains Mono',ui-monospace,monospace;font-variant-numeric:tabular-nums;
+.num{font-family:var(--fm);font-variant-numeric:tabular-nums;
      letter-spacing:-.02em}
 .hidden{display:none!important}
 ::-webkit-scrollbar{width:9px;height:9px}
@@ -74,7 +78,7 @@ body{font-family:'Space Grotesk',system-ui,sans-serif;background:var(--bg);color
   background:var(--s1)}
 .mlbl{font-size:9.5px;color:var(--dim);letter-spacing:.11em;text-transform:uppercase;margin-bottom:6px}
 select#mes{width:100%;background:var(--s2);border:1px solid var(--line2);color:var(--cy);
-  font-family:'Space Grotesk';font-size:15px;font-weight:500;padding:7px 10px;border-radius:7px;
+  font-family:inherit;font-size:15px;font-weight:500;padding:7px 10px;border-radius:7px;
   cursor:pointer;outline:none}
 select#mes option{background:var(--s2);color:var(--tx)}
 .mstatus{font-size:10.5px;margin-top:7px;display:flex;align-items:center;gap:5px;color:var(--dim)}
@@ -365,7 +369,7 @@ td.r{text-align:right}
 .rhead{display:flex;align-items:baseline;gap:12px;font-size:10.5px;color:var(--dim);
   letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
 .rres{font-size:19px;font-weight:500;letter-spacing:0;text-transform:none;
-  font-family:'JetBrains Mono',monospace}
+  font-family:var(--fm)}
 .rres.pos{color:var(--grn)} .rres.neg{color:var(--red)}
 .rmar{margin-left:auto;font-size:11px;color:var(--mut);letter-spacing:0;text-transform:none}
 .rtab th{text-align:left}
