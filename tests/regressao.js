@@ -763,6 +763,13 @@ teste("F1", "trocar base volta à tela de carga mantendo a tela atual; cópia de
   await p.context().close();
 });
 
+teste("R1", "SEGMAP sem as entradas 6xxx–9xxx; unidades 6–9 continuam Backoffice", async () => {
+  const p = await pagina("novo");
+  const r = await p.evaluate(() => ({ mortas: Object.keys(SEGMAP).filter(k => /^[6-9]/.test(k)),
+    fora: DB.units.filter(u => /^[6-9]/.test(u.cod) && !u.vig && u.seg !== "Backoffice").map(u => u.cod) }));
+  igual({ mortas: [], fora: [] }, r, "SEGMAP");
+});
+
 /* ================================================================== */
 (async () => {
   const filtro = process.argv.slice(2).filter(a => !a.startsWith("--"));
