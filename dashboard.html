@@ -2221,6 +2221,7 @@ function palGo(i){ const o=palItens[i]; if(!o||!o.go)return; fechaPal(); o.go();
 // Abre a unidade e deixa a tabela só com a conta indicada.
 function abreConta(unidade,conta){
   const u=umap[unidade]; if(!u) return;
+  if(u.vig){ go({tipo:"exc"}); return; }
   const ac=amap[conta];
   go({tipo:"det",seg:u.seg,unit:unidade});
   view.filtro="todos";
@@ -2468,7 +2469,8 @@ ${abas.map((a,i)=>`<Relationship Id="rId${i+1}" Type="http://schemas.openxmlform
 
 /* ---------- exportação ---------- */
 const round2=n=>Math.round(n*100)/100;
-const hoje=()=>new Date().toISOString().slice(0,10);
+// data local (toISOString é UTC: depois das 21h o arquivo sairia com a data de amanhã)
+const hoje=()=>{const d=new Date(),z=n=>String(n).padStart(2,"0");return d.getFullYear()+"-"+z(d.getMonth()+1)+"-"+z(d.getDate());};
 const limpaNome=t=>t.normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[^\w-]+/g,"_");
 
 const CAB=["Conta","Descricao da conta","Natureza","Recorrente","Planejado","Realizado","Variacao",
@@ -2485,7 +2487,7 @@ function linhasUnidade(cod){
     const [p,r]=agr(d);                          // agrega os meses do período
     if(Math.abs(p)<EPS && Math.abs(r)<EPS) return;
     const ac=amap[d.a]||{desc:"",rec:"—",fv:"—"};
-    out.push({a:d.a,desc:ac.desc,nat:natureza(d.a),p,r,v:r-p,
+    out.push({a:d.a,desc:ac.desc,nat:natureza(d.a),p,r,v:r-p,d,
       pct:Math.abs(p)>EPS?((r-p)/Math.abs(p)*100):null,
       fav:favor(r-p),
       st:statusOf(p,r,aberto,est[cod]), cf:confDe(d), hist:histDe(d),
@@ -2495,7 +2497,7 @@ function linhasUnidade(cod){
   out.sort((x,y)=>(STO[x.st]-STO[y.st])||Math.abs(y.p)-Math.abs(x.p));
   return out;
 }
-const linhaXLS=r=>[r.a,r.desc,r.nat,r.rec,r.p,r.r,r.v,
+const linhaXLS=r=>[r.a,r.desc,r.nat,r.rec,round2(r.p),round2(r.r),round2(r.v),
    r.pct==null?"":+r.pct.toFixed(1), r.st==="sem"?"":FAVLBL[r.fav],
    ST[r.st], r.st==="sem"?CONF[r.cf]:"",
    r.hist.length, r.hist.length?r.hist[r.hist.length-1]:"", r.cls];
@@ -2508,7 +2510,8 @@ const LARG_RES=[14,12,30,9,13,14,13,13,12,12,15,15,15,15,13];
 const LARG_UNI=[15,42,14,11,15,15,15,11,13,16,16,10,10,26];
 
 function exportaConjunto(uns,nomeArq){
-  const comAba=uns.filter(o=>o.sem>0).sort((x,y)=>y.expo-x.expo);
+  // unidade exportada sozinha sempre ganha a aba dela, mesmo sem pendência
+  const comAba=uns.filter(o=>o.sem>0||uns.length===1).sort((x,y)=>y.expo-x.expo);
   const usados=new Set(); const nomes={};
   comAba.forEach(o=>{ nomes[o.cod]=nomeAba(o.nome,usados); });
 
@@ -2518,7 +2521,8 @@ function exportaConjunto(uns,nomeArq){
             [], CAB_RES];
   const hyper=[];
   uns.sort((x,y)=>y.expo-x.expo).forEach((o,k)=>{
-    const rs=linhasUnidade(o.cod).filter(r=>r.st==="sem");
+    // mesma regra do cartão (relevante): as colunas de confiança somam "Contas sem lançamento"
+    const rs=linhasUnidade(o.cod).filter(r=>r.st==="sem"&&relevante(r.d));
     const c={alta:0,media:0,baixa:0,nd:0}; rs.forEach(r=>c[r.cf]++);
     const v=o.real-o.plan;
     li.push([SEGNM[o.seg],o.cod,o.nome,faixaLbl(),o.orc,o.sem,
@@ -2542,6 +2546,7 @@ function exportaConjunto(uns,nomeArq){
 }
 function exportUnidade(){
   const {a}=met(), o=a[view.unit];
+  if(!o) return;
   exportaConjunto([o],`variacao_${modo==="rec"?"recorrentes_":""}${limpaNome(o.nome)}_${limpaNome(faixaLbl())}_${hoje()}.xlsx`);
 }
 function exportSeg(){
@@ -2714,13 +2719,14 @@ function exportLastro(){
            ["Unidade","Cod. unidade","Segmento","Conta","Descricao da conta",
             "Meses orcados","Media por mes","Total no ano","Recorrente"]];
   lst.forEach(o=>l.push([o.nome,o.u,SEGNM[o.seg],o.a,o.desc,o.meses,
-     Math.round(o.media),Math.round(o.val),o.rec?"Sim":"Nao"]));
+     round2(o.media),round2(o.val),o.rec?"Sim":"Nao"]));
   baixaXLSX(`orcamento_sem_lastro_2026_${hoje()}.xlsx`,
     [{nome:"Sem lastro",linhas:l,hdr:4,larg:[30,12,14,15,42,14,15,16,12],titulos:[1]}]);
 }
 
 /* ---------- roteamento ---------- */
 function go(v){
+  if(v.tipo==="det" && umap[v.unit] && umap[v.unit].vig) v={tipo:"exc"};   // vigiada tem tela própria
   view={...view,...v};
   if(v.tipo==="det"){ aba="pend"; view.filtro="sem"; view.busca=""; view.sk="st"; view.sd=1; }
   else { view.filtro="todos"; view.busca=""; view.sk="st"; view.sd=1; aba="pend"; }

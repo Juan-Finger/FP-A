@@ -470,6 +470,41 @@ teste("A12", "'há mais tempo sem lançamento' e tendência respeitam o mês sel
   await p.context().close();
 });
 
+async function baixa(p, fn) {
+  const [dl] = await Promise.all([p.waitForEvent("download", { timeout: 20000 }), p.evaluate(fn)]);
+  const f = path.join(TMP, dl.suggestedFilename()); await dl.saveAs(f);
+  return { nome: dl.suggestedFilename(), abas: JSON.parse(cp.execFileSync("python3", [path.join(__dirname, "le_xlsx.py"), f], { maxBuffer: 1 << 28 }).toString()) };
+}
+teste("A13", "exportação: centavos, contagens que fecham e unidade sem pendência", async () => {
+  const p = await pagina("novo");
+  const x = await baixa(p, () => { corte = 5000; exportGeral(); });
+  const res = x.abas["Resumo"], cab = res[3], iSem = cab.indexOf("Contas sem lancamento");
+  const falhas = [];
+  res.slice(4).forEach(l => { const soma = l[iSem + 1] + l[iSem + 2] + l[iSem + 3] + l[iSem + 4]; if (soma !== l[iSem]) falhas.push(l[1] + ": " + soma + "≠" + l[iSem]); });
+  ok(!falhas.length, "colunas de confiança não somam 'Contas sem lançamento': " + falhas.slice(0, 3));
+  for (const [aba, ls] of Object.entries(x.abas)) for (const l of ls) for (const v of l)
+    if (typeof v === "number" && Math.abs(v * 100 - Math.round(v * 100)) > 1e-6) { falhas.push(aba + ": " + v); break; }
+  ok(!falhas.length, "valor com mais de 2 casas: " + falhas.slice(0, 3));
+  ok(!/Z?\d{4}-\d{2}-\d{2}/.test(x.nome) || x.nome.includes(await p.evaluate(() => hoje())), "data do arquivo");
+  const y = await baixa(p, () => { corte = 0; const o = Object.values(met().a).find(o => o.sem === 0) || Object.values(met().a)[0];
+    view.unit = o.cod; view.seg = o.seg; exportUnidade(); });
+  ok(Object.keys(y.abas).length === 2, "unidade exportada sozinha sem a aba dela: " + Object.keys(y.abas));
+  const l = await baixa(p, () => exportLastro());
+  const vals = l.abas["Sem lastro"].slice(4).map(r => r[7]);
+  ok(vals.some(v => v % 1 !== 0), "lastro exportado sem centavos");
+  await p.evaluate(() => { corte = 0; go({ tipo: "hub" }); });
+});
+
+teste("A11", "unidade vigiada nunca abre no detalhe (sem métricas) nem quebra a exportação", async () => {
+  const p = await pagina("novo");
+  const r = await p.evaluate(() => { const v = DB.units.find(u => u.vig);
+    go({ tipo: "det", seg: v.seg, unit: v.cod }); const t1 = view.tipo;
+    go({ tipo: "hub" }); abreConta(v.cod, DB.accts[0].cod); const t2 = view.tipo;
+    let erro = null; try { view.unit = v.cod; exportUnidade(); } catch (e) { erro = e.message; }
+    go({ tipo: "hub" }); return { t1, t2, erro }; });
+  igual({ t1: "exc", t2: "exc", erro: null }, r, "vigiada");
+});
+
 /* ================================================================== */
 (async () => {
   const filtro = process.argv.slice(2).filter(a => !a.startsWith("--"));
