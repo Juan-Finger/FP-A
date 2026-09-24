@@ -213,6 +213,8 @@ td.r{text-align:right}
 .gerado b{color:var(--mut);font-weight:400}
 .gerado.velho{color:var(--amb)}
 .gerado.velho b{color:var(--amb)}
+.lnk{background:none;border:none;padding:0;margin-top:5px;color:var(--cy2);font:inherit;text-decoration:underline;cursor:pointer}
+.lnk.av{color:var(--amb)}
 .segbar{display:flex;gap:3px;background:var(--s2);border:1px solid var(--line);
   border-radius:8px;padding:3px;margin:0 10px 4px}
 .segbar button{flex:1;background:transparent;border:none;color:var(--mut);font-family:inherit;
@@ -654,7 +656,21 @@ const _REAL=[9,11,13,15,17,19,21,23,25,27,29,31];
 const _CC=0,_CCD=1,_CU=2,_CUD=3,_COLMIN=32;
 
 function _limpa(v){let t=(v||"").trim();const m=t.match(/^="?([\s\S]*?)"?$/);if(m)t=m[1];return t.replace(/^"+|"+$/g,'').trim();}
-function _num(v){let t=_limpa(v).replace(/\./g,'').replace(',','.');const n=parseFloat(t);return isNaN(n)?0:Math.round(n*100)/100;}
+// Número pt-BR ("1.234,56"). A conversão é a mesma do gerador Python (tira os
+// pontos, vírgula vira ponto, o texto inteiro tem de ser número; senão vale 0).
+// Todo valor fora do formato pt-BR é registrado e aparece no resumo da carga,
+// inclusive os que convertem mas são suspeitos (ex.: "1234.56" vira 123456).
+const _RE_NUM=/^-?(?:\d{1,3}(?:\.\d{3})+|\d*)(?:,\d*)?$/;
+function _num(v,inv,li,col){
+  let t=v||"";
+  t=(t.charCodeAt(0)===61||t.indexOf('"')>=0)?_limpa(t):t.trim();   // ="..." só quando precisa
+  if(t==="") return 0;
+  let n=Number(t.replace(/\./g,'').replace(/,/g,'.'));
+  const valido=Number.isFinite(n);
+  if(!valido) n=0;
+  if(inv&&(!valido||!_RE_NUM.test(t))) inv(t,li,col);
+  return Math.round(n*100)/100;
+}
 function _cel(l,i){return (i>=0&&i<l.length)?l[i]:"";}
 function _seg(cod){
   if(["6","7","8","9"].includes(cod[0])) return "Backoffice";
@@ -664,60 +680,142 @@ function _seg(cod){
 }
 function _compacta(v){const r=Math.round(v*100)/100;const i=Math.trunc(r);return r===i?i:r;}
 
-/* Parser CSV: delimitador ';', campos aspados com escape "" (igual csv.reader) */
-function _parseCSV(txt){
-  const rows=[];let row=[];let f="";let q=false;const n=txt.length;
-  for(let i=0;i<n;i++){const ch=txt[i];
-    if(q){ if(ch==='"'){ if(txt[i+1]==='"'){f+='"';i++;} else q=false; } else f+=ch; }
-    else { if(ch==='"')q=true; else if(ch===';'){row.push(f);f="";} else if(ch==='\n'){row.push(f);rows.push(row);row=[];f="";} else if(ch==='\r'){} else f+=ch; }
+/* Parser CSV com a mesma semântica do csv.reader do Python (delimitador ';'):
+   aspa só abre campo quoted quando é o 1º caractere do campo; "" dentro dele é
+   uma aspa; aspa no meio de um campo comum é literal. Entrega uma linha por vez
+   (não guarda o arquivo inteiro em memória). Processa a partir de `ini` e para
+   depois de `max` linhas, sempre numa fronteira de linha; devolve onde parou. */
+function _parseCSV(txt,onRow,ini=0,max=Infinity){
+  const n=txt.length; let i=ini,row=[],k=0;
+  const fim=j=>{while(j<n){const c=txt.charCodeAt(j);if(c===59||c===10||c===13)break;j++;}return j;};
+  while(i<n){ let f;
+    if(txt.charCodeAt(i)===34){ let j=i+1; f="";
+      for(;;){const q=txt.indexOf('"',j); if(q<0){f+=txt.slice(j);i=n;break;}
+        f+=txt.slice(j,q); if(txt.charCodeAt(q+1)===34){f+='"';j=q+2;} else {i=q+1;break;}}
+      const e=fim(i); f+=txt.slice(i,e); i=e;
+    } else { const e=fim(i); f=txt.slice(i,e); i=e; }
+    row.push(f); const c=txt.charCodeAt(i);
+    if(c===59){ i++; if(i===n){row.push("");onRow(row);} continue; }
+    if(c===13){ i++; if(txt.charCodeAt(i)===10) i++; } else if(c===10) i++;
+    onRow(row); row=[];
+    if(++k>=max) return i;
   }
-  if(f!==""||row.length){row.push(f);rows.push(row);}
-  return rows;
+  return n;
 }
 
-function construirPayload(txt){
-  const linhas=_parseCSV(txt);
-  if(linhas.length<2) throw new Error("O arquivo não tem linhas de dados.");
-  if(linhas[0].length<_COLMIN) throw new Error("O arquivo tem "+linhas[0].length+" colunas; o esperado são ao menos "+_COLMIN+". Confirme que é o export do Plano com Planejado e Realizado de janeiro a dezembro.");
-  const comb=new Map(), unit_desc={}, acct_desc={};
-  for(let li=1;li<linhas.length;li++){
-    const l=linhas[li]; if(!l||l.length===0)continue;
+/* Conferência do cabeçalho: só recusa CONTRADIÇÕES (ex.: "Realizado" onde deveria
+   estar o Planejado, ou "MAR" na coluna de fevereiro). Cabeçalho sem rótulo
+   reconhecível passa, com uma nota no resumo da carga. */
+const _MESN=[["jan","janeiro"],["fev","fevereiro"],["mar","marco"],["abr","abril"],["mai","maio"],["jun","junho"],
+             ["jul","julho"],["ago","agosto"],["set","setembro"],["out","outubro"],["nov","novembro"],["dez","dezembro"]];
+const _norm=t=>String(t||"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase();
+function _confereCabecalho(h){
+  const erros=[]; let reconhecidas=0;
+  for(let i=0;i<12;i++) for(const [col,tipo] of [[_PLAN[i],"Planejado"],[_REAL[i],"Realizado"]]){
+    const bruto=_limpa(_cel(h,col)), t=_norm(bruto);
+    const real=/real/.test(t), plan=/plan|orc|previs|budget/.test(t);
+    const meses=_MESN.map((ns,m)=>ns.some(x=>new RegExp("(^|[^a-z])"+x+"([^a-z]|$)").test(t))?m:-1).filter(m=>m>=0);
+    if(real||plan||meses.length) reconhecidas++;
+    if(tipo==="Planejado"&&real&&!plan || tipo==="Realizado"&&plan&&!real)
+      erros.push(`coluna ${col+1} ("${bruto}") deveria ser ${tipo} de ${_MESES[i]}`);
+    else if(meses.length&&!meses.includes(i))
+      erros.push(`coluna ${col+1} ("${bruto}") parece ser de ${_MESES[meses[0]]}, mas deveria ser ${tipo} de ${_MESES[i]}`);
+  }
+  return {erros, nota: reconhecidas ? "" : "O cabeçalho não tem rótulos de mês/Planejado/Realizado reconhecíveis; a posição das colunas não pôde ser conferida."};
+}
+
+/* Agregação conta × unidade. Regras de negócio idênticas ao gerador Python. */
+function _agregador(info){
+  const comb=new Map(), unit_desc=new Map(), acct_desc=new Map();
+  const carga={arquivo:(info&&info.nome)||"",tamanho:(info&&info.tamanho)||0,modificado:(info&&info.modificado)||0,
+    encoding:(info&&info.encoding)||"",linhas:0,usadas:0,vazias:0,naoA:0,dummy:0,semConta:0,curtas:0,
+    invalidos:0,amostrasInv:[],cabecalho:{erros:[],nota:""}};
+  let hdr=null, li=0;
+  function linha(l){
+    li++;
+    if(!hdr){
+      hdr=l;
+      if(hdr.length<_COLMIN) throw new Error("O arquivo tem "+hdr.length+" colunas; o esperado são ao menos "+_COLMIN+". Confirme que é o export do Plano com Planejado e Realizado de janeiro a dezembro.");
+      carga.cabecalho=_confereCabecalho(hdr);
+      if(carga.cabecalho.erros.length) throw new Error("As colunas do arquivo não estão na ordem esperada: "
+        +carga.cabecalho.erros.slice(0,3).join("; ")+(carga.cabecalho.erros.length>3?" …":"")
+        +". Confirme que é o export padrão do Plano.");
+      return;
+    }
+    carga.linhas++;
+    if(!l||l.length===0||(l.length===1&&l[0]==="")){carga.vazias++;return;}
     const uo=_limpa(_cel(l,_CU));
-    if(!uo.endsWith("A")||uo==="DUMMYA")continue;
+    if(uo==="DUMMYA"){carga.dummy++;return;}
+    if(!uo.endsWith("A")){carga.naoA++;return;}
     const u=_UNIFICAR[uo]||uo;
-    let c=_limpa(_cel(l,_CC)); if(!c)continue;
+    let c=_limpa(_cel(l,_CC)); if(!c){carga.semConta++;return;}
     c=_FUNDIR[c]||c;
-    if(!(u in unit_desc)||uo===u) unit_desc[u]=_limpa(_cel(l,_CUD));
-    if(!(c in acct_desc)) acct_desc[c]=_limpa(_cel(l,_CCD));
+    if(l.length<_COLMIN) carga.curtas++;
+    carga.usadas++;
+    if(!unit_desc.has(u)||uo===u) unit_desc.set(u,_limpa(_cel(l,_CUD)));
+    if(!acct_desc.has(c)) acct_desc.set(c,_limpa(_cel(l,_CCD)));
     const k=c+"\u0000"+u;
     let o=comb.get(k); if(!o){o=[new Array(12).fill(0),new Array(12).fill(0)];comb.set(k,o);}
-    for(let i=0;i<12;i++){o[0][i]+=_num(_cel(l,_PLAN[i]));o[1][i]+=_num(_cel(l,_REAL[i]));}
+    for(let i=0;i<12;i++){
+      o[0][i]+=_num(_cel(l,_PLAN[i]),inv,li,_PLAN[i]);
+      o[1][i]+=_num(_cel(l,_REAL[i]),inv,li,_REAL[i]);
+    }
   }
-  if(comb.size===0) throw new Error("Nenhuma linha aproveitável. Só entram unidades da família analítica (código terminado em 'A').");
-  const data=[];
-  for(const [k,o] of comb){
-    const idx=k.indexOf("\u0000"), c=k.slice(0,idx), u=k.slice(idx+1);
-    const tem=o[0].some(x=>Math.abs(x)>0.005)||o[1].some(x=>Math.abs(x)>0.005);
-    if(tem) data.push({a:c,u:u,p:o[0].map(_compacta),r:o[1].map(_compacta)});
+  function inv(t,linha,col){carga.invalidos++;
+    if(carga.amostrasInv.length<12) carga.amostrasInv.push({linha,coluna:col+1,valor:t});}
+  function fim(){
+    if(!hdr||carga.linhas===0) throw new Error("O arquivo não tem linhas de dados.");
+    if(comb.size===0) throw new Error("Nenhuma linha aproveitável. Só entram unidades da família analítica (código terminado em 'A').");
+    const data=[];
+    for(const [k,o] of comb){
+      const idx=k.indexOf("\u0000"), c=k.slice(0,idx), u=k.slice(idx+1);
+      const tem=o[0].some(x=>Math.abs(x)>0.005)||o[1].some(x=>Math.abs(x)>0.005);
+      if(tem) data.push({a:c,u:u,p:o[0].map(_compacta),r:o[1].map(_compacta)});
+    }
+    const units=[...unit_desc.keys()].sort().map(u=>({cod:u,nome:unit_desc.get(u)||u,seg:_VIG.has(u)?"Vigiada":_seg(u),vig:_VIG.has(u)?1:0}));
+    const ehRec=c=>{if(_REC_EXTRA.has(c))return true;return String((CLASSIF[c]||["",""])[0]).toLowerCase().startsWith("recorrente");};
+    const nat=c=>{const pre=c.split(".")[0],sub=c.slice(0,3);
+      if(pre==="3"){const ded=c.slice(0,5)==="3.1.1"&&(acct_desc.get(c)||"").includes("(-)");return ded?"ded":"rec";}
+      if(pre==="4"){if(sub==="4.2")return "out";if(sub==="4.3")return "fin";return "cd";}
+      if(pre==="5")return "imp";return "out";};
+    const accts=[...acct_desc.keys()].sort().map(c=>({cod:c,desc:acct_desc.get(c),nat:nat(c),rec:(CLASSIF[c]||["—","—"])[0],fv:(CLASSIF[c]||["—","—"])[1],r:ehRec(c)?1:0}));
+    const mes_abs=new Array(12).fill(0);
+    for(const d of data) for(let i=0;i<12;i++) mes_abs[i]+=Math.abs(d.r[i]);
+    const fechado=mes_abs.map(x=>Math.abs(x)>1);
+    // conferência: totais por mês (todas as unidades "A", inclusive vigiadas)
+    carga.totais=_MESES.map((m,i)=>{let p=0,r=0;for(const d of data){p+=d.p[i];r+=d.r[i];}return {p,r};});
+    carga.semSegmento=units.filter(u=>u.seg==="Sem segmento").map(u=>u.cod+" "+u.nome);
+    carga.semClassif=accts.filter(a=>!CLASSIF[a.cod]&&!["rec","ded"].includes(a.nat)).map(a=>a.cod+" "+a.desc);
+    const d=new Date(),z=n=>String(n).padStart(2,"0");
+    const gerado=d.getFullYear()+"-"+z(d.getMonth()+1)+"-"+z(d.getDate())+"T"+z(d.getHours())+":"+z(d.getMinutes());
+    return {meses:_MESES,fechado,units,accts,data,gerado,carga};
   }
-  const units=Object.keys(unit_desc).sort().map(u=>({cod:u,nome:unit_desc[u]||u,seg:_VIG.has(u)?"Vigiada":_seg(u),vig:_VIG.has(u)?1:0}));
-  const ehRec=c=>{if(_REC_EXTRA.has(c))return true;return String((CLASSIF[c]||["",""])[0]).toLowerCase().startsWith("recorrente");};
-  const nat=c=>{const pre=c.split(".")[0],sub=c.slice(0,3);
-    if(pre==="3"){const ded=c.slice(0,5)==="3.1.1"&&(acct_desc[c]||"").includes("(-)");return ded?"ded":"rec";}
-    if(pre==="4"){if(sub==="4.2")return "out";if(sub==="4.3")return "fin";return "cd";}
-    if(pre==="5")return "imp";return "out";};
-  const accts=Object.keys(acct_desc).sort().map(c=>({cod:c,desc:acct_desc[c],nat:nat(c),rec:(CLASSIF[c]||["—","—"])[0],fv:(CLASSIF[c]||["—","—"])[1],r:ehRec(c)?1:0}));
-  const mes_abs=new Array(12).fill(0);
-  for(const d of data) for(let i=0;i<12;i++) mes_abs[i]+=Math.abs(d.r[i]);
-  const fechado=mes_abs.map(x=>Math.abs(x)>1);
-  const d=new Date(),z=n=>String(n).padStart(2,"0");
-  const gerado=d.getFullYear()+"-"+z(d.getMonth()+1)+"-"+z(d.getDate())+"T"+z(d.getHours())+":"+z(d.getMinutes());
-  return {meses:_MESES,fechado,units,accts,data,gerado};
+  return {linha,fim};
+}
+// Versão síncrona (usada pelos testes). A tela de carga usa a assíncrona.
+function construirPayload(txt,info){
+  const ag=_agregador(info); _parseCSV(txt,ag.linha); return ag.fim();
+}
+// Processa em blocos para a tela não congelar e mostrar o progresso.
+async function construirPayloadAsync(txt,info,progresso){
+  const ag=_agregador(info); let i=0;
+  while(i<txt.length){
+    i=_parseCSV(txt,ag.linha,i,4000);
+    if(progresso) progresso(i/txt.length);
+    await new Promise(r=>setTimeout(r,0));
+  }
+  return ag.fim();
+}
+// UTF-8 quando o arquivo é UTF-8 válido (ex.: regravado pelo Excel); senão Windows-1252,
+// que é o padrão do export do Plano.
+function _decodifica(buf){
+  try{ return {txt:new TextDecoder("utf-8",{fatal:true}).decode(buf),encoding:"UTF-8"}; }
+  catch(e){ return {txt:new TextDecoder("windows-1252").decode(buf),encoding:"Windows-1252"}; }
 }
 
 /* ==== Tela de carregamento do CSV do Plano ==== */
 (function(){
-  var OV='<div id="_ov" style="position:fixed;inset:0;z-index:99999;background:#0A1220;'
+  var OV='<div id="_ov" role="dialog" aria-modal="true" aria-labelledby="_ovt" style="position:fixed;inset:0;z-index:99999;background:#0A1220;'
    +'display:flex;align-items:center;justify-content:center;padding:20px;'
    +'font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif">'
    +'<div style="max-width:520px;width:100%;background:#0D1829;border:1px solid rgba(255,255,255,.13);'
@@ -725,45 +823,66 @@ function construirPayload(txt){
    +'<div style="display:flex;gap:12px;align-items:center;margin-bottom:4px">'
    +'<div style="width:4px;height:34px;background:#22D3EE;border-radius:2px"></div>'
    +'<div><div style="font-size:12px;letter-spacing:.14em;color:#22D3EE;text-transform:uppercase;font-weight:600">FP&amp;A · Multilog</div>'
-   +'<div style="font-size:19px;font-weight:500;margin-top:2px">Análise de Variação — Orçado × Realizado</div></div></div>'
+   +'<h1 id="_ovt" style="font-size:19px;font-weight:500;margin-top:2px">Análise de Variação — Orçado × Realizado</h1></div></div>'
    +'<p style="color:#8FA3B8;font-size:13.5px;line-height:1.6;margin:14px 0 16px">'
    +'Carregue a base exportada do <b style="color:#E8EEF5">Plano</b> (o arquivo <b style="color:#E8EEF5">.csv</b>) '
    +'para montar o painel com os números atuais.</p>'
-   +'<label id="_zone" for="_file" style="display:block;cursor:pointer;text-align:center;'
+   +'<label id="_zone" style="display:block;cursor:pointer;text-align:center;'
    +'border:1.6px dashed rgba(255,255,255,.22);border-radius:11px;padding:26px 18px;transition:border-color .15s,background .15s">'
+   +'<input id="_file" type="file" accept=".csv,text/csv" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden">'
    +'<div style="font-size:14.5px;color:#E8EEF5;font-weight:500">Arraste o CSV aqui ou clique para escolher</div>'
-   +'<div style="font-size:12px;color:#5D7188;margin-top:8px">O arquivo é lido aqui no seu navegador — nada é enviado para fora.</div>'
+   +'<div style="font-size:12px;color:#8FA3B8;margin-top:8px">O arquivo é lido aqui no seu navegador — nada é enviado para fora.</div>'
    +'</label>'
-   +'<input id="_file" type="file" accept=".csv,text/csv" style="display:none">'
-   +'<div id="_msg" style="min-height:20px;margin-top:14px;font-size:13px"></div>'
-   +'</div></div>';
+   +'<div id="_msg" role="status" aria-live="polite" style="min-height:20px;margin-top:14px;font-size:13px"></div>'
+   +'</div></div>'
+   +'<style>#_zone:focus-within{border-color:#22D3EE!important;outline:2px solid #22D3EE;outline-offset:2px}</style>';
 
-  function msg(t,cor){var m=document.getElementById("_msg");if(m)m.innerHTML=t?('<span style="color:'+(cor||"#F87171")+'">'+t+'</span>'):"";}
+  var ocupado=false;
+  function msg(t,cor){var m=document.getElementById("_msg");if(!m)return;m.textContent="";
+    if(t){var s=document.createElement("span");s.style.color=cor||"#F87171";s.textContent=t;m.appendChild(s);}}
+  // Enquanto a tela de carga está aberta, o painel por trás não recebe foco nem clique.
+  function inerte(v){document.querySelectorAll("body > *").forEach(function(el){if(el.id!=="_ov")el.inert=v;});}
   function arranca(pay){
     window.__DB__=pay;
-    var ov=document.getElementById("_ov");if(ov)ov.remove();
-    var code=document.getElementById("app").textContent;
+    var erro=null, antes=window.onerror;
+    window.onerror=function(m){erro=m;return true;};
+    var code=document.getElementById("app").textContent+"\n;window.__APP_OK__=true;";
     var s=document.createElement("script");s.textContent=code;document.body.appendChild(s);
+    window.onerror=antes;
+    if(!window.__APP_OK__){ msg("O painel não conseguiu iniciar com esta base: "+(erro||"erro desconhecido")+". Recarregue a página (F5) e tente de novo."); return; }
+    var ov=document.getElementById("_ov");if(ov)ov.remove();
+    inerte(false);
+    if(window.__aoCarregar__) window.__aoCarregar__();
   }
   function processar(file){
-    if(!file)return;
+    if(!file||ocupado)return;
+    ocupado=true;
     if(!/\.csv$/i.test(file.name)) msg("Isso não parece um .csv, mas vou tentar mesmo assim…","#E7B549");
-    else msg("Processando "+file.name+"…","#8FA3B8");
-    setTimeout(function(){
-      var rd=new FileReader();
-      rd.onload=function(){try{arranca(construirPayload(rd.result));}catch(e){msg("Não deu para montar o painel: "+e.message);}};
-      rd.onerror=function(){msg("Não consegui ler o arquivo.");};
-      rd.readAsText(file,"ISO-8859-1");
-    },30);
+    else msg("Lendo "+file.name+"…","#8FA3B8");
+    var rd=new FileReader();
+    rd.onload=function(){
+      var dec=_decodifica(rd.result);
+      var info={nome:file.name,tamanho:file.size,modificado:file.lastModified||0,encoding:dec.encoding};
+      construirPayloadAsync(dec.txt,info,function(f){msg("Processando "+file.name+"… "+Math.round(f*100)+"%","#8FA3B8");})
+        .then(arranca)
+        .catch(function(e){msg("Não deu para montar o painel: "+e.message);})
+        .then(function(){ocupado=false;});
+    };
+    rd.onerror=function(){msg("Não consegui ler o arquivo.");ocupado=false;};
+    rd.readAsArrayBuffer(file);
   }
   function wire(){
     var inp=document.getElementById("_file"),zone=document.getElementById("_zone");
-    inp.addEventListener("change",function(e){processar(e.target.files[0]);});
+    inp.addEventListener("change",function(e){processar(e.target.files[0]);e.target.value="";});
     ["dragover","dragenter"].forEach(function(ev){zone.addEventListener(ev,function(e){e.preventDefault();zone.style.borderColor="#22D3EE";zone.style.background="rgba(34,211,238,.06)";});});
-    ["dragleave"].forEach(function(ev){zone.addEventListener(ev,function(e){e.preventDefault();zone.style.borderColor="";zone.style.background="";});});
-    zone.addEventListener("drop",function(e){e.preventDefault();zone.style.borderColor="";zone.style.background="";processar(e.dataTransfer.files[0]);});
+    zone.addEventListener("dragleave",function(e){e.preventDefault();zone.style.borderColor="";zone.style.background="";});
+    // Soltar o arquivo em qualquer ponto da janela: sem isto o navegador abre o CSV e sai do painel.
+    window.addEventListener("dragover",function(e){e.preventDefault();});
+    window.addEventListener("drop",function(e){e.preventDefault();zone.style.borderColor="";zone.style.background="";
+      if(document.getElementById("_ov")&&e.dataTransfer&&e.dataTransfer.files.length) processar(e.dataTransfer.files[0]);});
+    inp.focus();
   }
-  function show(){var d=document.createElement("div");d.innerHTML=OV;document.body.appendChild(d.firstChild);wire();}
+  function show(){var d=document.createElement("div");d.innerHTML=OV;while(d.firstChild)document.body.appendChild(d.firstChild);inerte(true);wire();}
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",show);else show();
 })();
 
@@ -794,6 +913,9 @@ if(!DB){
   throw new Error("template aberto sem dados");
 }
 
+
+// Escapa texto vindo do CSV antes de pôr em HTML (nomes e descrições são dados, não markup).
+const he=s=>String(s??"").replace(/[&<>"']/g,c=>"&#"+c.charCodeAt(0)+";");
 
 const SEG=["Alfandegados","CDs","Transportes","Fronteiras","Corporativo","Backoffice","Sem segmento"];
 const SEGNM={Alfandegados:"Alfandegados",CDs:"CDs",Transportes:"Transportes",Fronteiras:"Fronteiras",Corporativo:"Corporativo",Backoffice:"Backoffice",Vigiada:"Vigiada","Sem segmento":"Sem segmento"};
@@ -838,6 +960,7 @@ function faixaLbl(){
   if(periodo==="mes") return DB.meses[M]+"/26";
   return DB.meses[ms[0]]+"–"+DB.meses[ms[ms.length-1]]+"/26";
 }
+const rotMes=i=>DB.meses[i]+"/26";
 const PERLBL={mes:"mês",acum:"acumulado",sem:"semestre"};
 
 // Um mês "fechado" pode estar só parcialmente lançado. Detecta comparando o
@@ -2636,19 +2759,77 @@ var render=function(){
   else if(view.tipo==="seg") renderSeg();
   else renderDet();
 }
-// carimbo de geração: no fluxo de pasta sincronizada é fácil abrir versão velha
+// carimbo da base: no fluxo de pasta sincronizada é fácil abrir um export velho.
+// A referência é a data de modificação do CSV (o painel é montado na hora da abertura).
 function carimbo(){
   try{
   const el=document.getElementById("gerado");
-  if(!el||!DB.gerado){ return; }
-  const g=new Date(DB.gerado);
-  const dias=Math.floor((Date.now()-g.getTime())/86400000);
-  const dt=g.toLocaleDateString("pt-BR")+" "+g.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
-  const velho=dias>35;
-  el.className="gerado"+(velho?" velho":"");
-  el.innerHTML=`Dados gerados em<br><b>${dt}</b>`
-    +(velho?`<br><b>há ${dias} dias — pode estar desatualizado</b>`:"");
+  if(!el) return;
+  const c=DB.carga||{};
+  const ref=c.modificado?new Date(c.modificado):(DB.gerado?new Date(DB.gerado):null);
+  const av=avisosCarga();
+  let txt="";
+  if(ref&&!isNaN(ref)){
+    const dias=Math.floor((Date.now()-ref.getTime())/86400000);
+    const dt=ref.toLocaleDateString("pt-BR")+" "+ref.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"});
+    const velho=c.modificado&&dias>35;
+    el.className="gerado"+(velho?" velho":"");
+    txt=(c.arquivo?`Base <b>${he(c.arquivo)}</b><br>`:"")
+      +`${c.modificado?"Arquivo de":"Dados gerados em"} <b>${dt}</b>`
+      +(velho?`<br><b>há ${dias} dias — pode estar desatualizado</b>`:"");
+  }
+  el.innerHTML=txt+`<br><button class="lnk${av.length?" av":""}" id="bcarga">${av.length?`⚠ ${av.length} aviso(s) na carga`:"Resumo da carga"}</button>`;
+  document.getElementById("bcarga").onclick=()=>{ if(window.fechaMenu) fechaMenu(); abreCarga(); };
   }catch(e){}
+}
+
+/* ---------- resumo da carga (conciliação com o Plano) ---------- */
+function avisosCarga(){
+  const c=DB.carga; if(!c) return [];
+  const a=[];
+  if(c.invalidos) a.push(`${fmtN(c.invalidos)} célula(s) de valor fora do formato pt-BR (convertidas como no gerador original)`);
+  if(c.curtas) a.push(`${fmtN(c.curtas)} linha(s) com menos colunas que o esperado (valores faltantes contam como zero)`);
+  if(c.cabecalho&&c.cabecalho.nota) a.push(c.cabecalho.nota);
+  if(c.semSegmento&&c.semSegmento.length) a.push(`${c.semSegmento.length} unidade(s) sem segmento definido`);
+  return a;
+}
+function abreCarga(){
+  const c=DB.carga||{}, el=document.getElementById("guia");
+  const n=x=>fmtN(x||0);
+  const lin=(l,v,dim)=>`<div class="tr2"><span>${l}</span><b class="num"${dim?' style="color:var(--mut)"':""}>${v}</b></div>`;
+  const av=avisosCarga();
+  const lista=(arr,max=15)=>arr.slice(0,max).map(x=>`<div class="tr2"><span>${he(x)}</span></div>`).join("")
+    +(arr.length>max?`<div class="expl2">…e mais ${arr.length-max}.</div>`:"");
+  const tot=(c.totais||[]).map((t,i)=>`<tr${DB.fechado[i]?"":' style="opacity:.5"'}><td>${rotMes(i)}</td>
+      <td class="r num">${fmtC(t.p)}</td><td class="r num">${fmtC(t.r)}</td><td class="r num">${fmtC(t.r-t.p)}</td>
+      <td class="nat">${DB.fechado[i]?(ehParcial(i)?"parcial":"fechado"):"em aberto"}</td></tr>`).join("");
+  el.innerHTML=`<div class="guiabox" role="dialog" aria-modal="true" aria-labelledby="cargat">
+    <div class="guiah"><div>
+        <h2 class="gt" id="cargat">Resumo da carga</h2>
+        <div class="gs">Confira os totais com o Plano antes de analisar.</div></div>
+      <button class="gx" aria-label="Fechar" onclick="fechaGuia()">✕</button></div>
+    <div class="guial">
+      ${av.length?`<div class="gp"><div class="gpt" style="color:var(--amb)">⚠ Avisos</div><div class="gpd">${av.map(he).join("<br>")}</div>
+        ${(c.amostrasInv||[]).length?`<table class="mini" style="margin-top:8px"><thead><tr><th>Linha</th><th>Coluna</th><th>Valor no arquivo</th></tr></thead>
+          <tbody>${c.amostrasInv.map(x=>`<tr><td class="num">${x.linha}</td><td class="num">${x.coluna}</td><td class="num">${he(x.valor)}</td></tr>`).join("")}</tbody></table>`:""}
+        ${(c.semSegmento||[]).length?`<div class="expl2">Unidades sem segmento:</div>${lista(c.semSegmento)}`:""}</div>`:""}
+      <div class="gp"><div class="gpt">Arquivo</div><div class="gpd">
+        ${lin("Nome",he(c.arquivo||"—"))}${lin("Tamanho",c.tamanho?(c.tamanho/1e6).toFixed(1).replace(".",",")+" MB":"—")}
+        ${lin("Modificado em",c.modificado?new Date(c.modificado).toLocaleString("pt-BR"):"—")}${lin("Codificação",he(c.encoding||"—"))}</div></div>
+      <div class="gp"><div class="gpt">Linhas</div><div class="gpd">
+        ${lin("Lidas (sem o cabeçalho)",n(c.linhas))}${lin("Aproveitadas (família A)",n(c.usadas))}
+        ${lin("Ignoradas — unidade fora da família A",n(c.naoA),1)}${lin("Ignoradas — DUMMYA",n(c.dummy),1)}
+        ${lin("Ignoradas — sem código de conta",n(c.semConta),1)}${lin("Ignoradas — linhas vazias",n(c.vazias),1)}
+        ${lin("Combinações conta × unidade",n(DB.data.length))}
+        ${lin("Unidades",n(DB.units.length)+" ("+DB.units.filter(u=>u.vig).length+" vigiadas)")}${lin("Contas",n(DB.accts.length))}</div></div>
+      <div class="gp"><div class="gpt">Totais por mês — todas as unidades A (inclusive vigiadas)</div>
+        <table class="mini" style="margin-top:6px"><thead><tr><th>Mês</th><th class="r">Planejado</th><th class="r">Realizado</th><th class="r">Variação</th><th></th></tr></thead>
+        <tbody>${tot}</tbody></table></div>
+      ${(c.semClassif||[]).length?`<div class="gp"><div class="gpt">Contas fora da tabela de classificação (${c.semClassif.length})</div>
+        <div class="gpd">São tratadas como não recorrentes. Se alguma deveria ser recorrente, atualize a tabela CLASSIF.</div>${lista(c.semClassif,10)}</div>`:""}
+    </div>
+    <div class="guiaf">Esc fecha</div></div>`;
+  el.classList.add("on");
 }
 
 /* ---------- estado na URL (permite salvar o próprio favorito) ---------- */
@@ -2747,6 +2928,7 @@ render=protege(render,"render");
     document.querySelectorAll("#perbar button").forEach(x=>x.classList.toggle("on",x===b));
     render();});
   render();
+  if(DB.carga&&(DB.carga.invalidos||DB.carga.curtas)) abreCarga();
 })();
 </script>
 </body>

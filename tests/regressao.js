@@ -184,6 +184,105 @@ teste("C0", "offline: nenhuma requisição de rede e CSP bloqueia exfiltração"
   p._erros = p._erros.filter(e => !/example\.com|Content Security Policy/.test(e));
 });
 
+/* ---------- carga do CSV ---------- */
+const pyPayload = csv => payloadBasico(JSON.parse(cp.execFileSync("python3", [path.join(__dirname, "oraculo_python.py"), CSV(csv)], { maxBuffer: 1 << 28 }).toString()));
+async function carrega(csv, html = NOVO) {
+  const p = await abre(html, csv, { espera: false, ms: 1500 });
+  const r = await p.evaluate(() => ({ db: window.__DB__ || null, ov: !!document.getElementById("_ov"), msg: (document.getElementById("_msg") || {}).textContent || "" }));
+  r.erros = p._erros; await p.context().close(); return r;
+}
+
+teste("A1", "aspa solta no meio do campo é literal (como no csv.reader) e não engole linhas", async () => {
+  const r = await carrega("aspa_solta.csv");
+  ok(r.db, "não carregou: " + r.msg);
+  igual(pyPayload("aspa_solta.csv"), payloadBasico(r.db), "difere do Python");
+  ok(r.db.carga.usadas === 4, "linhas usadas: " + r.db.carga.usadas);
+  ok(r.db.accts.some(a => a.desc === 'Tubo 1/2" PVC'), "descrição com aspa perdida");
+});
+
+teste("A9", "número fora do formato pt-BR converte igual ao Python e é reportado", async () => {
+  const r = await carrega("num_invalido.csv");
+  ok(r.db, "não carregou: " + r.msg);
+  igual(pyPayload("num_invalido.csv"), payloadBasico(r.db), "difere do Python");
+  ok(r.db.carga.invalidos === 3, "inválidos: " + r.db.carga.invalidos);
+  igual(["1.234,56-", "1234.56", "12,5 D"], r.db.carga.amostrasInv.map(x => x.valor), "amostras");
+});
+
+teste("A10", "cabeçalho com Planejado/Realizado trocados é recusado com mensagem clara", async () => {
+  const r = await carrega("cab_trocado.csv");
+  ok(!r.db, "carregou uma base com colunas trocadas");
+  ok(r.ov && /deveria ser Planejado de JAN/.test(r.msg), "mensagem: " + r.msg);
+  const b = await carrega("plano_sint.csv");  // cabeçalho correto continua passando
+  ok(b.db && !b.db.carga.cabecalho.erros.length, "cabeçalho correto recusado");
+});
+
+teste("A11e", "CSV em UTF-8 e em Windows-1252 dão o mesmo texto", async () => {
+  const a = await carrega("utf8.csv"), b = await carrega("cp1252.csv");
+  ok(a.db && b.db, "não carregou");
+  igual(payloadBasico(b.db), payloadBasico(a.db), "UTF-8 × 1252");
+  ok(a.db.accts[0].desc === "Manutenção – veículos" && a.db.carga.encoding === "UTF-8" && b.db.carga.encoding === "Windows-1252", "encoding");
+});
+
+teste("A14", "carga robusta: drop fora da área, erro de inicialização e teclado", async () => {
+  // 1) soltar o arquivo em qualquer lugar da janela carrega o painel
+  let p = await abre(NOVO);
+  const txt = fs.readFileSync(CSV("so_orcado.csv"), "latin1");
+  const prev = await p.evaluate(t => { const dt = new DataTransfer(); dt.items.add(new File([t], "x.csv"));
+    const ev = new DragEvent("drop", { dataTransfer: dt, bubbles: true, cancelable: true }); document.body.dispatchEvent(ev); return ev.defaultPrevented; }, txt);
+  ok(prev, "drop fora da área não foi interceptado");
+  await p.waitForSelector("#kpis .kpi", { timeout: 10000 });
+  await p.context().close();
+  // 2) se o app falhar ao iniciar, a tela de carga fica e explica
+  p = await abre(NOVO);
+  await p.evaluate(() => { document.getElementById("app").textContent = "throw new Error('falha simulada')"; });
+  await p.setInputFiles("#_file", CSV("so_orcado.csv")); await p.waitForTimeout(800);
+  const st = await p.evaluate(() => ({ ov: !!document.getElementById("_ov"), msg: document.getElementById("_msg").textContent }));
+  ok(st.ov && /falha simulada/.test(st.msg), "falha de inicialização: " + JSON.stringify(st));
+  await p.context().close();
+  // 3) teclado: o foco fica no seletor de arquivo; o painel por trás não recebe foco
+  p = await abre(NOVO);
+  const focos = [];
+  for (let i = 0; i < 3; i++) { await p.keyboard.press("Tab"); focos.push(await p.evaluate(() => document.activeElement.id || document.activeElement.tagName)); }
+  ok(focos.every(f => f === "_file" || f === "BODY"), "Tab saiu da tela de carga: " + focos);
+  await p.context().close();
+});
+
+teste("B1", "carga da base de ~12 MB mais rápida que a original", async () => {
+  const t = async html => { const p = await abre(html); const a = Date.now(); await p.setInputFiles("#_file", CSV("plano_sint.csv"));
+    await p.waitForSelector("#kpis .kpi", { timeout: 90000 }); const ms = Date.now() - a; await p.context().close(); return ms; };
+  const o = await t(ORIG), n = await t(NOVO);
+  console.log(`        carga: original ${o} ms · novo ${n} ms (${(fs.statSync(CSV("plano_sint.csv")).size / 1e6).toFixed(1)} MB)`);
+  ok(n < o, "não ficou mais rápido");
+});
+
+teste("A7", "carimbo usa a data do arquivo e avisa base velha", async () => {
+  const velho = CSV("base_velha.csv");
+  fs.copyFileSync(CSV("so_orcado.csv"), velho);
+  const t = (Date.now() - 60 * 86400000) / 1000; fs.utimesSync(velho, t, t);
+  let p = await abre(NOVO, "base_velha.csv");
+  let g = await p.evaluate(() => document.getElementById("gerado").innerText);
+  ok(/base_velha\.csv/.test(g) && /Arquivo de/.test(g) && /há 60 dias/.test(g), "carimbo: " + g);
+  await p.context().close();
+  p = await pagina("novo");
+  g = await p.evaluate(() => document.getElementById("gerado").innerText);
+  ok(!/desatualizado/.test(g), "base nova marcada como velha: " + g);
+});
+
+teste("D2", "resumo da carga: conciliação e avisos", async () => {
+  const p = await pagina("novo");
+  const r = await p.evaluate(() => { abreCarga(); const t = document.getElementById("guia").innerText; fechaGuia();
+    let real = 0; DB.data.forEach(d => real += d.r[7]);
+    return { t, real: fmtC(real), usadas: DB.carga.usadas, ign: DB.carga.naoA + DB.carga.dummy + DB.carga.semConta + DB.carga.vazias, linhas: DB.carga.linhas }; });
+  ok(r.t.includes(r.real), "total de AGO ausente do resumo");
+  ok(r.usadas + r.ign === r.linhas, "linhas não fecham: " + JSON.stringify(r));
+  const q = await abre(NOVO, "num_invalido.csv");
+  const aberto = await q.evaluate(() => document.getElementById("guia").classList.contains("on") && document.getElementById("guia").innerText);
+  ok(aberto && /1\.234,56-/.test(aberto) && /3 célula/.test(aberto), "avisos não abriram sozinhos");
+  const bt = await q.evaluate(() => document.getElementById("bcarga").textContent);
+  ok(/aviso/.test(bt), "selo de aviso ausente: " + bt);
+  await q.context().close();
+});
+
 /* ================================================================== */
 (async () => {
   const filtro = process.argv.slice(2);
