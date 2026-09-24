@@ -88,6 +88,17 @@ def bordas():
     # nome com HTML e apóstrofo; unidade e conta fora das tabelas
     escreve("nomes.csv", [linha("4.9.9.99.9.99", 'Conta <img src=x onerror="window.__XSS__=1">',
                                 "4999A", "Sant'Ana <b>X</b>", v, [-90.0] * 8 + [0] * 4)])
+    # marcação e aspas em TODOS os campos de texto (nomes, descrições e códigos)
+    inj = '<i data-inj=1>'
+    linhas = []
+    for k, (u, c) in enumerate([("44'01A", "4.1.1.01.1.01"), ('44"02A', "4.1.1.01.1.02"),
+                                ("4" + inj + "A", "4.1.1.01.1.0" + inj), ("4101A", "4.1.1.02.1.01'x")]):
+        for m in range(3):
+            conta = c if m == 0 else "4.1.1.04.1.0%d" % (m + 1)
+            r = [-90.0] * 8 + [0] * 4
+            if m == 1: r[7] = 0.0
+            linhas.append(linha(conta, "Conta " + inj + " d'x \"y\"", u, "Unid " + inj + " Sant'Ana \"Z\"", v, r))
+    escreve("injecao.csv", linhas)
     # mesma base em UTF-8
     escreve("utf8.csv", [linha("4.1.1.01.1.01", "Manutenção – veículos", "4101A", "São Paulo", v, v)], enc="utf-8")
     escreve("cp1252.csv", [linha("4.1.1.01.1.01", "Manutenção – veículos", "4101A", "São Paulo", v, v)])

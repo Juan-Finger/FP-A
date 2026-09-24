@@ -149,6 +149,30 @@ teste("T02", "métricas de todas as telas idênticas ao original (fora as difere
   for (const p of [o, n]) await p.evaluate(() => { modo = "geral"; periodo = "mes"; corte = 0; M = DB.fechado.lastIndexOf(true); go({ tipo: "hub" }); });
 });
 
+/* Texto visível das telas (estado padrão) — pega mudanças acidentais de renderização */
+function TELAS() {
+  const segs = SEG.filter(s => DB.units.some(u => u.seg === s && !u.vig));
+  const cods = Object.keys(met().a).sort(), un = [cods[0], cods[4], cods[17]];
+  const passos = [["hub", () => go({ tipo: "hub" })], ["exc", () => go({ tipo: "exc" })], ["lastro", () => go({ tipo: "lastro" })], ["lsorc", () => go({ tipo: "lsorc" })]];
+  segs.forEach(s => passos.push(["seg:" + s, () => go({ tipo: "seg", seg: s })], ["ct:" + s, () => setVseg("ct")], ["mp:" + s, () => setVseg("mp")], ["un:" + s, () => setVseg("un")]));
+  un.forEach(u => ["pend", "var", "res", "sin", "hist"].forEach(a => passos.push(["det:" + u + ":" + a, () => { go({ tipo: "det", seg: umap[u].seg, unit: u }); setAba(a); }])));
+  const out = {};
+  for (const [k, f] of passos) { f(); out[k] = { kpis: document.getElementById("kpis").innerText, body: document.getElementById("body").innerText,
+    titulo: document.getElementById("title").innerText, sub: document.getElementById("subtitle").innerText }; }
+  go({ tipo: "hub" });
+  return out;
+}
+const TEXTO_INTENCIONAL = [];   // [id, fn(orig, novo, chave)] — normaliza diferenças de texto intencionais
+teste("T05", "texto visível de todas as telas idêntico ao original (estado padrão)", async () => {
+  const [o, n] = await Promise.all([pagina("orig"), pagina("novo")]);
+  const a = await o.evaluate(TELAS), b = await n.evaluate(TELAS);
+  for (const k of Object.keys(a)) {
+    const x = JSON.parse(JSON.stringify(a[k])), y = JSON.parse(JSON.stringify(b[k] || {}));
+    for (const [, fn] of TEXTO_INTENCIONAL) fn(x, y, k);
+    igual(x, y, "tela " + k);
+  }
+});
+
 teste("T03", "carrega base só com orçado (nenhum mês fechado) sem erro", async () => {
   const p = await abre(NOVO, "so_orcado.csv");
   ok(!p._erros.length, "erros: " + p._erros.join(" | "));
@@ -281,6 +305,33 @@ teste("D2", "resumo da carga: conciliação e avisos", async () => {
   const bt = await q.evaluate(() => document.getElementById("bcarga").textContent);
   ok(/aviso/.test(bt), "selo de aviso ausente: " + bt);
   await q.context().close();
+});
+
+teste("A5", "texto do CSV nunca vira HTML/JS (nomes, descrições e códigos com < ' \")", async () => {
+  const p = await abre(NOVO, "injecao.csv");
+  const r = await p.evaluate(async () => {
+    const achados = [];
+    const confere = onde => {
+      if (document.querySelector("[data-inj]")) achados.push("elemento injetado em " + onde);
+      document.querySelectorAll("[data-tip]").forEach(el => { if (/<i data-inj/i.test(decodeURIComponent(el.dataset.tip))) achados.push("tooltip em " + onde); });
+      document.querySelectorAll("[onclick]").forEach(el => { try { new Function(el.getAttribute("onclick")); } catch (e) { achados.push("onclick inválido em " + onde + ": " + el.getAttribute("onclick").slice(0, 60)); } });
+    };
+    const segs = [...new Set(DB.units.map(u => u.seg))];
+    const telas = [["hub", () => go({ tipo: "hub" })], ["exc", () => go({ tipo: "exc" })], ["lastro", () => go({ tipo: "lastro" })], ["lsorc", () => go({ tipo: "lsorc" })]];
+    segs.filter(s => s !== "Vigiada").forEach(s => telas.push(["seg " + s, () => go({ tipo: "seg", seg: s })], ["ct " + s, () => { setVseg("ct"); const c = contasDoSegmento(s)[0]; if (c) toggleConta(c.a); }], ["mp " + s, () => setVseg("mp")], ["un", () => setVseg("un")]));
+    DB.units.filter(u => !u.vig).forEach(u => ["pend", "var", "res", "sin", "hist"].forEach(a => telas.push(["det " + u.cod + " " + a, () => { go({ tipo: "det", seg: u.seg, unit: u.cod }); setAba(a); setF("todos"); toggleExp(linhas()[0] && linhas()[0].a); }])));
+    for (const [nome, f] of telas) { f(); confere(nome); }
+    abrePal(); montaPal("conta"); confere("busca global"); montaPal("unid"); confere("busca global unidades"); fechaPal();
+    abreCarga(); confere("resumo da carga"); fechaGuia();
+    return { achados: [...new Set(achados)].slice(0, 10), xss: !!window.__XSS__ };
+  });
+  ok(!r.xss && !r.achados.length, r.achados.join("\n      "));
+  // a busca da unidade aceita aspas sem quebrar o campo
+  const v = await p.evaluate(() => { const u = DB.units.find(u => !u.vig); go({ tipo: "det", seg: u.seg, unit: u.cod });
+    view.busca = 'd"x'; renderDet(); return document.getElementById("busca").value; });
+  ok(v === 'd"x', "valor da busca: " + v);
+  ok(!p._erros.length, p._erros.join(" | "));
+  await p.context().close();
 });
 
 /* ================================================================== */

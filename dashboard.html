@@ -916,6 +916,8 @@ if(!DB){
 
 // Escapa texto vindo do CSV antes de pôr em HTML (nomes e descrições são dados, não markup).
 const he=s=>String(s??"").replace(/[&<>"']/g,c=>"&#"+c.charCodeAt(0)+";");
+// Valor para dentro de um onclick="...": string JS válida e escapada para o atributo.
+const js=s=>he(JSON.stringify(String(s??"")));
 
 const SEG=["Alfandegados","CDs","Transportes","Fronteiras","Corporativo","Backoffice","Sem segmento"];
 const SEGNM={Alfandegados:"Alfandegados",CDs:"CDs",Transportes:"Transportes",Fronteiras:"Fronteiras",Corporativo:"Corporativo",Backoffice:"Backoffice",Vigiada:"Vigiada","Sem segmento":"Sem segmento"};
@@ -1098,7 +1100,7 @@ function renderNav(){
   document.getElementById("nav").innerHTML=
     `<a class="${view.tipo==='hub'?'on':''}" onclick="go({tipo:'hub'})">
        <span class="dot" style="background:var(--cy)"></span>Visão geral</a>`
-    + segs.map(s=>`<a class="${view.seg===s&&view.tipo!=='hub'?'on':''}" onclick="go({tipo:'seg',seg:'${s}'})">
+    + segs.map(s=>`<a class="${view.seg===s&&view.tipo!=='hub'?'on':''}" onclick="go({tipo:'seg',seg:${js(s)}})">
        <span class="dot" style="background:${cor(s)}"></span>${SEGNM[s]}
        <span class="n">${bys[s]||0}</span></a>`).join("")
     + (UNS_VIG.length?`<a class="${view.tipo==='exc'?'on':''}" onclick="go({tipo:'exc'})">
@@ -1162,7 +1164,7 @@ function renderKpis(){
    ${view.tipo==="det"
      ? `<div class="kpi" ${T(tpOrc)}><div class="lbl">${modo==="rec"?"Recorrentes orçadas":"Contas com orçamento"}</div>
           <div class="v num">${scope[0]?scope[0].orc:0}</div>
-          <div class="sub">${umap[view.unit].cod}</div></div>`
+          <div class="sub">${he(umap[view.unit].cod)}</div></div>`
      : `<div class="kpi" ${T(tpOrc)}><div class="lbl">Unidades</div><div class="v num">${un}</div>
           <div class="sub">${view.tipo==="hub"?"todos os segmentos":SEGNM[view.seg]}</div></div>`}
    <div class="kpi r" ${T(tpSem)}><div class="lbl">${modo==="rec"?"Recorrentes sem lançamento":"Contas sem lançamento"}</div>
@@ -1177,11 +1179,11 @@ function renderKpis(){
 // tooltip com as contas sem lançamento de uma unidade (top 10)
 function tipContas(o){
   const {total,soma,top}=topContasUnidade(o.cod,10);
-  if(!total) return `<b>${o.nome}</b><div class="tl">Sem contas pendentes neste mês.</div>`;
-  return `<b>${o.nome}</b>
+  if(!total) return `<b>${he(o.nome)}</b><div class="tl">Sem contas pendentes neste mês.</div>`;
+  return `<b>${he(o.nome)}</b>
     <div class="tl">${total} contas com orçamento e sem lançamento · R$ ${fmtMi(soma)} exposto</div>
     <div class="tsep"></div>
-    ${top.map(c=>`<div class="tr2"><span>${(amap[c.a]||{}).desc||c.a}</span>
+    ${top.map(c=>`<div class="tr2"><span>${he((amap[c.a]||{}).desc||c.a)}</span>
        <b class="num">${fmtC(c.p)}</b>
        <span class="cf ${c.cf}" style="font-size:9px">${CONF[c.cf]}</span></div>`).join("")}
     ${total>10?`<div class="tl" style="margin-top:5px">…e mais ${total-10} contas. Clique para ver todas.</div>`:""}`;
@@ -1197,7 +1199,7 @@ function renderHub(){
   const ordem=Object.keys(bys).sort((x,y)=>bys[y].expo-bys[x].expo);
   const maxE=Math.max(...ordem.map(s=>bys[s].expo),1);
   const cards=ordem.map(s=>{const b=bys[s],v=b.real-b.plan;
-    return `<div class="card fade" onclick="go({tipo:'seg',seg:'${s}'})">
+    return `<div class="card fade" onclick="go({tipo:'seg',seg:${js(s)}})">
       <div class="top"><div class="nm">${SEGNM[s]}</div>
         <span class="tag" style="${tint(s)}">${b.n} un</span></div>
       <div class="mid" style="display:block"><div class="big num ${b.expo?'':'z'}" style="font-size:25px">${aberto?"—":"R$ "+fmtMi(b.expo)}</div>
@@ -1209,10 +1211,10 @@ function renderHub(){
   // top 8 piores unidades (global)
   const worst=Object.values(a).filter(o=>o.sem>0)
     .sort((x,y)=>y.expo-x.expo).slice(0,10);
-  const wl=worst.length?worst.map((o,i)=>`<div class="wrow" onclick="go({tipo:'det',seg:'${o.seg}',unit:'${o.cod}'})">
+  const wl=worst.length?worst.map((o,i)=>`<div class="wrow" onclick="go({tipo:'det',seg:${js(o.seg)},unit:${js(o.cod)}})">
       <span class="rk num">${i+1}</span>
       <span class="sg" style="${tint(o.seg)}">${SEGNM[o.seg]}</span>
-      <span class="nm">${o.nome}</span>
+      <span class="nm">${he(o.nome)}</span>
       <span class="num cnt" style="color:var(--mut);font-size:11px" ${T(tipContas(o))}>${o.sem} contas</span>
       <span class="qt num" style="width:74px;color:var(--amb)">R$ ${fmtMi(o.expo)}</span></div>`).join("")
     : `<div class="empty">Nenhuma unidade com pendência neste mês.</div>`;
@@ -1223,8 +1225,8 @@ function renderHub(){
      <div class="at">⚠ ${mudas.length} unidade(s) não lançaram NADA em ${faixaLbl()}</div>
      <div class="ad">Vinham lançando nos meses anteriores e ficaram sem nenhum lançamento agora.
        Somam <b>R$ ${fmtMi(mudas.reduce((s,o)=>s+o.expo,0))}</b> de orçamento sem realizado.</div>
-     <div class="alist">${mudas.slice(0,12).map(o=>`<span class="ac" onclick="go({tipo:'det',seg:'${o.seg}',unit:'${o.cod}'})">
-       ${o.nome} <b>${o.sem}</b></span>`).join("")}</div></div>`:"";
+     <div class="alist">${mudas.slice(0,12).map(o=>`<span class="ac" onclick="go({tipo:'det',seg:${js(o.seg)},unit:${js(o.cod)}})">
+       ${he(o.nome)} <b>${o.sem}</b></span>`).join("")}</div></div>`:"";
   document.getElementById("body").innerHTML=
     faixaResultado(Object.keys(a))+alerta+`
     <div class="cols2">
@@ -1282,9 +1284,9 @@ function renderSeg(){
       <button class="xbtn" onclick="exportSeg()">exportar segmento</button></div>
     ${vseg==="ct"?renderContasSeg(s):vseg==="mp"?renderMapa(s):""}
     <div class="grid g3" ${vseg!=="un"?'style="display:none"':""}>`+arr.map(o=>{const v=o.real-o.plan,calm=o.sem===0;
-      return `<div class="card fade ${calm?'calm':''}" onclick="go({tipo:'det',seg:'${s}',unit:'${o.cod}'})">
-        <div class="top"><div class="nm">${o.nome}${o.est==="muda"?' <span class="mudo">parou de lançar</span>':""}</div>
-          <span class="tag" style="${tint(s)}">${o.cod}</span></div>
+      return `<div class="card fade ${calm?'calm':''}" onclick="go({tipo:'det',seg:${js(s)},unit:${js(o.cod)}})">
+        <div class="top"><div class="nm">${he(o.nome)}${o.est==="muda"?' <span class="mudo">parou de lançar</span>':""}</div>
+          <span class="tag" style="${tint(s)}">${he(o.cod)}</span></div>
         <div class="mid"><div>
             <div class="big num ${calm?'z':''}" style="font-size:24px">${aberto?"—":"R$ "+fmtMi(o.expo)}</div>
             <div class="biglbl" style="margin-top:3px">${aberto?"":o.sem+" contas · "+o.alta+" lançavam todo mês"}</div>
@@ -1472,8 +1474,8 @@ function renderExcecoes(){
      e deve ser repassado. Elas funcionam como sentinela: se algo aparecer, algum lançamento
      foi para o lugar errado ou a unidade ainda está ativa sem que o cadastro reflita isso.</div></div>
    ${lst.map(o=>`<div class="exbox ${o.linhas.length?"alerta2":"limpa2"}">
-      <div class="exh"><span class="exn">${o.u.nome}</span>
-        <span class="tag" style="background:rgba(143,163,184,.12);color:var(--mut)">${o.u.cod}</span>
+      <div class="exh"><span class="exn">${he(o.u.nome)}</span>
+        <span class="tag" style="background:rgba(143,163,184,.12);color:var(--mut)">${he(o.u.cod)}</span>
         ${o.linhas.length
           ? `<span class="exq">${o.linhas.length} conta(s) · R$ ${fmtMi(o.val)} em ${faixaLbl()}</span>`
           : `<span class="exok">sem movimento no período</span>`}
@@ -1481,7 +1483,7 @@ function renderExcecoes(){
       ${o.linhas.length?`<table class="mini exT"><thead><tr><th>Conta</th><th>Descrição</th>
          <th>Natureza</th><th class="r">Orçado</th><th class="r">Lançado</th><th>Meses com lançamento</th></tr></thead>
          <tbody>${o.linhas.slice(0,12).map(l=>`<tr>
-           <td class="num" style="color:var(--dim)">${l.a}</td><td>${l.desc}</td>
+           <td class="num" style="color:var(--dim)">${he(l.a)}</td><td>${he(l.desc)}</td>
            <td class="nat">${l.nat}</td>
            <td class="r num">${Math.abs(l.p)<EPS?"—":fmtC(l.p)}</td>
            <td class="r num" style="color:#F79A9A">${fmtC(l.r)}</td>
@@ -1570,7 +1572,7 @@ function renderSemLancarHa(cod){
      <table class="mini"><thead><tr><th>Conta</th><th class="r">Meses seguidos</th>
        <th class="r">Orçado acumulado</th><th>Desde</th><th>Último lançamento</th></tr></thead>
      <tbody>${lst.slice(0,15).map(o=>`<tr>
-       <td>${o.desc}${o.rec&&modo!=="rec"?' <span class="cf alta" style="font-size:8.5px">recorrente</span>':""}</td>
+       <td>${he(o.desc)}${o.rec&&modo!=="rec"?' <span class="cf alta" style="font-size:8.5px">recorrente</span>':""}</td>
        <td class="r"><span class="frac"><b>${o.seq}</b></span>
          <span class="bar2"><i style="width:${(o.seq/mx*100).toFixed(0)}%;background:${o.seq>=4?"var(--red)":"var(--amb)"}"></i></span></td>
        <td class="r num" style="color:var(--amb)">${fmtC(o.val)}</td>
@@ -1706,7 +1708,7 @@ function renderMapa(sg){
              : m.n===0 ? "rgba(74,222,155,.16)"
              : `rgba(239,178,92,${(0.12+t*0.78).toFixed(2)})`;
     const cs=m.n?contasDoMes(cod,i):[];
-    const lista=cs.slice(0,8).map(c=>`<div class="tr2"><span>${c.desc}</span>
+    const lista=cs.slice(0,8).map(c=>`<div class="tr2"><span>${he(c.desc)}</span>
         <b class="num">${fmtC(c.v)}</b></div>`).join("");
     return `<td class="hm${m.parcial?" pc":""}" style="background:${bg}"
       ${T(`<b>${m.mes}/26</b>${m.parcial?' <span style="color:#F3C784">(fechamento parcial)</span>':""}
@@ -1726,7 +1728,7 @@ function renderMapa(sg){
       <th class="r">Total</th></tr></thead>
     <tbody>${linhas.map(l=>{
       const tot=l.h.filter(Boolean).reduce((s,m)=>s+m.n,0);
-      return `<tr><td class="hmu" onclick="go({tipo:'det',seg:'${sg}',unit:'${l.cod}'})">${l.nome}</td>
+      return `<tr><td class="hmu" onclick="go({tipo:'det',seg:${js(sg)},unit:${js(l.cod)}})">${he(l.nome)}</td>
         ${meses.map(i=>cel(l.h[i],i,l.cod)).join("")}
         <td class="r num" style="color:var(--mut)">${tot}</td></tr>`;}).join("")}
     </tbody></table></div>`;
@@ -1756,11 +1758,11 @@ function detalheContaSeg(sg,conta,desc){
   const tp=ls.reduce((a,o)=>a+o.p,0), tr=ls.reduce((a,o)=>a+o.r,0);
   const mx=Math.max(...ls.map(o=>Math.abs(o.p)||Math.abs(o.r)),1);
   return `<tr class="exp"><td colspan="6"><div class="expbox">
-    <div class="expt">${desc} · conta ${conta} · todas as unidades de ${SEGNM[sg]} em ${faixaLbl()}</div>
+    <div class="expt">${he(desc)} · conta ${he(conta)} · todas as unidades de ${SEGNM[sg]} em ${faixaLbl()}</div>
     <table class="mini"><thead><tr><th>Unidade</th><th class="r">Orçado</th>
       <th class="r">Realizado</th><th class="r">Variação</th><th></th><th>Status</th></tr></thead>
-    <tbody>${ls.map(o=>`<tr class="clic" onclick="event.stopPropagation();abreConta('${o.cod}','${conta}')">
-      <td>${o.nome}</td>
+    <tbody>${ls.map(o=>`<tr class="clic" onclick="event.stopPropagation();abreConta(${js(o.cod)},${js(conta)})">
+      <td>${he(o.nome)}</td>
       <td class="r num">${Math.abs(o.p)<EPS?"—":fmtC(o.p)}</td>
       <td class="r num">${Math.abs(o.r)<EPS?"—":fmtC(o.r)}</td>
       <td class="r num ${o.v<0?'neg':'pos'}">${Math.abs(o.v)<EPS?"—":fmtC(o.v)}</td>
@@ -1789,16 +1791,16 @@ function renderContasSeg(sg){
       <th>Conta</th><th>Descrição</th><th class="r">Unidades c/ falha</th>
       <th class="r">R$ exposto</th><th>Alcance</th><th>Quais unidades</th>
     </tr></thead><tbody>${lst.map(o=>`<tr class="lin ${expConta===o.a?'aberta':''}"
-        onclick="toggleConta('${o.a}')">
-      <td class="num" style="color:var(--dim)"><span class="cx">${expConta===o.a?"▾":"▸"}</span>${o.a}</td>
-      <td>${o.desc}${o.rec&&modo!=="rec"?' <span class="cf alta" style="font-size:8.5px">recorrente</span>':""}</td>
+        onclick="toggleConta(${js(o.a)})">
+      <td class="num" style="color:var(--dim)"><span class="cx">${expConta===o.a?"▾":"▸"}</span>${he(o.a)}</td>
+      <td>${he(o.desc)}${o.rec&&modo!=="rec"?' <span class="cf alta" style="font-size:8.5px">recorrente</span>':""}</td>
       <td class="r"><span class="frac"><b>${o.sem}</b>/${o.tot}</span>
         <span class="bar2"><i style="width:${(o.taxa*100).toFixed(0)}%"></i></span></td>
       <td class="r num" style="color:var(--amb)">${fmtC(o.val)}</td>
       <td><span class="tp ${o.tipo}">${TIPOLBL[o.tipo]}</span></td>
       <td class="uns">${o.uns.slice(0,4).map(u=>`<span class="uc${u.muda?" m":""}"
-          onclick="go({tipo:'det',seg:'${sg}',unit:'${u.cod}'})">${u.nome}</span>`).join("")}
-        ${o.uns.length>4?`<span class="umais" ${T(o.uns.slice(4).map(u=>`<div class="tr2"><span>${u.nome}</span><b class="num">${fmtC(u.v)}</b></div>`).join(""))}>+${o.uns.length-4}</span>`:""}</td>
+          onclick="go({tipo:'det',seg:${js(sg)},unit:${js(u.cod)}})">${he(u.nome)}</span>`).join("")}
+        ${o.uns.length>4?`<span class="umais" ${T(o.uns.slice(4).map(u=>`<div class="tr2"><span>${he(u.nome)}</span><b class="num">${fmtC(u.v)}</b></div>`).join(""))}>+${o.uns.length-4}</span>`:""}</td>
     </tr>`+(expConta===o.a?detalheContaSeg(sg,o.a,o.desc):"")).join("")}</tbody></table></div>`;
 }
 
@@ -1848,7 +1850,7 @@ function renderDet(){
   const cont={todos:rows.length}; rows.forEach(r=>cont[r.st]=(cont[r.st]||0)+1);
   const chips=[["todos","Todas"],["sem","Sem lançamento"],["sorc","Sem orçamento"],["ana","Analisar"],["ok","Ok"],["zer","Zerado"]]
     .filter(([k])=>k==="todos"||cont[k])
-    .map(([k,l])=>`<div class="chip ${view.filtro===k?'on':''}" onclick="setF('${k}')">${l}<span class="c num">${cont[k]||0}</span></div>`).join("");
+    .map(([k,l])=>`<div class="chip ${view.filtro===k?'on':''}" onclick="setF(${js(k)})">${l}<span class="c num">${cont[k]||0}</span></div>`).join("");
 
   if(view.filtro!=="todos") rows=rows.filter(r=>r.st===view.filtro);
   if(view.busca){const q=view.busca.toLowerCase();
@@ -1866,9 +1868,9 @@ function renderDet(){
 
   const mxv=Math.max(...rows.map(r=>Math.abs(r.v)),1);
   const ar=key=>view.sk===key?`<span class="ar">${view.sd>0?"▼":"▲"}</span>`:"";
-  const body=rows.length?rows.map(r=>`<tr class="lin ${expandida===r.a?'aberta':''}" onclick="toggleExp('${r.a}')">
-      <td class="num" style="color:var(--dim)"><span class="cx">${expandida===r.a?"▾":"▸"}</span>${r.a}</td>
-      <td>${r.desc}</td>
+  const body=rows.length?rows.map(r=>`<tr class="lin ${expandida===r.a?'aberta':''}" onclick="toggleExp(${js(r.a)})">
+      <td class="num" style="color:var(--dim)"><span class="cx">${expandida===r.a?"▾":"▸"}</span>${he(r.a)}</td>
+      <td>${he(r.desc)}</td>
       <td class="r num">${fmtC(r.p)}</td>
       <td class="r num">${fmtC(r.r)}</td>
       <td class="r num ${r.v<0?'neg':'pos'}">${fmtC(r.v)}
@@ -1879,7 +1881,7 @@ function renderDet(){
       <td>${r.st==="sem"?'<span style="color:var(--s3)">—</span>':`<span class="fv ${r.fav}">${FAVLBL[r.fav]}</span>`}</td>
       <td><span class="st ${r.st}">${ST[r.st]}</span></td>
       <td>${r.st==="sem"?`<span class="cf ${r.cf}" ${T(tipHist(r.hist,r.cf))}>${CONF[r.cf]}</span>`:'<span style="color:var(--s3)">—</span>'}</td>
-      <td class="cls">${r.cls}</td></tr>`+(expandida===r.a?mesATes(r.d):"")).join("")
+      <td class="cls">${he(r.cls)}</td></tr>`+(expandida===r.a?mesATes(r.d):"")).join("")
     :`<tr><td colspan="11"><div class="empty">Nenhuma conta neste filtro.</div></td></tr>`;
 
   const all=linhas();
@@ -1909,7 +1911,7 @@ function renderDet(){
           margin-bottom:9px">1 · Orçado sem nenhum realizado &nbsp;·&nbsp;
           <b style="color:var(--amb)">${semL.length} contas · R$ ${fmtMi(expoT)}</b></div>
      ${semL.slice(0,5).map(r=>`<div class="erow">
-        <span class="bn">${r.desc}<span class="nat"> · ${r.nat}</span></span>
+        <span class="bn">${he(r.desc)}<span class="nat"> · ${r.nat}</span></span>
         <span class="bb" style="width:${(Math.abs(r.p)/mx1*80).toFixed(0)}px;background:var(--amb)"></span>
         <span class="num" style="width:92px;text-align:right;color:var(--amb)">${fmtC(Math.abs(r.p))}</span>
         <span class="cf ${r.cf}" style="width:104px;text-align:center" ${T(tipHist(r.hist,r.cf))}>${CONF[r.cf]}</span></div>`).join("")}
@@ -1928,7 +1930,7 @@ function renderDet(){
           margin-bottom:9px">2 · Maiores variações (orçado e realizado lançados) &nbsp;·&nbsp;
           <b class="${totV<0?'neg':'pos'}">total ${fmtMi(totV)} ${FAVLBL[favor(totV)]}</b></div>
      ${top.map(r=>`<div class="erow">
-        <span class="bn">${r.desc}<span class="nat"> · ${r.nat}</span></span>
+        <span class="bn">${he(r.desc)}<span class="nat"> · ${r.nat}</span></span>
         <span class="bb" style="width:${(Math.abs(r.v)/mx2*80).toFixed(0)}px;
               background:${r.v<0?'var(--red)':'var(--grn)'}"></span>
         <span class="num ${r.v<0?'neg':'pos'}" style="width:92px;text-align:right">${fmtC(r.v)}</span>
@@ -1941,7 +1943,7 @@ function renderDet(){
      <div style="font-size:10.5px;color:var(--dim);letter-spacing:.1em;text-transform:uppercase;margin-bottom:9px">
        Lançou sem ter orçamento &nbsp;·&nbsp; <b style="color:#C4B5FD">${sorc.length} contas · R$ ${fmtMi(tSorc)}</b></div>
      ${sorc.slice(0,5).map(r=>`<div class="erow">
-        <span class="bn">${r.desc}<span class="nat"> · ${r.nat}</span></span>
+        <span class="bn">${he(r.desc)}<span class="nat"> · ${r.nat}</span></span>
         <span class="bb" style="width:${(Math.abs(r.r)/mxS*80).toFixed(0)}px;background:#A78BFA"></span>
         <span class="num" style="width:92px;text-align:right;color:#C4B5FD">${fmtC(r.r)}</span></div>`).join("")}
      ${sorc.length>5?`<div style="font-size:11px;color:var(--dim);margin-top:7px;cursor:pointer"
@@ -1956,7 +1958,7 @@ function renderDet(){
        3 · Sinais de atenção <span style="text-transform:none;letter-spacing:0">— hipóteses a confirmar, não conclusões</span></div>
      ${an.length?`<div class="sinal"><div class="sh">Valor fora do padrão da própria conta</div>
        ${an.slice(0,4).map(o=>`<div class="erow">
-          <span class="bn">${o.desc}</span>
+          <span class="bn">${he(o.desc)}</span>
           <span style="color:var(--dim);font-size:10.5px">típico ${fmtC(o.med)}</span>
           <span class="num ${o.raz>1?'neg':'pos'}" style="width:96px;text-align:right">${fmtC(o.at)}</span>
           <span class="cf ${o.raz>1?'alta':'media'}" style="width:74px;text-align:center">${
@@ -1965,9 +1967,9 @@ function renderDet(){
      ${pr.length?`<div class="sinal"><div class="sh">Possível lançamento em conta trocada</div>
        ${mesesAtivos().some(ehParcial)?`<div class="avisop">Mês em fechamento parcial: muitas contas ainda não foram lançadas, então esses pares têm mais chance de ser coincidência. Só estão listados pares do mesmo grupo contábil.</div>`:""}
        ${pr.map(o=>`<div class="par">
-          <div class="pl"><span class="pn">sumiu</span> ${o.fdesc}
+          <div class="pl"><span class="pn">sumiu</span> ${he(o.fdesc)}
             <b class="num">${fmtC(o.fmed)}</b></div>
-          <div class="pl"><span class="pn pk">pico</span> ${o.pdesc}
+          <div class="pl"><span class="pn pk">pico</span> ${he(o.pdesc)}
             <b class="num">${fmtC(o.pexc)}</b>
             ${o.mesmo?'<span class="cf alta" style="font-size:9px">mesmo grupo contábil</span>':'<span class="cf baixa" style="font-size:9px">grupos diferentes</span>'}</div>
          </div>`).join("")}
@@ -1985,7 +1987,7 @@ function renderDet(){
     : aba==="sin" ? (b3||`<div class="empty">Nenhum sinal de atenção neste recorte.</div>`)
     : b0+renderSemLancarHa(view.unit);
   const expl=`<div class="abas">${abas.map(([k,l,n])=>
-      `<button class="${aba===k?"on":""}" onclick="setAba('${k}')">${l}${
+      `<button class="${aba===k?"on":""}" onclick="setAba(${js(k)})">${l}${
         n?`<span class="ab">${n}</span>`:""}</button>`).join("")}</div>`
     +painel+`<div class="legenda">
       <span><b>Como ler:</b> variação positiva favorece o resultado</span>
@@ -1997,7 +1999,7 @@ function renderDet(){
        view.filtro!=="todos"?` · <b>${(ST[view.filtro]||"todas").toLowerCase()}</b>`:" · todas"}
        <span class="tabq">${rows.length} de ${all.length}</span></div>
     <div class="toolbar">${chips}
-      <input id="busca" placeholder="Buscar conta ou descrição…" value="${view.busca}">
+      <input id="busca" placeholder="Buscar conta ou descrição…" value="${he(view.busca)}">
       <button class="xbtn" onclick="exportUnidade()">exportar unidade</button>
     </div>
     <div class="tw"><table><thead><tr>
@@ -2191,11 +2193,11 @@ function pintaPal(){
     ? palItens.map((o,i)=>`<div class="palit${i===palSel?" sel":""}${o.go?"":" inerte"}"
         onclick="palGo(${i})">
         <span class="pt">${o.t}</span>
-        <span class="pn2"><span class="pnn">${o.n}</span>${
-          o.sub?`<span class="psub">${o.sub}</span>`:""}${
+        <span class="pn2"><span class="pnn">${he(o.n)}</span>${
+          o.sub?`<span class="psub">${he(o.sub)}</span>`:""}${
           o.nota?`<span class="pnota">${o.nota}</span>`:""}</span>
         ${o.tagsem?'<span class="cf alta" style="font-size:8.5px">sem lançamento</span>':""}
-        ${o.x?`<span class="px num">${o.x}</span>`:""}</div>`).join("")
+        ${o.x?`<span class="px num">${he(o.x)}</span>`:""}</div>`).join("")
     : `<div class="palvazio">Nada encontrado${sg?" em "+(SEGNM[sg]||sg):""}.</div>`);
   const el=document.querySelector(".palit.sel"); if(el) el.scrollIntoView({block:"nearest"});
 }
@@ -2504,7 +2506,7 @@ function exportaConjunto(uns,nomeArq){
     const v=o.real-o.plan;
     li.push([SEGNM[o.seg],o.cod,o.nome,faixaLbl(),o.orc,o.sem,
       c.alta,c.media,c.baixa,round2(o.expo),round2(o.plan),round2(o.real),round2(v),FAVLBL[favor(v)]]);
-    if(nomes[o.cod]) hyper.push({ref:"C"+(li.length),loc:`'${nomes[o.cod]}'!A1`,txt:o.nome});
+    if(nomes[o.cod]) hyper.push({ref:"C"+(li.length),loc:`'${nomes[o.cod].replace(/'/g,"''")}'!A1`,txt:o.nome});
   });
   const abas=[{nome:"Resumo",linhas:li,hdr:4,larg:LARG_RES,titulos:[1],
                hyper,link:false}];
@@ -2584,16 +2586,16 @@ function renderLastroSemOrc(){
     </div>
     <div class="cols2" style="margin-bottom:18px">
       <div><div class="sect">Unidades com mais gasto não orçado</div>
-        <div class="worst">${uns.map(([c,o],i)=>`<div class="wrow" onclick="go({tipo:'det',seg:'${o.seg}',unit:'${c}'})">
+        <div class="worst">${uns.map(([c,o],i)=>`<div class="wrow" onclick="go({tipo:'det',seg:${js(o.seg)},unit:${js(c)}})">
           <span class="rk num">${i+1}</span>
           <span class="sg" style="${tint(o.seg)}">${SEGNM[o.seg]}</span>
-          <span class="nm">${o.nome}</span>
-          <span class="num" style="color:var(--dim);font-size:11px">${o.n} linhas</span>
+          <span class="nm">${he(o.nome)}</span>
+          <span class="num" style="color:var(--dim);font-size:11px">${he(o.n)} linhas</span>
           <span class="qt num" style="width:78px;color:#C4B5FD">R$ ${fmtMi(o.val)}</span></div>`).join("")}</div></div>
       <div><div class="sect">Concentração</div>
         <div class="worst" style="padding:14px 16px">
-          ${lst.slice(0,6).map(o=>`<div class="erow clicavel" onclick="abreConta('${o.u}','${o.a}')">
-            <span class="bn">${o.desc}<span class="nat"> · ${o.nome} · ${o.a}</span></span>
+          ${lst.slice(0,6).map(o=>`<div class="erow clicavel" onclick="abreConta(${js(o.u)},${js(o.a)})">
+            <span class="bn">${he(o.desc)}<span class="nat"> · ${he(o.nome)} · ${he(o.a)}</span></span>
             <span class="bb" style="width:${(o.val/mx*70).toFixed(0)}px;background:#A78BFA"></span>
             <span class="num" style="width:104px;text-align:right;color:#C4B5FD">${fmtC(o.val)}</span></div>`).join("")}
         </div></div>
@@ -2603,9 +2605,9 @@ function renderLastroSemOrc(){
     <div class="tw"><table><thead><tr>
       <th>Unidade</th><th>Segmento</th><th>Conta</th><th>Descrição</th>
       <th class="r">Meses lançados</th><th class="r">Média/mês</th><th class="r">Total no ano</th><th>Recorrente</th>
-    </tr></thead><tbody>${lst.slice(0,300).map(o=>`<tr class="lin" onclick="abreConta('${o.u}','${o.a}')">
-      <td>${o.nome}</td><td><span class="sg" style="${tint(o.seg)}">${SEGNM[o.seg]}</span></td>
-      <td class="num" style="color:var(--dim)">${o.a}</td><td>${o.desc}</td>
+    </tr></thead><tbody>${lst.slice(0,300).map(o=>`<tr class="lin" onclick="abreConta(${js(o.u)},${js(o.a)})">
+      <td>${he(o.nome)}</td><td><span class="sg" style="${tint(o.seg)}">${SEGNM[o.seg]}</span></td>
+      <td class="num" style="color:var(--dim)">${he(o.a)}</td><td>${he(o.desc)}</td>
       <td class="r num">${o.meses}</td><td class="r num">${fmtC(o.media)}</td>
       <td class="r num" style="color:#C4B5FD">${fmtC(o.val)}</td>
       <td>${o.rec?'<span class="cf alta" style="font-size:9px">recorrente</span>':'<span style="color:var(--s3)">—</span>'}</td>
@@ -2654,20 +2656,20 @@ function renderLastro(){
     </div>
     <div class="cols2" style="margin-bottom:18px">
       <div><div class="sect">Unidades com mais orçamento parado</div>
-        <div class="worst">${uns.map(([c,o],i)=>`<div class="wrow" onclick="go({tipo:'det',seg:'${o.seg}',unit:'${c}'})">
+        <div class="worst">${uns.map(([c,o],i)=>`<div class="wrow" onclick="go({tipo:'det',seg:${js(o.seg)},unit:${js(c)}})">
           <span class="rk num">${i+1}</span>
           <span class="sg" style="${tint(o.seg)}">${SEGNM[o.seg]}</span>
-          <span class="nm">${o.nome}</span>
-          <span class="num" style="color:var(--dim);font-size:11px">${o.n} linhas</span>
+          <span class="nm">${he(o.nome)}</span>
+          <span class="num" style="color:var(--dim);font-size:11px">${he(o.n)} linhas</span>
           <span class="qt num" style="width:78px;color:#C4B5FD">R$ ${fmtMi(o.val)}</span></div>`).join("")}</div></div>
       <div><div class="sect">Concentração</div>
         <div class="worst" style="padding:14px 16px">
           ${lst.slice(0,6).map(o=>`<div class="erow clicavel"
-              onclick="abreConta('${o.u}','${o.a}')"
-              ${T(`<b>${o.desc}</b><div class="tl">${o.nome} · conta ${o.a}</div>
+              onclick="abreConta(${js(o.u)},${js(o.a)})"
+              ${T(`<b>${he(o.desc)}</b><div class="tl">${he(o.nome)} · conta ${he(o.a)}</div>
                  <div class="tl">Orçada em ${o.meses} meses, sem nenhum lançamento.</div>
                  <div class="tl" style="color:var(--cy2)">Clique para abrir a unidade nesta conta.</div>`)}>
-            <span class="bn">${o.desc}<span class="nat"> · ${o.nome} · ${o.a}</span></span>
+            <span class="bn">${he(o.desc)}<span class="nat"> · ${he(o.nome)} · ${he(o.a)}</span></span>
             <span class="bb" style="width:${(o.val/mx*70).toFixed(0)}px;background:#A78BFA"></span>
             <span class="num" style="width:104px;text-align:right;color:#C4B5FD">${fmtC(o.val)}</span></div>`).join("")}
         </div></div>
@@ -2678,9 +2680,9 @@ function renderLastro(){
       <th>Unidade</th><th>Segmento</th><th>Conta</th><th>Descrição</th>
       <th class="r">Meses orçados</th><th class="r">Média/mês</th><th class="r">Total no ano</th><th>Recorrente</th>
     </tr></thead><tbody>${lst.slice(0,300).map(o=>`<tr class="lin"
-      onclick="abreConta('${o.u}','${o.a}')">
-      <td>${o.nome}</td><td><span class="sg" style="${tint(o.seg)}">${SEGNM[o.seg]}</span></td>
-      <td class="num" style="color:var(--dim)">${o.a}</td><td>${o.desc}</td>
+      onclick="abreConta(${js(o.u)},${js(o.a)})">
+      <td>${he(o.nome)}</td><td><span class="sg" style="${tint(o.seg)}">${SEGNM[o.seg]}</span></td>
+      <td class="num" style="color:var(--dim)">${he(o.a)}</td><td>${he(o.desc)}</td>
       <td class="r num">${o.meses}</td><td class="r num">${fmtC(o.media)}</td>
       <td class="r num" style="color:#C4B5FD">${fmtC(o.val)}</td>
       <td>${o.rec?'<span class="cf alta" style="font-size:9px">recorrente</span>':'<span style="color:var(--s3)">—</span>'}</td>
@@ -2736,10 +2738,10 @@ var render=function(){
   }else{
     const u=umap[view.unit];
     const e2=met().a[view.unit];
-    document.getElementById("title").innerHTML=u.nome
+    document.getElementById("title").innerHTML=he(u.nome)
       +(e2&&e2.est==="muda"?' <span class="mudo big">não lançou nada no período</span>':"");
     cb.innerHTML=`<span onclick="go({tipo:'hub'})">Visão geral</span><i>›</i>`
-      +`<span onclick="go({tipo:'seg',seg:'${view.seg}'})">${SEGNM[view.seg]}</span><i>›</i>${u.cod}`;
+      +`<span onclick="go({tipo:'seg',seg:${js(view.seg)}})">${SEGNM[view.seg]}</span><i>›</i>${he(u.cod)}`;
   }
   document.getElementById("subtitle").innerHTML=
     `${faixaLbl()} · ${aberto?"sem realizado importado":PERLBL[periodo]}`
