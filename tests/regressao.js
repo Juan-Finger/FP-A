@@ -148,6 +148,8 @@ intencional("A6", (o, n, e) => {
 // A12: "há mais tempo sem lançamento" e a tendência param no mês analisado
 intencional("A12", (o, n, e) => { if (e.M === "ult") return;
   for (const u in o.unid) for (const s of [o.unid[u], n.unid[u]]) { delete s.semLH; delete s.pad; } });
+// A15: margem acima de ±1000% (receita desprezível) passou a ser "—"
+intencional("A15", (o, n) => { for (const k of ["margem", "margemP"]) if (o.res[k] != null && Math.abs(o.res[k]) > 1000) o.res[k] = null; });
 // A3: "Por conta" deixou de listar receita/dedução como falha
 intencional("A3", (o, n) => { for (const sg in o.porConta) o.porConta[sg] = o.porConta[sg].filter(x => !x.res); });
 
@@ -164,14 +166,16 @@ teste("T01", "payload idêntico ao painel original e ao gerador Python", async (
 
 teste("T02", "métricas de todas as telas idênticas ao original (fora as diferenças intencionais)", async () => {
   const [o, n] = await Promise.all([pagina("orig"), pagina("novo")]);
-  const so = await o.evaluate(SNAP, ESTADOS), sn = await n.evaluate(SNAP, ESTADOS);
-  for (let i = 0; i < ESTADOS.length; i++) {
-    const a = JSON.parse(JSON.stringify(so[i])), b = JSON.parse(JSON.stringify(sn[i]));
-    for (const x of INTENCIONAIS) x.fn(a, b, ESTADOS[i]);
-    igual(a, b, "estado " + JSON.stringify(ESTADOS[i]));
+  try {
+    const so = await o.evaluate(SNAP, ESTADOS), sn = await n.evaluate(SNAP, ESTADOS);
+    for (let i = 0; i < ESTADOS.length; i++) {
+      const a = JSON.parse(JSON.stringify(so[i])), b = JSON.parse(JSON.stringify(sn[i]));
+      for (const x of INTENCIONAIS) x.fn(a, b, ESTADOS[i]);
+      igual(a, b, "estado " + JSON.stringify(ESTADOS[i]));
+    }
+  } finally {   // restaura o estado padrão das páginas compartilhadas
+    for (const p of [o, n]) await p.evaluate(() => { modo = "geral"; periodo = "mes"; corte = 0; M = DB.fechado.lastIndexOf(true); go({ tipo: "hub" }); });
   }
-  // restaura o estado padrão das páginas compartilhadas
-  for (const p of [o, n]) await p.evaluate(() => { modo = "geral"; periodo = "mes"; corte = 0; M = DB.fechado.lastIndexOf(true); go({ tipo: "hub" }); });
 });
 
 /* Texto visível das telas (estado padrão) — pega mudanças acidentais de renderização */
@@ -188,6 +192,11 @@ function TELAS() {
   return out;
 }
 const TEXTO_INTENCIONAL = [];   // [id, fn(orig, novo, chave)] — normaliza diferenças de texto intencionais
+// A15: margem acima de ±1000% vira "—" (faixa de resultado) ou some (aba Resultado)
+const MG = "-?\\d{4,}(?:,\\d)?%";
+TEXTO_INTENCIONAL.push(["A15", o => { if (!o.body) return;
+  o.body = o.body.replace(new RegExp("^" + MG + "$", "gm"), "—").replace(new RegExp("^orç\\. " + MG + "\\n", "gm"), "")
+    .replace(new RegExp("\\s*margem " + MG + "( · orçada [^\\n]*)?", "g"), "").replace(new RegExp(" · orçada " + MG, "g"), ""); }]);
 // A3: a lista "Por conta" mudou (sem receita); os dados dela são conferidos no T02 e no teste A3
 TEXTO_INTENCIONAL.push(["A3", (o, n, k) => { if (k.startsWith("ct:")) { delete o.body; delete n.body; } }]);
 // A4: mapa e histórico mudam para unidades que ainda não tinham começado a lançar (conferido no T02 e no A4)
@@ -503,6 +512,119 @@ teste("A11", "unidade vigiada nunca abre no detalhe (sem métricas) nem quebra a
     let erro = null; try { view.unit = v.cod; exportUnidade(); } catch (e) { erro = e.message; }
     go({ tipo: "hub" }); return { t1, t2, erro }; });
   igual({ t1: "exc", t2: "exc", erro: null }, r, "vigiada");
+});
+
+/* Auditoria de contraste WCAG: todo texto visível, com fundo efetivo (camadas
+ * translúcidas compostas) e opacidade herdada. Mínimo 4,5:1 (3:1 para texto grande). */
+function AUDITA_CONTRASTE(limite) {
+  const rgba = s => { const m = s.match(/rgba?\(([^)]+)\)/); if (!m) return null; const v = m[1].split(/[ ,/]+/).filter(Boolean).map(Number); return [v[0], v[1], v[2], v.length > 3 ? v[3] : 1]; };
+  const sobre = (c, b) => [0, 1, 2].map(i => c[i] * c[3] + b[i] * (1 - c[3])).concat(1);
+  const L = c => { const f = x => { x /= 255; return x <= .03928 ? x / 12.92 : ((x + .055) / 1.055) ** 2.4; }; return .2126 * f(c[0]) + .7152 * f(c[1]) + .0722 * f(c[2]); };
+  const cr = (a, b) => { const x = L(a), y = L(b); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); };
+  const fundo = el => { const pilha = []; for (let e = el; e; e = e.parentElement) { const c = rgba(getComputedStyle(e).backgroundColor); if (c && c[3] > 0) pilha.push(c); if (c && c[3] === 1) break; }
+    let b = [255, 255, 255, 1]; for (let i = pilha.length - 1; i >= 0; i--) b = sobre(pilha[i], b); return b; };
+  const opac = el => { let o = 1; for (let e = el; e; e = e.parentElement) o *= +getComputedStyle(e).opacity; return o; };
+  const out = [];
+  const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let n = w.nextNode(); n; n = w.nextNode()) {
+    if (!n.textContent.trim()) continue;
+    const el = n.parentElement; if (!el || el.closest("[aria-hidden=true],.hidden,script,style,#_ov")) continue;
+    const r = el.getBoundingClientRect(), cs = getComputedStyle(el);
+    if (!r.width || !r.height || cs.visibility === "hidden" || el.closest(".tip") && getComputedStyle(el.closest(".tip")).display === "none") continue;
+    const bg = fundo(el), o = opac(el); let fg = rgba(cs.color); fg = [fg[0], fg[1], fg[2], fg[3] * o];
+    const c = cr(sobre(fg, bg), bg), px = parseFloat(cs.fontSize), grande = px >= 24 || (px >= 18.66 && +cs.fontWeight >= 700);
+    const min = grande ? 3 : limite;
+    if (px < 10.99) out.push(`fonte ${px}px "${n.textContent.trim().slice(0, 24)}" <${el.tagName.toLowerCase()} class="${el.className}">`);
+    if (c < min - 0.01) out.push(`${c.toFixed(2)}:1 ${px}px "${n.textContent.trim().slice(0, 24)}" <${el.tagName.toLowerCase()} class="${el.className}">`);
+  }
+  return [...new Set(out)];
+}
+async function auditaTelas(p, limite = 4.5) {
+  await p.addStyleTag({ content: "*,*::before,*::after{animation:none!important;transition:none!important}" });
+  return p.evaluate(lim => {
+    const res = {};
+    const segs = SEG.filter(s => DB.units.some(u => u.seg === s && !u.vig)), u = Object.keys(met().a)[4];
+    const passos = [["hub", () => go({ tipo: "hub" })], ["seg", () => go({ tipo: "seg", seg: segs[1] })], ["ct", () => { setVseg("ct"); toggleConta(contasDoSegmento(segs[1])[0].a); }], ["mp", () => setVseg("mp")],
+      ["det", () => { setVseg("un"); go({ tipo: "det", seg: umap[u].seg, unit: u }); setF("todos"); toggleExp(linhas()[0].a); }], ["det-var", () => setAba("var")], ["det-res", () => setAba("res")], ["det-sin", () => setAba("sin")], ["det-hist", () => setAba("hist")],
+      ["exc", () => go({ tipo: "exc" })], ["lastro", () => go({ tipo: "lastro" })], ["lsorc", () => go({ tipo: "lsorc" })],
+      ["tooltip", () => { go({ tipo: "hub" }); const k = document.querySelectorAll(".kpi")[1]; k.dispatchEvent(new MouseEvent("mouseover", { bubbles: true, clientX: 300, clientY: 200 })); }],
+      ["busca", () => { document.querySelector(".tip").style.display = "none"; abrePal(); montaPal("conta"); }], ["guia", () => { fechaPal(); abreGuia(); }], ["carga", () => { fechaGuia(); abreCarga(); }]];
+    for (const [k, f] of passos) { f(); const a = eval("(" + window.__AUDITA__ + ")")(lim); if (a.length) res[k] = a; }
+    fechaGuia(); go({ tipo: "hub" });
+    return res;
+  }, limite);
+}
+teste("C6", "C1/C2/C6: contraste WCAG AA e fonte ≥ 11px em todas as telas, nos temas escuro e claro", async () => {
+  const falhas = [];
+  for (const tema of ["escuro", "claro"]) {
+    const p = await abre(NOVO, "plano_sint.csv");
+    await p.evaluate(([t, f]) => { window.__AUDITA__ = f; if (t === "claro") document.body.classList.add("claro"); else document.body.classList.remove("claro"); }, [tema, AUDITA_CONTRASTE.toString()]);
+    const r = await auditaTelas(p);
+    for (const [k, v] of Object.entries(r)) falhas.push(`[${tema}/${k}] ${v.length} texto(s): ` + v.slice(0, 4).join(" · "));
+    await p.context().close();
+  }
+  ok(!falhas.length, falhas.join("\n      "));
+});
+
+teste("C8", "celular: barra do topo mostra a tela atual", async () => {
+  const p = await abre(NOVO, "plano_sint.csv", { viewport: { width: 390, height: 844 } });
+  const r = await p.evaluate(() => { const s = SEG.find(s => DB.units.some(u => u.seg === s && !u.vig)); go({ tipo: "seg", seg: s });
+    const a = [document.getElementById("title").textContent, document.getElementById("tbtitulo").textContent];
+    const u = Object.keys(met().a)[0]; go({ tipo: "det", seg: umap[u].seg, unit: u });
+    return [a, [document.getElementById("title").textContent, document.getElementById("tbtitulo").textContent]]; });
+  ok(r[0][0] === r[0][1] && r[1][0] === r[1][1], JSON.stringify(r));
+  await p.context().close();
+});
+
+teste("C9", "cabeçalho da tabela fica visível ao rolar a lista", async () => {
+  const p = await pagina("novo");
+  const r = await p.evaluate(() => { const u = Object.keys(met().a)[0]; go({ tipo: "det", seg: umap[u].seg, unit: u }); setF("todos");
+    const tw = document.querySelector(".tw"); tw.scrollTop = 400;
+    const d = tw.querySelector("thead th").getBoundingClientRect().top - tw.getBoundingClientRect().top;
+    const rolou = tw.scrollTop; go({ tipo: "hub" }); return { d, rolou }; });
+  ok(r.rolou > 0 && Math.abs(r.d) <= 2, JSON.stringify(r));
+});
+
+teste("C10", "CSS íntegro: nenhuma regra perdida por chave solta", async () => {
+  const p = await pagina("novo");
+  const css = fs.readFileSync(NOVO, "utf8").match(/<style>([\s\S]*?)<\/style>/)[1].replace(/\/\*[\s\S]*?\*\//g, "");
+  ok((css.match(/\{/g) || []).length === (css.match(/\}/g) || []).length, "chaves desbalanceadas no CSS");
+  const r = await p.evaluate(() => { const sels = []; const f = rs => [...rs].forEach(x => { if (x.selectorText) sels.push(x.selectorText); if (x.cssRules) f(x.cssRules); });
+    f(document.styleSheets[0].cssRules); return { xbtn: sels.includes(".xbtn"), bg: getComputedStyle(document.querySelector(".xbtn")).borderStyle }; });
+  ok(r.xbtn && r.bg === "solid", "regra .xbtn: " + JSON.stringify(r));
+});
+
+teste("C11", "cores de segmento acompanham o tema e a troca de tema redesenha", async () => {
+  const p = await pagina("novo");
+  const r = await p.evaluate(() => { const esc = cor("CDs"); document.getElementById("btema").click();
+    const cla = cor("CDs"), tag = document.querySelector(".card .tag") && document.querySelector(".card .tag").getAttribute("style");
+    document.getElementById("btema").click(); return { esc, cla, tag }; });
+  ok(r.esc === "#AA7AD3" && r.cla === "#7A5195", JSON.stringify(r));
+});
+
+teste("C12", "semântica: h1, rótulos, aria-pressed, tema do sistema, movimento reduzido, tela larga", async () => {
+  const p = await abre(NOVO, "so_orcado.csv", { colorScheme: "light", viewport: { width: 2560, height: 1300 } });
+  const r = await p.evaluate(() => { const m = document.querySelector("main").getBoundingClientRect(), a = document.querySelector(".app").getBoundingClientRect();
+    document.querySelector('#perbar [data-p="acum"]').click();
+    return { h1: document.querySelector("h1#title") !== null, label: !!document.querySelector('label[for="mes"]'),
+      pressed: [...document.querySelectorAll("#perbar button")].map(b => b.getAttribute("aria-pressed")).join(),
+      claro: document.body.classList.contains("claro"), centro: Math.abs((m.left - 230) - (a.right - m.right)) < 4,
+      motion: [...document.styleSheets[0].cssRules].some(x => x.conditionText && x.conditionText.includes("prefers-reduced-motion")) }; });
+  igual({ h1: true, label: true, pressed: "false,true,false", claro: true, centro: true, motion: true }, r, "semântica");
+  await p.context().close();
+});
+
+teste("A15", "detalhes: 999,6 mil, margem sem sentido, link com estado, cabeçalho de tabela interna", async () => {
+  const p = await pagina("novo");
+  const r = await p.evaluate(() => {
+    const out = { mi: fmtMi(999600), mg: margemPct(-90, 1), mg2: margemPct(50, 100) };
+    const u = Object.keys(met().a)[0]; go({ tipo: "det", seg: umap[u].seg, unit: u }); setF("todos"); toggleExp(linhas()[0].a);
+    const sk = view.sk; document.querySelector("tr.exp thead th").click(); out.sort = view.sk === sk;
+    go({ tipo: "hub" }); return out; });
+  igual({ mi: "1,0 mi", mg: null, mg2: 50, sort: true }, r, "detalhes");
+  const q = await abre(NOVO, "so_orcado.csv", { hash: "#v=lsorc&mes=0" });
+  ok(await q.evaluate(() => view.tipo) === "lsorc", "link para 'Lastro sem orçamento' não restaurado");
+  await q.context().close();
 });
 
 /* ================================================================== */
