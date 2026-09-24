@@ -1556,7 +1556,7 @@ function histPendencias(cod){
 // Há quantos meses seguidos a conta está orçada e sem nenhum lançamento.
 // Diz onde a falha virou crônica, em vez de só contar quantas são.
 function semLancarHa(cod){
-  const fech=[...Array(12).keys()].filter(i=>DB.fechado[i]);
+  const fech=[...Array(12).keys()].filter(i=>DB.fechado[i]&&i<=M);   // até o mês analisado
   const out=[];
   DB.data.forEach(d=>{
     if(d.u!==cod) return;
@@ -1599,7 +1599,7 @@ function renderSemLancarHa(cod){
 
 function padraoUnidade(cod){
   // fora: meses em que a unidade não lançou nada (já têm alerta próprio ou ainda não tinha começado)
-  const h=histPendencias(cod).filter(m=>m && !m.muda && !m.inativa && !m.parcial);
+  const h=histPendencias(cod).filter(m=>m && m.i<=M && !m.muda && !m.inativa && !m.parcial);   // até o mês analisado
   if(!h.length) return {tipo:"limpa",txt:"sem base de comparação"};
   if(h.every(m=>m.n===0)) return {tipo:"limpa",txt:"sem pendências no período"};
   if(h.length<6) return {tipo:"estavel",txt:"histórico curto"};

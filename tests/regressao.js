@@ -145,6 +145,9 @@ intencional("A6", (o, n, e) => {
   for (const u in o.met) { delete o.met[u].alta; if (n.met[u]) delete n.met[u].alta; }
   for (const u in o.unid) for (const s of [o.unid[u], n.unid[u]]) s.linhas.forEach(l => { l[5] = l[6] = "A6"; });
 });
+// A12: "há mais tempo sem lançamento" e a tendência param no mês analisado
+intencional("A12", (o, n, e) => { if (e.M === "ult") return;
+  for (const u in o.unid) for (const s of [o.unid[u], n.unid[u]]) { delete s.semLH; delete s.pad; } });
 // A3: "Por conta" deixou de listar receita/dedução como falha
 intencional("A3", (o, n) => { for (const sg in o.porConta) o.porConta[sg] = o.porConta[sg].filter(x => !x.res); });
 
@@ -455,6 +458,15 @@ teste("A6", "confiança nos modos Acum./Sem. usa os meses anteriores ao período
   // 4102A lançou JAN–MAI e parou: em AGO e no 2º semestre é "lançava todo mês"; no acumulado não há mês anterior
   igual({ mes: "media", sem: "alta", acum: "nd" }, { mes: r.mes, sem: r.sem, acum: r.acum }, "confiança");
   ok(/sem histórico/.test(r.sub), "subtítulo no acumulado: " + r.sub);
+  await p.context().close();
+});
+
+teste("A12", "'há mais tempo sem lançamento' e tendência respeitam o mês selecionado", async () => {
+  const p = await abre(NOVO, "estados.csv");
+  const r = await p.evaluate(() => { periodo = "mes";
+    const s = m => { M = m; return semLancarHa("4102A").map(o => o.seq + " desde " + o.desde).join(); };
+    return { ago: s(7), mai: s(4) }; });
+  igual({ ago: "3 desde JUN,3 desde JUN", mai: "" }, r, "4102A lançou até MAI");
   await p.context().close();
 });
 
