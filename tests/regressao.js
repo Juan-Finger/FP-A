@@ -711,6 +711,16 @@ teste("C7", "busca na unidade: não recria o campo, preserva cursor e filtra", a
   await p.evaluate(() => go({ tipo: "hub" }));
 });
 
+teste("A8", "ano vem da base (cabeçalho ou nome do arquivo), não do código", async () => {
+  const le = async csv => { const p = await abre(NOVO, csv); const r = await p.evaluate(() => ({ ano: ANO, sub: document.getElementById("subtitle").textContent,
+    opt: document.querySelector("#mes option").textContent, fonte: DB.carga.anoFonte })); await p.context().close(); return r; };
+  const a = await le("ano_cab.csv"), b = await le("export_plano_2025.csv"), c = await le("plano_sint.csv");
+  ok(a.ano === 2027 && /AGO\/27/.test(a.sub) && a.opt === "JAN/27" && /cabeçalho/.test(a.fonte), "cabeçalho: " + JSON.stringify(a));
+  ok(b.ano === 2025 && /AGO\/25/.test(b.sub) && /nome/.test(b.fonte), "nome do arquivo: " + JSON.stringify(b));
+  ok(c.ano === 2026, "base 2026: " + JSON.stringify(c));
+  ok(!/\/26\b|2026/.test(fs.readFileSync(NOVO, "utf8").replace(/colL[^\n]*|Planejado JAN\/2026[^\n]*/g, "")), "ano fixo no código");
+});
+
 /* ================================================================== */
 (async () => {
   const filtro = process.argv.slice(2).filter(a => !a.startsWith("--"));

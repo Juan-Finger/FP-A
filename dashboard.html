@@ -740,6 +740,24 @@ function _confereCabecalho(h){
   return {erros, nota: reconhecidas ? "" : "O cabeçalho não tem rótulos de mês/Planejado/Realizado reconhecíveis; a posição das colunas não pôde ser conferida."};
 }
 
+/* Ano da base: 1) rótulos do cabeçalho (ex.: "Planejado JAN/2026" ou "JAN/26");
+   2) nome do arquivo; 3) ano da data de modificação do arquivo; 4) ano atual.
+   A origem aparece no resumo da carga. */
+function _detectaAno(h,info){
+  const votos={};
+  for(const col of _PLAN.concat(_REAL)){
+    const t=_limpa(_cel(h,col));
+    let m=t.match(/(?:^|\D)(20\d{2})(?:\D|$)/)||t.match(/\/(\d{2})(?:\D|$)/);
+    if(m){ const a=m[1].length===2?2000+(+m[1]):+m[1]; votos[a]=(votos[a]||0)+1; }
+  }
+  const melhor=Object.keys(votos).sort((a,b)=>votos[b]-votos[a])[0];
+  if(melhor) return {ano:+melhor,fonte:"cabeçalho do arquivo"};
+  const n=((info&&info.nome)||"").match(/(?:^|\D)(20\d{2})(?:\D|$)/);
+  if(n) return {ano:+n[1],fonte:"nome do arquivo"};
+  if(info&&info.modificado) return {ano:new Date(info.modificado).getFullYear(),fonte:"data de modificação do arquivo"};
+  return {ano:new Date().getFullYear(),fonte:"ano atual (não encontrado no arquivo)"};
+}
+
 /* Agregação conta × unidade. Regras de negócio idênticas ao gerador Python. */
 function _agregador(info){
   const comb=new Map(), unit_desc=new Map(), acct_desc=new Map();
@@ -753,6 +771,7 @@ function _agregador(info){
       hdr=l;
       if(hdr.length<_COLMIN) throw new Error("O arquivo tem "+hdr.length+" colunas; o esperado são ao menos "+_COLMIN+". Confirme que é o export do Plano com Planejado e Realizado de janeiro a dezembro.");
       carga.cabecalho=_confereCabecalho(hdr);
+      const an=_detectaAno(hdr,info); carga.ano=an.ano; carga.anoFonte=an.fonte;
       if(carga.cabecalho.erros.length) throw new Error("As colunas do arquivo não estão na ordem esperada: "
         +carga.cabecalho.erros.slice(0,3).join("; ")+(carga.cabecalho.erros.length>3?" …":"")
         +". Confirme que é o export padrão do Plano.");
@@ -804,7 +823,7 @@ function _agregador(info){
     carga.semClassif=accts.filter(a=>!CLASSIF[a.cod]&&!["rec","ded"].includes(a.nat)).map(a=>a.cod+" "+a.desc);
     const d=new Date(),z=n=>String(n).padStart(2,"0");
     const gerado=d.getFullYear()+"-"+z(d.getMonth()+1)+"-"+z(d.getDate())+"T"+z(d.getHours())+":"+z(d.getMinutes());
-    return {meses:_MESES,fechado,units,accts,data,gerado,carga};
+    return {meses:_MESES,fechado,units,accts,data,gerado,ano:carga.ano,carga};
   }
   return {linha,fim};
 }
@@ -961,6 +980,9 @@ const NATLBL={rec:"Receita",ded:"Dedução",cd:"Custo/Despesa",out:"Outras rec./
 const ehRec=c=>recSet.has(c);
 const N_REC=recSet.size;
 
+// ano da base (detectado na carga) — nada de ano fixo no código
+const ANO=DB.ano||new Date().getFullYear(), AA=String(ANO).slice(-2);
+const rotMes=i=>DB.meses[i]+"/"+AA;
 // meses cobertos pela comparação escolhida
 function faixa(){
   if(periodo==="acum") return [0,M];
@@ -974,11 +996,10 @@ function mesesAtivos(){                     // só meses já fechados dentro da 
 }
 function faixaLbl(){
   const ms=mesesAtivos();
-  if(!ms.length) return DB.meses[M]+"/26";
-  if(periodo==="mes") return DB.meses[M]+"/26";
-  return DB.meses[ms[0]]+"–"+DB.meses[ms[ms.length-1]]+"/26";
+  if(!ms.length) return rotMes(M);
+  if(periodo==="mes") return rotMes(M);
+  return DB.meses[ms[0]]+"–"+rotMes(ms[ms.length-1]);
 }
-const rotMes=i=>DB.meses[i]+"/26";
 const PERLBL={mes:"mês",acum:"acumulado",sem:"semestre"};
 
 // Um mês "fechado" pode estar só parcialmente lançado. Detecta comparando o
@@ -1163,7 +1184,7 @@ function renderKpis(){
       <span class="tv">R$ ${fmtMi(cv[k])}</span></div>`;
 
   const tpOrc = view.tipo==="det"
-    ? `<b>Contas com orçamento</b><div class="tl">Quantas contas tinham valor orçado para esta unidade em ${DB.meses[M]}/26. É o universo que deveria ter lançamento no mês.</div>`
+    ? `<b>Contas com orçamento</b><div class="tl">Quantas contas tinham valor orçado para esta unidade em ${rotMes(M)}. É o universo que deveria ter lançamento no mês.</div>`
     : `<b>Unidades</b><div class="tl">${un} unidades no escopo atual${view.tipo==="hub"?" (todos os segmentos)":" ("+SEGNM[view.seg]+")"}.</div>`;
   const tpSem = `<b>${modo==="rec"?"Contas recorrentes sem lançamento":"Contas sem lançamento"}</b>
      <div class="tl">Contas com orçamento em ${faixaLbl()} e realizado zerado no período, <b>mesmo a unidade tendo lançado outras contas</b>. Indica lançamento faltante, não valor zero real.</div>
@@ -1432,7 +1453,7 @@ function renderResultado(cod){
   const barras=fech.map(i=>{
     const hr=Math.max(1,Math.abs(sr.rec[i])/mx*H), hc=Math.max(1,Math.abs(sr.cus[i])/mx*H);
     const pos=sr.res[i]>=0;
-    return `<div class="gcol" ${T(`<b>${DB.meses[i]}/26</b>
+    return `<div class="gcol" ${T(`<b>${rotMes(i)}</b>
         <div class="tr2"><span>Receita líquida</span><b class="num">${fmtC(sr.rec[i])}</b></div>
         <div class="tr2"><span>Custos e despesas</span><b class="num">${fmtC(sr.cus[i])}</b></div>
         <div class="tr2"><span>Resultado</span><b class="num ${pos?'pos':'neg'}">${fmtC(sr.res[i])}</b></div>`)}>
@@ -1736,7 +1757,7 @@ function renderMapa(sg){
   const meses=[...Array(12).keys()].filter(i=>DB.fechado[i]);
   const cel=(m,i,cod)=>{
     if(!m) return `<td class="hm off"></td>`;
-    if(m.inativa) return `<td class="hm off" ${T(`<b>${m.mes}/26</b><div class="tl">A unidade ainda não tinha lançado nada no ano até este mês: sem pendência a cobrar.</div>`)}></td>`;
+    if(m.inativa) return `<td class="hm off" ${T(`<b>${rotMes(m.i)}</b><div class="tl">A unidade ainda não tinha lançado nada no ano até este mês: sem pendência a cobrar.</div>`)}></td>`;
     const t=m.n/mx;
     const bg = m.muda ? "rgba(242,109,109,.85)"
              : m.n===0 ? "rgba(74,222,155,.16)"
@@ -1745,7 +1766,7 @@ function renderMapa(sg){
     const lista=cs.slice(0,8).map(c=>`<div class="tr2"><span>${he(c.desc)}</span>
         <b class="num">${fmtC(c.v)}</b></div>`).join("");
     return `<td class="hm${m.parcial?" pc":""}${m.muda?" muda":""}" style="background:${bg}"
-      ${T(`<b>${m.mes}/26</b>${m.parcial?' <span style="color:var(--fg-warn)">(fechamento parcial)</span>':""}
+      ${T(`<b>${rotMes(m.i)}</b>${m.parcial?' <span style="color:var(--fg-warn)">(fechamento parcial)</span>':""}
         <div class="tl">${m.n} conta(s) com orçamento e sem lançamento · R$ ${fmtMi(m.val)}</div>
         ${m.muda?'<div class="tl" style="color:var(--fg-neg)">A unidade não lançou nada neste mês.</div>':""}
         ${lista?`<div class="tsep"></div>${lista}`:""}
@@ -1944,9 +1965,9 @@ function renderDet(){
      <div class="hph"><span>Histórico de pendências por mês</span>
        <span class="pad ${pad.tipo}">${PADLBL[pad.tipo]}${pad.txt?" · "+pad.txt:""}</span></div>
      <div class="hpg">${hp.map((m,i)=>{
-        if(!m||m.inativa) return `<div class="hpc off"${m?` ${T(`<b>${m.mes}/26</b><div class="tl">A unidade ainda não tinha lançado nada no ano até este mês.</div>`)}`:""}><div class="hpb"></div><div class="hpm">${DB.meses[i]}</div></div>`;
+        if(!m||m.inativa) return `<div class="hpc off"${m?` ${T(`<b>${rotMes(m.i)}</b><div class="tl">A unidade ainda não tinha lançado nada no ano até este mês.</div>`)}`:""}><div class="hpb"></div><div class="hpm">${DB.meses[i]}</div></div>`;
         const alt=Math.max(3,Math.round(m.n/mx0*46));
-        return `<div class="hpc${i===M?" atual":""}${m.parcial?" parc":""}" ${T(`<b>${m.mes}/26</b>${m.parcial?' <span style="color:var(--fg-warn)">(fechamento parcial)</span>':""}
+        return `<div class="hpc${i===M?" atual":""}${m.parcial?" parc":""}" ${T(`<b>${rotMes(m.i)}</b>${m.parcial?' <span style="color:var(--fg-warn)">(fechamento parcial)</span>':""}
            <div class="tl">${m.n} conta(s) com orçamento e sem lançamento</div>
            <div class="tl">R$ ${fmtMi(m.val)} exposto</div>
            ${m.muda?'<div class="tl" style="color:var(--fg-neg)">A unidade não lançou NADA neste mês.</div>':""}`)}>
@@ -2717,7 +2738,7 @@ function renderLastroSemOrc(){
   document.getElementById("body").innerHTML=`
     <div class="expl" style="border-left:3px solid #A78BFA;margin-bottom:18px">
       <div class="expl2" style="margin:0;font-size:12px;color:var(--mut)">
-      Estas linhas tiveram lançamento mês após mês e <b>nunca</b> foram orçadas em 2026.
+      Estas linhas tiveram lançamento mês após mês e <b>nunca</b> foram orçadas em ${ANO}.
       É gasto recorrente que ficou de fora do orçamento — o oposto do orçamento sem lastro.
       Serve de insumo para o próximo ciclo: incluir a previsão.
       ${mesesAtivos().some(ehParcial)?" Meses em fechamento parcial ficam fora desta conta.":""}</div>
@@ -2754,14 +2775,14 @@ function renderLastroSemOrc(){
 }
 function exportLastroSemOrc(){
   const lst=lastroSemOrc(6);
-  const l=[[`Lastro sem orçamento · 2026 · ${MODOLBL[modo]}`],
+  const l=[[`Lastro sem orçamento · ${ANO} · ${MODOLBL[modo]}`],
            [`${lst.length} linhas lançadas 6+ meses e nunca orçadas · R$ ${Math.round(lst.reduce((s,o)=>s+o.val,0)).toLocaleString("pt-BR")}`],
            [],
            ["Unidade","Cod. unidade","Segmento","Conta","Descricao da conta",
             "Meses lancados","Media por mes","Total no ano","Recorrente"]];
   lst.forEach(o=>l.push([o.nome,o.u,SEGNM[o.seg],o.a,o.desc,o.meses,
      round2(o.media),round2(o.val),o.rec?"Sim":"Nao"]));
-  baixaXLSX(`lastro_sem_orcamento_2026_${hoje()}.xlsx`,
+  baixaXLSX(`lastro_sem_orcamento_${ANO}_${hoje()}.xlsx`,
     [{nome:"Sem orcamento",linhas:l,hdr:4,larg:[30,12,14,15,42,14,15,16,12],titulos:[1]}]);
 }
 
@@ -2787,7 +2808,7 @@ function renderLastro(){
   document.getElementById("body").innerHTML=`
     <div class="expl" style="border-left:3px solid #A78BFA;margin-bottom:18px">
       <div class="expl2" style="margin:0;font-size:12px;color:var(--mut)">
-      Estas linhas foram orçadas mês após mês e <b>nunca</b> tiveram lançamento em 2026.
+      Estas linhas foram orçadas mês após mês e <b>nunca</b> tiveram lançamento em ${ANO}.
       Não é falha de lançamento — é orçamento sem contrapartida real. Serve de insumo para o
       próximo ciclo orçamentário: revisar a premissa ou zerar a linha.
       ${mesesAtivos().some(ehParcial)?" Meses em fechamento parcial ficam fora desta conta.":""}</div>
@@ -2829,14 +2850,14 @@ function renderLastro(){
 }
 function exportLastro(){
   const lst=semLastro(6);
-  const l=[[`Orçamento sem lastro · 2026 · ${MODOLBL[modo]}`],
+  const l=[[`Orçamento sem lastro · ${ANO} · ${MODOLBL[modo]}`],
            [`${lst.length} linhas orçadas 6+ meses e nunca lançadas · R$ ${Math.round(lst.reduce((s,o)=>s+o.val,0)).toLocaleString("pt-BR")}`],
            [],
            ["Unidade","Cod. unidade","Segmento","Conta","Descricao da conta",
             "Meses orcados","Media por mes","Total no ano","Recorrente"]];
   lst.forEach(o=>l.push([o.nome,o.u,SEGNM[o.seg],o.a,o.desc,o.meses,
      round2(o.media),round2(o.val),o.rec?"Sim":"Nao"]));
-  baixaXLSX(`orcamento_sem_lastro_2026_${hoje()}.xlsx`,
+  baixaXLSX(`orcamento_sem_lastro_${ANO}_${hoje()}.xlsx`,
     [{nome:"Sem lastro",linhas:l,hdr:4,larg:[30,12,14,15,42,14,15,16,12],titulos:[1]}]);
 }
 
@@ -2958,7 +2979,8 @@ function abreCarga(){
         ${(c.semSegmento||[]).length?`<div class="expl2">Unidades sem segmento:</div>${lista(c.semSegmento)}`:""}</div>`:""}
       <div class="gp"><div class="gpt">Arquivo</div><div class="gpd">
         ${lin("Nome",he(c.arquivo||"—"))}${lin("Tamanho",c.tamanho?(c.tamanho/1e6).toFixed(1).replace(".",",")+" MB":"—")}
-        ${lin("Modificado em",c.modificado?new Date(c.modificado).toLocaleString("pt-BR"):"—")}${lin("Codificação",he(c.encoding||"—"))}</div></div>
+        ${lin("Modificado em",c.modificado?new Date(c.modificado).toLocaleString("pt-BR"):"—")}${lin("Codificação",he(c.encoding||"—"))}
+        ${lin("Ano da base",ANO+(c.anoFonte?" · pelo "+he(c.anoFonte):""))}</div></div>
       <div class="gp"><div class="gpt">Linhas</div><div class="gpd">
         ${lin("Lidas (sem o cabeçalho)",n(c.linhas))}${lin("Aproveitadas (família A)",n(c.usadas))}
         ${lin("Ignoradas — unidade fora da família A",n(c.naoA),1)}${lin("Ignoradas — DUMMYA",n(c.dummy),1)}
@@ -3029,7 +3051,7 @@ render=protege(render,"render");
 (function init(){
   const sel=document.getElementById("mes");
   sel.innerHTML=DB.meses.map((m,i)=>
-    `<option value="${i}" ${i===M?"selected":""}>${m}/26${DB.fechado[i]?"":" ·"}</option>`).join("");
+    `<option value="${i}" ${i===M?"selected":""}>${rotMes(i)}${DB.fechado[i]?"":" · em aberto"}</option>`).join("");
   // se veio link com estado, aplica antes do primeiro render
   sel.onchange=()=>{M=+sel.value;render();};
   const pi=document.getElementById("palin");

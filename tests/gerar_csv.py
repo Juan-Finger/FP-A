@@ -106,6 +106,13 @@ def bordas():
         for c in ["4.1.1.01.1.01", "4.1.1.04.1.01"]:
             ests.append(linha(c, "Desc " + c, u, "Unid " + u, v, [-90.0 if i in meses else 0.0 for i in range(12)]))
     escreve("estados.csv", ests)
+    # ano: no cabeçalho ("JAN/27") ou só no nome do arquivo
+    h0 = HDR[:]
+    HDR = [c.replace("/2026", "/27") for c in h0]
+    escreve("ano_cab.csv", [linha("4.1.1.01.1.01", "Desc", "4101A", "U", v, [-90.0] * 8 + [0] * 4)])
+    HDR = [c.replace("/2026", "") for c in h0]
+    escreve("export_plano_2025.csv", [linha("4.1.1.01.1.01", "Desc", "4101A", "U", v, [-90.0] * 8 + [0] * 4)])
+    HDR = h0
     # mesma base em UTF-8
     escreve("utf8.csv", [linha("4.1.1.01.1.01", "Manutenção – veículos", "4101A", "São Paulo", v, v)], enc="utf-8")
     escreve("cp1252.csv", [linha("4.1.1.01.1.01", "Manutenção – veículos", "4101A", "São Paulo", v, v)])
