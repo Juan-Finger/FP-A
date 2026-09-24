@@ -65,17 +65,20 @@ contas trocadas, base velha) ficam no objeto `CFG`, no início do script do app,
 Backoffice 6–9, vigiadas, natureza pelo prefixo) ficam nas constantes do carregador e **não foram
 alteradas**.
 
+## Regras confirmadas
+
+- **Mês fechado:** o mês precisa ter realizado **e** o CSV precisa ter sido exportado depois de
+  **7 dias corridos** após o fim do mês (o fechamento vai até o 2º dia útil, com ajustes na
+  primeira semana). Exemplo: agosto fecha a partir de 08/09, 00:00. A referência é a data do
+  arquivo exportado (a data da importação só entra se o arquivo não informar data). O Resumo
+  da carga mostra, para cada mês em aberto, o motivo e o prazo de ajustes.
+- **Pendências:** só a família 3 (receita e dedução) fica fora. A 4.2 e a 4.3 contam como
+  pendência e aparecem em "Custos e despesas".
+- **Segmentos:** unidades 6xxx–9xxx são Backoffice pela regra do código. O `SEGMAP` não tem
+  (nem precisa ter) entradas para elas.
+
 ## Dúvidas de regra em aberto
 
-Estes pontos foram mantidos como estavam e aguardam confirmação:
-
-1. O `SEGMAP` tem 6001A–9003A mapeadas para Fronteiras/CDs/Alfandegados/Transportes, mas a regra
-   "6–9 = Backoffice" é aplicada antes, então esse mapeamento nunca é usado.
-2. Só a família 3.x fica fora da pendência. A 4.2 ("outras receitas/despesas") e a 4.3
-   ("financeiro", que inclui receita financeira) contam como pendência e entram em
-   "Custos e despesas".
-3. Um mês é "fechado" se tem qualquer realizado acima de R$ 1. Uma provisão isolada num mês
-   futuro muda o mês padrão.
-4. As unidades vigiadas continuam aparecendo em "Orçamento sem lastro" e em "Lastro sem orçamento".
-   Clicar numa delas agora leva a Exceções.
-5. A confiança "lançava todo mês" tolera um mês sem lançamento.
+1. As unidades vigiadas continuam aparecendo em "Orçamento sem lastro" e em
+   "Lastro sem orçamento". Clicar numa delas agora leva a Exceções.
+2. A confiança "lançava todo mês" tolera um mês sem lançamento.

@@ -32,9 +32,16 @@ def linha(conta, desc, unid, udesc, p, r):
     return ";".join(cel + ["0", "0"])
 
 
+# Data fixa de "exportação" dos arquivos (a regra de mês fechado depende dela):
+# 15/09/2026 — já passou a semana de ajustes de agosto, então JAN–AGO estão fechados.
+DATA_EXPORT = __import__("datetime").datetime(2026, 9, 15, 12, 0).timestamp()
+
+
 def escreve(nome, linhas, enc="cp1252"):
-    with open(os.path.join(TMP, nome), "w", encoding=enc, newline="") as fh:
+    caminho = os.path.join(TMP, nome)
+    with open(caminho, "w", encoding=enc, newline="") as fh:
         fh.write("\r\n".join([";".join(HDR)] + linhas) + "\r\n")
+    os.utime(caminho, (DATA_EXPORT, DATA_EXPORT))
 
 
 def principal():
@@ -110,9 +117,16 @@ def bordas():
     h0 = HDR[:]
     HDR = [c.replace("/2026", "/27") for c in h0]
     escreve("ano_cab.csv", [linha("4.1.1.01.1.01", "Desc", "4101A", "U", v, [-90.0] * 8 + [0] * 4)])
+    t27 = __import__("datetime").datetime(2027, 9, 15, 12, 0).timestamp()   # base de 2027 exportada em 2027
+    os.utime(os.path.join(TMP, "ano_cab.csv"), (t27, t27))
     HDR = [c.replace("/2026", "") for c in h0]
     escreve("export_plano_2025.csv", [linha("4.1.1.01.1.01", "Desc", "4101A", "U", v, [-90.0] * 8 + [0] * 4)])
     HDR = h0
+    # fechamento: realizado JAN–AGO exceto MAI (mês passado sem realizado) + provisão isolada em DEZ
+    r = [-90.0] * 8 + [0.0] * 4
+    r[4] = 0.0; r[11] = -50.0
+    escreve("fechamento.csv", [linha("4.1.1.01.1.01", "Desc", "4101A", "U", v, r),
+                               linha("4.1.1.04.1.01", "Desc", "4101A", "U", v, [-90.0] * 4 + [0.0] + [-90.0] * 3 + [0.0] * 4)])
     # mesma base em UTF-8
     escreve("utf8.csv", [linha("4.1.1.01.1.01", "Manutenção – veículos", "4101A", "São Paulo", v, v)], enc="utf-8")
     escreve("cp1252.csv", [linha("4.1.1.01.1.01", "Manutenção – veículos", "4101A", "São Paulo", v, v)])

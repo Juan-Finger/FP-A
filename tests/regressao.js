@@ -361,9 +361,12 @@ teste("A7", "carimbo usa a data do arquivo e avisa base velha", async () => {
   let g = await p.evaluate(() => document.getElementById("gerado").innerText);
   ok(/base_velha\.csv/.test(g) && /Arquivo de/.test(g) && /há 60 dias/.test(g), "carimbo: " + g);
   await p.context().close();
-  p = await pagina("novo");
+  const nova = CSV("base_nova.csv"); fs.copyFileSync(CSV("so_orcado.csv"), nova);
+  const agora = Date.now() / 1000; fs.utimesSync(nova, agora, agora);
+  p = await abre(NOVO, "base_nova.csv");
   g = await p.evaluate(() => document.getElementById("gerado").innerText);
   ok(!/desatualizado/.test(g), "base nova marcada como velha: " + g);
+  await p.context().close();
 });
 
 teste("D2", "resumo da carga: conciliação e avisos", async () => {
@@ -768,6 +771,30 @@ teste("R1", "SEGMAP sem as entradas 6xxx–9xxx; unidades 6–9 continuam Backof
   const r = await p.evaluate(() => ({ mortas: Object.keys(SEGMAP).filter(k => /^[6-9]/.test(k)),
     fora: DB.units.filter(u => /^[6-9]/.test(u.cod) && !u.vig && u.seg !== "Backoffice").map(u => u.cod) }));
   igual({ mortas: [], fora: [] }, r, "SEGMAP");
+});
+
+teste("R2", "mês fechado: tem realizado E a data do arquivo passou 7 dias corridos do fim do mês", async () => {
+  const com = async (nome, data) => {
+    const f = CSV(nome); fs.copyFileSync(CSV("fechamento.csv"), f); fs.utimesSync(f, data, data);
+    const p = await abre(NOVO, nome);
+    const r = await p.evaluate(() => { abreCarga(); const t = document.getElementById("guia").innerText; fechaGuia();
+      return { fechados: DB.meses.filter((m, i) => DB.fechado[i]).join(","), padrao: DB.meses[M], resumo: t,
+               opcao: [...document.querySelectorAll("#mes option")][7].textContent,
+               subAgo: (M = 7, render(), document.getElementById("subtitle").textContent) }; });
+    await p.context().close(); return r;
+  };
+  // 07/09 23:59: agosto ainda na semana de ajustes; maio sem realizado; dezembro (provisão) no futuro
+  const a = await com("fech_0709.csv", new Date(2026, 8, 7, 23, 59));
+  igual({ fechados: "JAN,FEV,MAR,ABR,JUN,JUL", padrao: "JUL" }, { fechados: a.fechados, padrao: a.padrao }, "exportado em 07/09 23:59");
+  ok(/AGO\/26[^\n]*em aberto[^\n]*07\/09/.test(a.resumo), "resumo não explica o prazo de agosto: " + a.resumo.match(/AGO\/26[^\n]*/));
+  ok(/em aberto/.test(a.opcao), "seletor de mês não marca agosto em aberto: " + a.opcao);
+  ok(/em aberto · prazo de ajustes até 07\/09/.test(a.subAgo), "subtítulo de agosto na semana de ajustes: " + a.subAgo);
+  // 08/09 00:00: passou a semana → agosto fechado
+  const b = await com("fech_0809.csv", new Date(2026, 8, 8, 0, 0));
+  igual({ fechados: "JAN,FEV,MAR,ABR,JUN,JUL,AGO", padrao: "AGO" }, { fechados: b.fechados, padrao: b.padrao }, "exportado em 08/09 00:00");
+  // ano seguinte: dezembro com realizado fecha a partir de 08/01
+  const c = await com("fech_prox_ano.csv", new Date(2027, 0, 8, 0, 0));
+  ok(c.fechados.endsWith("AGO,DEZ"), "dezembro no ano seguinte: " + c.fechados);
 });
 
 /* ================================================================== */

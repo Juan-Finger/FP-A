@@ -672,6 +672,10 @@ const _SEG_MANUAL={"4402A":"CDs","4425A":"Fronteiras","5003A":"Transportes"};
 const _FUNDIR={"4.1.1.01.1.98":"4.1.1.01.1.99"};
 const _REC_EXTRA=new Set(["4.1.1.02.1.09"]);
 const _MESES=["JAN","FEV","MAR","ABR","MAI","JUN","JUL","AGO","SET","OUT","NOV","DEZ"];
+// Fechamento: o mês corrido é fechado até o 2º dia útil do mês seguinte, com ajustes
+// possíveis depois. Um mês só conta como FECHADO quando o arquivo foi exportado depois
+// de 7 dias corridos do fim do mês (ex.: agosto fecha a partir de 08/09, 00:00).
+const _PRAZO_FECHAMENTO_DIAS=7;
 const _PLAN=[8,10,12,14,16,18,20,22,24,26,28,30];
 const _REAL=[9,11,13,15,17,19,21,23,25,27,29,31];
 const _CC=0,_CCD=1,_CU=2,_CUD=3,_COLMIN=32;
@@ -821,7 +825,14 @@ function _agregador(info){
     const accts=[...acct_desc.keys()].sort().map(c=>({cod:c,desc:acct_desc.get(c),nat:nat(c),rec:(CLASSIF[c]||["—","—"])[0],fv:(CLASSIF[c]||["—","—"])[1],r:ehRec(c)?1:0}));
     const mes_abs=new Array(12).fill(0);
     for(const d of data) for(let i=0;i<12;i++) mes_abs[i]+=Math.abs(d.r[i]);
-    const fechado=mes_abs.map(x=>Math.abs(x)>1);
+    // Mês fechado = tem realizado E a base foi exportada depois da semana de ajustes.
+    // Referência: data do arquivo exportado (sem ela, a data da importação).
+    const ref=carga.modificado?new Date(carga.modificado):new Date();
+    carga.fechamento={referencia:+ref,fonte:carga.modificado?"data do arquivo exportado":"data da importação (o arquivo não informou a data)",
+      prazoDias:_PRAZO_FECHAMENTO_DIAS,
+      meses:_MESES.map((m,i)=>({temReal:Math.abs(mes_abs[i])>1,
+        abreEm:+new Date(carga.ano,i+1,1+_PRAZO_FECHAMENTO_DIAS)}))};       // 1º instante após o prazo
+    const fechado=carga.fechamento.meses.map(x=>x.temReal&&+ref>=x.abreEm);
     // conferência: totais por mês (todas as unidades "A", inclusive vigiadas)
     carga.totais=_MESES.map((m,i)=>{let p=0,r=0;for(const d of data){p+=d.p[i];r+=d.r[i];}return {p,r};});
     carga.semSegmento=units.filter(u=>u.seg==="Sem segmento").map(u=>u.cod+" "+u.nome);
@@ -2924,7 +2935,7 @@ var render=function(){
       +`<span onclick="go({tipo:'seg',seg:${js(view.seg)}})">${SEGNM[view.seg]}</span><i>›</i>${he(u.cod)}`;
   }
   document.getElementById("subtitle").innerHTML=
-    `${faixaLbl()} · ${aberto?"sem realizado importado":PERLBL[periodo]}`
+    `${faixaLbl()} · ${aberto?statusMesCarga(M).replace(" · sem realizado"," · sem realizado importado"):PERLBL[periodo]}`
     +(modo==="rec"?` <span class="modotag">${N_REC} contas recorrentes</span>`:"")
     +(corte>0?` <span class="modotag" style="background:rgba(143,163,184,.14);color:var(--mut)">ignorando abaixo de R$ ${fmtN(corte)}</span>`:"")
     +(mesesAtivos().some(ehParcial)?` <span class="modotag parc" ${T(`<b>Fechamento parcial</b>
@@ -2982,6 +2993,14 @@ function avisosCarga(){
   if(c.semSegmento&&c.semSegmento.length) a.push(`${c.semSegmento.length} unidade(s) sem segmento definido`);
   return a;
 }
+// status de um mês no resumo da carga, com o motivo quando está em aberto
+function statusMesCarga(i){
+  if(DB.fechado[i]) return ehParcial(i)?"fechado · parcial":"fechado";
+  const f=DB.carga&&DB.carga.fechamento&&DB.carga.fechamento.meses[i];
+  if(!f||!f.temReal) return "em aberto · sem realizado";
+  const ult=new Date(f.abreEm-86400000);
+  return "em aberto · prazo de ajustes até "+ult.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"});
+}
 function abreCarga(){
   const c=DB.carga||{}, el=document.getElementById("guia");
   const n=x=>fmtN(x||0);
@@ -2991,7 +3010,7 @@ function abreCarga(){
     +(arr.length>max?`<div class="expl2">…e mais ${arr.length-max}.</div>`:"");
   const tot=(c.totais||[]).map((t,i)=>`<tr${DB.fechado[i]?"":' style="color:var(--dim)"'}><td style="color:inherit">${rotMes(i)}</td>
       <td class="r num">${fmtC(t.p)}</td><td class="r num">${fmtC(t.r)}</td><td class="r num">${fmtC(t.r-t.p)}</td>
-      <td class="nat">${DB.fechado[i]?(ehParcial(i)?"parcial":"fechado"):"em aberto"}</td></tr>`).join("");
+      <td class="nat">${statusMesCarga(i)}</td></tr>`).join("");
   el.innerHTML=`<div class="guiabox" role="dialog" aria-modal="true" aria-labelledby="cargat">
     <div class="guiah"><div>
         <h2 class="gt" id="cargat">Resumo da carga</h2>
@@ -3005,7 +3024,8 @@ function abreCarga(){
       <div class="gp"><div class="gpt">Arquivo</div><div class="gpd">
         ${lin("Nome",he(c.arquivo||"—"))}${lin("Tamanho",c.tamanho?(c.tamanho/1e6).toFixed(1).replace(".",",")+" MB":"—")}
         ${lin("Modificado em",c.modificado?new Date(c.modificado).toLocaleString("pt-BR"):"—")}${lin("Codificação",he(c.encoding||"—"))}
-        ${lin("Ano da base",ANO+(c.anoFonte?" · pelo "+he(c.anoFonte):""))}</div></div>
+        ${lin("Ano da base",ANO+(c.anoFonte?" · pelo "+he(c.anoFonte):""))}
+        ${c.fechamento?lin("Fechamento",`mês com realizado e ${c.fechamento.prazoDias} dias corridos após o fim, pela ${he(c.fechamento.fonte)} (${new Date(c.fechamento.referencia).toLocaleDateString("pt-BR")})`):""}</div></div>
       <div class="gp"><div class="gpt">Linhas</div><div class="gpd">
         ${lin("Lidas (sem o cabeçalho)",n(c.linhas))}${lin("Aproveitadas (família A)",n(c.usadas))}
         ${lin("Ignoradas — unidade fora da família A",n(c.naoA),1)}${lin("Ignoradas — DUMMYA",n(c.dummy),1)}
