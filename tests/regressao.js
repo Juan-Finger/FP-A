@@ -173,6 +173,28 @@ teste("T05", "texto visível de todas as telas idêntico ao original (estado pad
   }
 });
 
+/* Snapshot APROVADO: hash de cada métrica em cada estado e do texto de cada tela.
+ * Mudança intencional → rodar `node tests/regressao.js --aprovar` e commitar o
+ * tests/referencia/snapshot_aprovado.json junto com a mudança, explicando o porquê. */
+const APROVADO = path.join(__dirname, "referencia", "snapshot_aprovado.json");
+const hash = o => require("crypto").createHash("sha256").update(JSON.stringify(o)).digest("hex").slice(0, 16);
+async function snapshotAtual() {
+  const n = await pagina("novo");
+  const snaps = await n.evaluate(SNAP, ESTADOS), telas = await n.evaluate(TELAS);
+  await n.evaluate(() => { modo = "geral"; periodo = "mes"; corte = 0; M = DB.fechado.lastIndexOf(true); go({ tipo: "hub" }); });
+  const out = { metricas: {}, telas: {} };
+  snaps.forEach(sn => { const k = JSON.stringify(sn.estado); out.metricas[k] = {};
+    for (const [c, v] of Object.entries(sn)) if (c !== "estado") out.metricas[k][c] = hash(v); });
+  for (const [k, v] of Object.entries(telas)) out.telas[k] = hash(v);
+  return out;
+}
+teste("T06", "métricas e telas idênticas ao snapshot aprovado", async () => {
+  const atual = await snapshotAtual();
+  if (process.argv.includes("--aprovar")) { fs.writeFileSync(APROVADO, JSON.stringify(atual, null, 1) + "\n"); console.log("        snapshot aprovado gravado"); return; }
+  ok(fs.existsSync(APROVADO), "sem snapshot aprovado: rode com --aprovar");
+  igual(JSON.parse(fs.readFileSync(APROVADO, "utf8")), atual, "difere do snapshot aprovado");
+});
+
 teste("T03", "carrega base só com orçado (nenhum mês fechado) sem erro", async () => {
   const p = await abre(NOVO, "so_orcado.csv");
   ok(!p._erros.length, "erros: " + p._erros.join(" | "));
@@ -336,7 +358,7 @@ teste("A5", "texto do CSV nunca vira HTML/JS (nomes, descrições e códigos com
 
 /* ================================================================== */
 (async () => {
-  const filtro = process.argv.slice(2);
+  const filtro = process.argv.slice(2).filter(a => !a.startsWith("--"));
   cp.execFileSync("python3", [path.join(__dirname, "gerar_csv.py")]);
   browser = await chromium.launch();
   let falhas = 0;
