@@ -1054,7 +1054,10 @@ function met(){
   // estado da unidade no período
   const temR={}, jaLancou={};
   DB.units.forEach(u=>{temR[u.cod]=false; jaLancou[u.cod]=false;});
-  const antes=[]; for(let i=0;i<12;i++) if(DB.fechado[i] && !ms.includes(i)) antes.push(i);
+  // "já lançou antes" = em algum mês fechado ANTERIOR ao período (mês posterior não conta:
+  // unidade que só começou depois não "parou de lançar")
+  const ini=ms.length?ms[0]:M;
+  const antes=[]; for(let i=0;i<ini;i++) if(DB.fechado[i]) antes.push(i);
   DB.data.forEach(d=>{ if(!rel(d))return;
     if(ms.some(i=>Math.abs(d.r[i])>EPS)) temR[d.u]=true;
     if(antes.some(i=>Math.abs(d.r[i])>EPS)) jaLancou[d.u]=true; });
@@ -1533,15 +1536,14 @@ function histPendencias(cod){
   for(let i=0;i<12;i++){
     if(!DB.fechado[i]){ out.push(null); continue; }
     const lancouAgora=linhas.some(d=>Math.abs(d.r[i])>EPS);
-    const lancouAntes=linhas.some(d=>[...Array(12).keys()]
-        .some(j=>DB.fechado[j]&&j!==i&&Math.abs(d.r[j])>EPS));
+    const lancouAntes=linhas.some(d=>{ for(let j=0;j<i;j++) if(DB.fechado[j]&&Math.abs(d.r[j])>EPS) return true; return false; });
     const est=lancouAgora?"ativa":(lancouAntes?"muda":"inativa");
     let n=0,val=0;
     linhas.forEach(d=>{
       const p=d.p[i],r=d.r[i];
       if(statusOf(p,r,false,est)==="sem"){n++;val+=Math.abs(p);}
     });
-    out.push({mes:DB.meses[i],n,val,muda:est==="muda",parcial:ehParcial(i),i});
+    out.push({mes:DB.meses[i],n,val,muda:est==="muda",inativa:est==="inativa",parcial:ehParcial(i),i});
   }
   cacheHist[key]=out; return out;
 }
@@ -1593,7 +1595,8 @@ function renderSemLancarHa(cod){
 }
 
 function padraoUnidade(cod){
-  const h=histPendencias(cod).filter(m=>m && !m.muda && !m.parcial);
+  // fora: meses em que a unidade não lançou nada (já têm alerta próprio ou ainda não tinha começado)
+  const h=histPendencias(cod).filter(m=>m && !m.muda && !m.inativa && !m.parcial);
   if(!h.length) return {tipo:"limpa",txt:"sem base de comparação"};
   if(h.every(m=>m.n===0)) return {tipo:"limpa",txt:"sem pendências no período"};
   if(h.length<6) return {tipo:"estavel",txt:"histórico curto"};
@@ -1690,7 +1693,7 @@ function contasDoMes(cod,i){
   const out=[];
   const linhas=DB.data.filter(d=>d.u===cod && ehPendencia(d.a) && (modo!=="rec"||ehRec(d.a)));
   const lancou=linhas.some(d=>Math.abs(d.r[i])>EPS);
-  const antes=linhas.some(d=>[...Array(12).keys()].some(j=>DB.fechado[j]&&j!==i&&Math.abs(d.r[j])>EPS));
+  const antes=linhas.some(d=>{ for(let j=0;j<i;j++) if(DB.fechado[j]&&Math.abs(d.r[j])>EPS) return true; return false; });
   const est=lancou?"ativa":(antes?"muda":"inativa");
   linhas.forEach(d=>{
     const p=d.p[i], r=d.r[i];
@@ -1712,6 +1715,7 @@ function renderMapa(sg){
   const meses=[...Array(12).keys()].filter(i=>DB.fechado[i]);
   const cel=(m,i,cod)=>{
     if(!m) return `<td class="hm off"></td>`;
+    if(m.inativa) return `<td class="hm off" ${T(`<b>${m.mes}/26</b><div class="tl">A unidade ainda não tinha lançado nada no ano até este mês: sem pendência a cobrar.</div>`)}></td>`;
     const t=m.n/mx;
     const bg = m.muda ? "rgba(242,109,109,.85)"
              : m.n===0 ? "rgba(74,222,155,.16)"
@@ -1901,7 +1905,7 @@ function renderDet(){
      <div class="hph"><span>Histórico de pendências por mês</span>
        <span class="pad ${pad.tipo}">${PADLBL[pad.tipo]}${pad.txt?" · "+pad.txt:""}</span></div>
      <div class="hpg">${hp.map((m,i)=>{
-        if(!m) return `<div class="hpc off"><div class="hpb"></div><div class="hpm">${DB.meses[i]}</div></div>`;
+        if(!m||m.inativa) return `<div class="hpc off"${m?` ${T(`<b>${m.mes}/26</b><div class="tl">A unidade ainda não tinha lançado nada no ano até este mês.</div>`)}`:""}><div class="hpb"></div><div class="hpm">${DB.meses[i]}</div></div>`;
         const alt=Math.max(3,Math.round(m.n/mx0*46));
         return `<div class="hpc${i===M?" atual":""}${m.parcial?" parc":""}" ${T(`<b>${m.mes}/26</b>${m.parcial?' <span style="color:#F3C784">(fechamento parcial)</span>':""}
            <div class="tl">${m.n} conta(s) com orçamento e sem lançamento</div>

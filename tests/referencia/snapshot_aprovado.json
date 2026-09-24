@@ -8,17 +8,17 @@
    "lastro": "ad336a4e74c83a2c",
    "lsorc": "4f53cda18c2baa0c",
    "porConta": "10e8dc6a3de4a034",
-   "unid": "1f8f944559f049e2"
+   "unid": "fd702cd871aad699"
   },
   "{\"modo\":\"geral\",\"periodo\":\"mes\",\"corte\":0,\"M\":2}": {
    "aberto": "fcbcf165908dd18a",
-   "met": "bd36ab4aee5236e1",
+   "met": "faa4c34a1d1a3167",
    "res": "8f29782f041855b6",
    "exc": "0a5be851daf91f8c",
    "lastro": "ad336a4e74c83a2c",
    "lsorc": "4f53cda18c2baa0c",
-   "porConta": "da2289af9f7b62e1",
-   "unid": "240620ce9c5d8e7f"
+   "porConta": "6c6806de1a6b51b5",
+   "unid": "0cc5de0288133c9b"
   },
   "{\"modo\":\"geral\",\"periodo\":\"mes\",\"corte\":5000,\"M\":\"ult\"}": {
    "aberto": "fcbcf165908dd18a",
@@ -28,17 +28,17 @@
    "lastro": "ad336a4e74c83a2c",
    "lsorc": "4f53cda18c2baa0c",
    "porConta": "4d7813194ba40b2a",
-   "unid": "ddde64d91d904369"
+   "unid": "9eeb4c340ad32c13"
   },
   "{\"modo\":\"geral\",\"periodo\":\"mes\",\"corte\":5000,\"M\":2}": {
    "aberto": "fcbcf165908dd18a",
-   "met": "488dc45397b5ebc5",
+   "met": "2b5a0837d0e83fb6",
    "res": "8f29782f041855b6",
    "exc": "0a5be851daf91f8c",
    "lastro": "ad336a4e74c83a2c",
    "lsorc": "4f53cda18c2baa0c",
-   "porConta": "024d25ba77e56240",
-   "unid": "44680b9d3b6dd203"
+   "porConta": "6c6806de1a6b51b5",
+   "unid": "138ee327439762ec"
   },
   "{\"modo\":\"geral\",\"periodo\":\"acum\",\"corte\":0,\"M\":\"ult\"}": {
    "aberto": "fcbcf165908dd18a",
@@ -48,17 +48,17 @@
    "lastro": "ad336a4e74c83a2c",
    "lsorc": "4f53cda18c2baa0c",
    "porConta": "1c283623a48d330c",
-   "unid": "59e4553d6b3da724"
+   "unid": "0e0787ddf9e72347"
   },
   "{\"modo\":\"geral\",\"periodo\":\"acum\",\"corte\":0,\"M\":2}": {
    "aberto": "fcbcf165908dd18a",
-   "met": "7c69a7e4c894012e",
+   "met": "dce35488b4332e31",
    "res": "098bcb79eea3eb8e",
    "exc": "1452b4bef6daee8a",
    "lastro": "ad336a4e74c83a2c",
    "lsorc": "4f53cda18c2baa0c",
-   "porConta": "9e64773567bb9b58",
-   "unid": "00eb316e0c0548a3"
+   "porConta": "5752e329e92809a5",
+   "unid": "4fdc77c0d3aa2b07"
   },
   "{\"modo\":\"geral\",\"periodo\":\"acum\",\"corte\":5000,\"M\":\"ult\"}": {
    "aberto": "fcbcf165908dd18a",
@@ -68,17 +68,17 @@
    "lastro": "ad336a4e74c83a2c",
    "lsorc": "4f53cda18c2baa0c",
    "porConta": "1c283623a48d330c",
-   "unid": "59e4553d6b3da724"
+   "unid": "0e0787ddf9e72347"
   },
   "{\"modo\":\"geral\",\"periodo\":\"acum\",\"corte\":5000,\"M\":2}": {
    "aberto": "fcbcf165908dd18a",
-   "met": "a7c8435743cced7b",
+   "met": "65a8ddedd359f8a4",
    "res": "098bcb79eea3eb8e",
    "exc": "1452b4bef6daee8a",
    "lastro": "ad336a4e74c83a2c",
    "lsorc": "4f53cda18c2baa0c",
-   "porConta": "9e64773567bb9b58",
-   "unid": "00eb316e0c0548a3"
+   "porConta": "5752e329e92809a5",
+   "unid": "4fdc77c0d3aa2b07"
   },
   "{\"modo\":\"geral\",\"periodo\":\"sem\",\"corte\":0,\"M\":\"ult\"}": {
    "aberto": "fcbcf165908dd18a",
@@ -88,7 +88,7 @@
    "lastro": "ad336a4e74c83a2c",
    "lsorc": "4f53cda18c2baa0c",
    "porConta": "5376f14fc35764e3",
-   "unid": "e523fddb0d0722b2"
+   "unid": "6fba64038c8dac68"
   },
   "{\"modo\":\"geral\",\"periodo\":\"sem\",\"corte\":0,\"M\":2}": {
    "aberto": "fcbcf165908dd18a",
@@ -98,7 +98,7 @@
    "lastro": "ad336a4e74c83a2c",
    "lsorc": "4f53cda18c2baa0c",
    "porConta": "103b3668e561327a",
-   "unid": "3e66a82541f926bf"
+   "unid": "d963c426bbb41f38"
   },
   "{\"modo\":\"geral\",\"periodo\":\"sem\",\"corte\":5000,\"M\":\"ult\"}": {
    "aberto": "fcbcf165908dd18a",
@@ -108,7 +108,7 @@
    "lastro": "ad336a4e74c83a2c",
    "lsorc": "4f53cda18c2baa0c",
    "porConta": "2bab985e6ffc9aeb",
-   "unid": "58a697a7060dce4e"
+   "unid": "a86aee0116909561"
   },
   "{\"modo\":\"geral\",\"periodo\":\"sem\",\"corte\":5000,\"M\":2}": {
    "aberto": "fcbcf165908dd18a",
@@ -118,7 +118,7 @@
    "lastro": "ad336a4e74c83a2c",
    "lsorc": "4f53cda18c2baa0c",
    "porConta": "103b3668e561327a",
-   "unid": "3e66a82541f926bf"
+   "unid": "d963c426bbb41f38"
   },
   "{\"modo\":\"rec\",\"periodo\":\"mes\",\"corte\":0,\"M\":\"ult\"}": {
    "aberto": "fcbcf165908dd18a",
@@ -128,17 +128,17 @@
    "lastro": "5363d25cac53bb4e",
    "lsorc": "4f53cda18c2baa0c",
    "porConta": "ee0f446add6189a4",
-   "unid": "d6df74fa8439bcd9"
+   "unid": "68be1f98ec8d57a0"
   },
   "{\"modo\":\"rec\",\"periodo\":\"mes\",\"corte\":0,\"M\":2}": {
    "aberto": "fcbcf165908dd18a",
-   "met": "7a5281d95fa0ab38",
+   "met": "2acd2c544349044e",
    "res": "8f29782f041855b6",
    "exc": "0a5be851daf91f8c",
    "lastro": "5363d25cac53bb4e",
    "lsorc": "4f53cda18c2baa0c",
-   "porConta": "aa313edbb06fd755",
-   "unid": "2aa2a7f3431fcd83"
+   "porConta": "3aa4b2ea6f3a7d4d",
+   "unid": "ae9e0a7dc187f88e"
   },
   "{\"modo\":\"rec\",\"periodo\":\"mes\",\"corte\":5000,\"M\":\"ult\"}": {
    "aberto": "fcbcf165908dd18a",
@@ -148,17 +148,17 @@
    "lastro": "5363d25cac53bb4e",
    "lsorc": "4f53cda18c2baa0c",
    "porConta": "552abf28fb986974",
-   "unid": "768ebeb585e59fa4"
+   "unid": "bb31db4348acf56f"
   },
   "{\"modo\":\"rec\",\"periodo\":\"mes\",\"corte\":5000,\"M\":2}": {
    "aberto": "fcbcf165908dd18a",
-   "met": "087c6746269bba40",
+   "met": "f1670d52f06bcbd2",
    "res": "8f29782f041855b6",
    "exc": "0a5be851daf91f8c",
    "lastro": "5363d25cac53bb4e",
    "lsorc": "4f53cda18c2baa0c",
-   "porConta": "1ea30d6446f5d9ed",
-   "unid": "2aa2a7f3431fcd83"
+   "porConta": "3aa4b2ea6f3a7d4d",
+   "unid": "ae9e0a7dc187f88e"
   },
   "{\"modo\":\"rec\",\"periodo\":\"acum\",\"corte\":0,\"M\":\"ult\"}": {
    "aberto": "fcbcf165908dd18a",
@@ -168,17 +168,17 @@
    "lastro": "5363d25cac53bb4e",
    "lsorc": "4f53cda18c2baa0c",
    "porConta": "6ef25cc2210c38b4",
-   "unid": "0f9510ba92104a35"
+   "unid": "cc573924978e05c3"
   },
   "{\"modo\":\"rec\",\"periodo\":\"acum\",\"corte\":0,\"M\":2}": {
    "aberto": "fcbcf165908dd18a",
-   "met": "b8ed2940ee770327",
+   "met": "4798ea15f6e7a703",
    "res": "098bcb79eea3eb8e",
    "exc": "1452b4bef6daee8a",
    "lastro": "5363d25cac53bb4e",
    "lsorc": "4f53cda18c2baa0c",
-   "porConta": "6e00f0f8e75685ed",
-   "unid": "fdc89a5dc8450ebe"
+   "porConta": "8ca589841e487d87",
+   "unid": "225f0ef594aeb320"
   },
   "{\"modo\":\"rec\",\"periodo\":\"acum\",\"corte\":5000,\"M\":\"ult\"}": {
    "aberto": "fcbcf165908dd18a",
@@ -188,17 +188,17 @@
    "lastro": "5363d25cac53bb4e",
    "lsorc": "4f53cda18c2baa0c",
    "porConta": "6ef25cc2210c38b4",
-   "unid": "0f9510ba92104a35"
+   "unid": "cc573924978e05c3"
   },
   "{\"modo\":\"rec\",\"periodo\":\"acum\",\"corte\":5000,\"M\":2}": {
    "aberto": "fcbcf165908dd18a",
-   "met": "b5a26ec855146657",
+   "met": "51c56af28cdb206a",
    "res": "098bcb79eea3eb8e",
    "exc": "1452b4bef6daee8a",
    "lastro": "5363d25cac53bb4e",
    "lsorc": "4f53cda18c2baa0c",
-   "porConta": "6e00f0f8e75685ed",
-   "unid": "fdc89a5dc8450ebe"
+   "porConta": "8ca589841e487d87",
+   "unid": "225f0ef594aeb320"
   },
   "{\"modo\":\"rec\",\"periodo\":\"sem\",\"corte\":0,\"M\":\"ult\"}": {
    "aberto": "fcbcf165908dd18a",
@@ -208,7 +208,7 @@
    "lastro": "5363d25cac53bb4e",
    "lsorc": "4f53cda18c2baa0c",
    "porConta": "11a3a61ec86ef6eb",
-   "unid": "635de67812f3c266"
+   "unid": "0d99a46cf2a5a9fa"
   },
   "{\"modo\":\"rec\",\"periodo\":\"sem\",\"corte\":0,\"M\":2}": {
    "aberto": "fcbcf165908dd18a",
@@ -218,7 +218,7 @@
    "lastro": "5363d25cac53bb4e",
    "lsorc": "4f53cda18c2baa0c",
    "porConta": "46a02ce9fa0a54a2",
-   "unid": "e6a9a53e322ae9f0"
+   "unid": "cdbfd40cde3559a2"
   },
   "{\"modo\":\"rec\",\"periodo\":\"sem\",\"corte\":5000,\"M\":\"ult\"}": {
    "aberto": "fcbcf165908dd18a",
@@ -228,7 +228,7 @@
    "lastro": "5363d25cac53bb4e",
    "lsorc": "4f53cda18c2baa0c",
    "porConta": "c4c9f887dd7402ca",
-   "unid": "635de67812f3c266"
+   "unid": "0d99a46cf2a5a9fa"
   },
   "{\"modo\":\"rec\",\"periodo\":\"sem\",\"corte\":5000,\"M\":2}": {
    "aberto": "fcbcf165908dd18a",
@@ -238,7 +238,7 @@
    "lastro": "5363d25cac53bb4e",
    "lsorc": "4f53cda18c2baa0c",
    "porConta": "46a02ce9fa0a54a2",
-   "unid": "e6a9a53e322ae9f0"
+   "unid": "cdbfd40cde3559a2"
   }
  },
  "telas": {
@@ -252,7 +252,7 @@
   "un:Alfandegados": "30f54b122084267e",
   "seg:CDs": "c72e584529048606",
   "ct:CDs": "156d55fc968bbeef",
-  "mp:CDs": "25c027723eef0121",
+  "mp:CDs": "b20904a60d7c661b",
   "un:CDs": "c72e584529048606",
   "seg:Transportes": "756af15d4421a5fc",
   "ct:Transportes": "ed3f0eb515309554",
@@ -279,7 +279,7 @@
   "det:4201A:var": "e5ea246a15fc0041",
   "det:4201A:res": "2ac5456615e0ea19",
   "det:4201A:sin": "409b6f935c2a2939",
-  "det:4201A:hist": "536171e0d02c1913",
+  "det:4201A:hist": "9bd10f4896c5b417",
   "det:4412A:pend": "8dfbdf996abc4a95",
   "det:4412A:var": "b113c1d53917e0e9",
   "det:4412A:res": "8f7c7d07843d1dfa",

@@ -125,6 +125,20 @@ for (const modo of ["geral", "rec"]) for (const periodo of ["mes", "acum", "sem"
  * propósito. O resto continua tendo de bater exatamente. */
 const INTENCIONAIS = [];
 const intencional = (id, fn) => INTENCIONAIS.push({ id, fn });
+// A4: "muda" (parou de lançar) só olha meses ANTERIORES. Unidades que eram "muda" só por
+// lançarem depois viram "inativa": aceita essa transição (e o que depende dela) e mais nada.
+intencional("A4", (o, n) => {
+  let houve = false;
+  for (const u in o.met) if (o.met[u].est === "muda" && n.met[u] && n.met[u].est === "inativa") {
+    houve = true; for (const k of ["est", "sem", "expo", "alta"]) { delete o.met[u][k]; delete n.met[u][k]; }
+    if (o.unid[u]) { o.unid[u].linhas.forEach(l => l[4] = "?"); n.unid[u].linhas.forEach(l => l[4] = "?"); }
+  }
+  if (houve) { delete o.porConta; delete n.porConta; }
+  for (const u in o.unid) { let mud = false;
+    n.unid[u].hist.forEach(x => { if (x && x.inativa) mud = true; if (x) delete x.inativa; });   // campo novo
+    o.unid[u].hist.forEach((m, i) => { const x = n.unid[u].hist[i]; if (m && x && m.muda && !x.muda) { o.unid[u].hist[i] = n.unid[u].hist[i] = "A4"; mud = true; } });
+    if (mud) { delete o.unid[u].pad; delete n.unid[u].pad; } }
+});
 // A3: "Por conta" deixou de listar receita/dedução como falha
 intencional("A3", (o, n) => { for (const sg in o.porConta) o.porConta[sg] = o.porConta[sg].filter(x => !x.res); });
 
@@ -167,6 +181,8 @@ function TELAS() {
 const TEXTO_INTENCIONAL = [];   // [id, fn(orig, novo, chave)] — normaliza diferenças de texto intencionais
 // A3: a lista "Por conta" mudou (sem receita); os dados dela são conferidos no T02 e no teste A3
 TEXTO_INTENCIONAL.push(["A3", (o, n, k) => { if (k.startsWith("ct:")) { delete o.body; delete n.body; } }]);
+// A4: mapa e histórico mudam para unidades que ainda não tinham começado a lançar (conferido no T02 e no A4)
+TEXTO_INTENCIONAL.push(["A4", (o, n, k) => { if (k.startsWith("mp:") || /^det:.*:hist$/.test(k)) { delete o.body; delete n.body; } }]);
 teste("T05", "texto visível de todas as telas idêntico ao original (estado padrão)", async () => {
   const [o, n] = await Promise.all([pagina("orig"), pagina("novo")]);
   const a = await o.evaluate(TELAS), b = await n.evaluate(TELAS);
@@ -394,6 +410,28 @@ teste("A3", "'Por conta' não lista receita nem dedução como falha", async () 
     DB.accts.filter(a => ["rec", "ded"].includes(a.nat)).forEach(a => { if (txt.includes(a.cod)) out.push("tela:" + a.cod); });
     return out; });
   ok(!r.length, r.join(", "));
+});
+
+teste("A4", "'parou de lançar' só considera meses ANTERIORES ao analisado", async () => {
+  const p = await abre(NOVO, "estados.csv");
+  const r = await p.evaluate(() => {
+    const est = mm => { M = mm; periodo = "mes"; return Object.fromEntries(Object.entries(met().a).map(([k, o]) => [k, o.est])); };
+    const hist = c => histPendencias(c).slice(0, 8).map(m => m.muda ? "M" : "-").join("");
+    const mar = est(2); go({ tipo: "hub" }); const alertaMar = !!document.querySelector(".alerta");
+    const ago = est(7); go({ tipo: "hub" }); const alertaAgo = (document.querySelector(".alerta") || {}).innerText || "";
+    return { mar, ago, alertaMar, alertaAgo, h1: hist("4101A"), h2: hist("4102A"), h3: hist("4103A"),
+             cm: contasDoMes("4101A", 2).length, cm2: contasDoMes("4102A", 6).length,
+             pad1: (M = 7, padraoUnidade("4101A").tipo), pad1t: padraoUnidade("4101A").txt };
+  });
+  igual({ "4101A": "inativa", "4102A": "ativa", "4103A": "ativa" }, r.mar, "estado em MAR");
+  igual({ "4101A": "ativa", "4102A": "muda", "4103A": "ativa" }, r.ago, "estado em AGO");
+  ok(!r.alertaMar, "alerta 'parou de lançar' em MAR para unidade que ainda não tinha começado");
+  ok(/Unid 4102A/.test(r.alertaAgo) && !/4101A/.test(r.alertaAgo), "alerta em AGO: " + r.alertaAgo);
+  igual({ h1: "--------", h2: "-----MMM", h3: "--------" }, { h1: r.h1, h2: r.h2, h3: r.h3 }, "histórico 'não lançou nada'");
+  // meses antes de a unidade começar não entram na tendência como "zero pendências"
+  ok(r.pad1 === "limpa" && r.pad1t === "sem pendências no período", "tendência da unidade nova: " + r.pad1 + " " + r.pad1t);
+  ok(r.cm === 0 && r.cm2 === 2, "contasDoMes: " + r.cm + "/" + r.cm2);
+  await p.context().close();
 });
 
 /* ================================================================== */

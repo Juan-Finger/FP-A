@@ -99,6 +99,13 @@ def bordas():
             if m == 1: r[7] = 0.0
             linhas.append(linha(conta, "Conta " + inj + " d'x \"y\"", u, "Unid " + inj + " Sant'Ana \"Z\"", v, r))
     escreve("injecao.csv", linhas)
+    # estados de unidade conhecidos: 4101A só começa em JUN; 4102A lança JAN–MAI e para;
+    # 4103A lança o ano todo. Duas contas cada, orçadas em todos os meses.
+    ests = []
+    for u, meses in [("4101A", range(5, 8)), ("4102A", range(0, 5)), ("4103A", range(0, 8))]:
+        for c in ["4.1.1.01.1.01", "4.1.1.04.1.01"]:
+            ests.append(linha(c, "Desc " + c, u, "Unid " + u, v, [-90.0 if i in meses else 0.0 for i in range(12)]))
+    escreve("estados.csv", ests)
     # mesma base em UTF-8
     escreve("utf8.csv", [linha("4.1.1.01.1.01", "Manutenção – veículos", "4101A", "São Paulo", v, v)], enc="utf-8")
     escreve("cp1252.csv", [linha("4.1.1.01.1.01", "Manutenção – veículos", "4101A", "São Paulo", v, v)])
