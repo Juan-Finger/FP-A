@@ -957,7 +957,16 @@ const js=s=>he(JSON.stringify(String(s??"")));
 const SEG=["Alfandegados","CDs","Transportes","Fronteiras","Corporativo","Backoffice","Sem segmento"];
 const SEGNM={Alfandegados:"Alfandegados",CDs:"CDs",Transportes:"Transportes",Fronteiras:"Fronteiras",Corporativo:"Corporativo",Backoffice:"Backoffice",Vigiada:"Vigiada","Sem segmento":"Sem segmento"};
 const SEGVAR={Alfandegados:"--alf",CDs:"--cd",Transportes:"--tra",Fronteiras:"--fro",Corporativo:"--cor",Backoffice:"--bko","Sem segmento":"--dim"};
-const cor=s=>getComputedStyle(document.body).getPropertyValue(SEGVAR[s]||"--dim").trim();
+// cores de segmento do tema atual, lidas uma vez por tema (getComputedStyle a cada
+// card forçava recálculo de estilo da página inteira)
+const _cores={};
+const cor=s=>{
+  const tema=document.body.classList.contains("claro")?"claro":"escuro";
+  if(!_cores[tema]){ const cs=getComputedStyle(document.body), c={};
+    for(const v of new Set([...Object.values(SEGVAR),"--dim"])) c[v]=cs.getPropertyValue(v).trim();
+    _cores[tema]=c; }
+  return _cores[tema][SEGVAR[s]||"--dim"];
+};
 const tint=(s,a)=>{const h=cor(s);return `background:${h}1F;color:${h}`;};
 
 let M = DB.fechado.lastIndexOf(true); if(M<0) M=0;
@@ -1017,13 +1026,14 @@ const ehParcial=i=>PARCIAL.set.has(i);
 const MODOLBL={geral:"Plano geral",rec:"Contas recorrentes"};
 let view={tipo:"hub",seg:null,unit:null,filtro:"todos",busca:"",sk:"st",sd:1};
 
-const fmtN=n=>Math.round(n).toLocaleString("pt-BR");
+// formatadores criados uma vez (toLocaleString cria um novo a cada número)
+const _NF0=new Intl.NumberFormat("pt-BR"), _NF2=new Intl.NumberFormat("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtN=n=>_NF0.format(Math.round(n));
 const pct=(n,d=1)=>n.toFixed(d).replace(".",",")+"%";
 // Valores com centavos, para fechar exatamente com o plano.
-const fmtC=n=>(n<0?"−":"")+Math.abs(n).toLocaleString("pt-BR",
-  {minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtC=n=>(n<0?"−":"")+_NF2.format(Math.abs(n));
 // Versão sem centavos, para onde o espaço é curto (barras, listas compactas).
-const fmtI=n=>(n<0?"−":"")+Math.abs(Math.round(n)).toLocaleString("pt-BR");
+const fmtI=n=>(n<0?"−":"")+_NF0.format(Math.abs(Math.round(n)));
 const fmtMi=n=>{const a=Math.abs(n);
   if(a>=999500)return (n<0?"−":"")+(a/1e6).toFixed(1).replace(".",",")+" mi";
   if(a>=1e3)return (n<0?"−":"")+(a/1e3).toFixed(0)+" mil"; return fmtC(n);};
@@ -1032,6 +1042,17 @@ const ST={sem:"Sem lançamento",sorc:"Sem orçamento",ana:"Analisar",ok:"Ok com 
 const STO={sem:0,sorc:1,ana:2,ok:3,zer:4,abr:5};
 
 const amap={}; DB.accts.forEach(a=>amap[a.cod]=a);
+// linhas de cada unidade, na mesma ordem de DB.data (as somas continuam idênticas)
+const PORU=new Map();
+DB.data.forEach(d=>{ let l=PORU.get(d.u); if(!l){ l=[]; PORU.set(d.u,l); } l.push(d); });
+const dadosDe=cod=>PORU.get(cod)||[];
+// memoização por estado (modo, período, mês, corte): DB não muda depois da carga
+const _memo=new Map();
+function memo(nome,fn,...args){
+  const k=nome+"|"+modo+"|"+periodo+"|"+M+"|"+corte+"|"+args.join("|");
+  if(!_memo.has(k)) _memo.set(k,fn(...args));
+  return _memo.get(k);
+}
 const umap={}; DB.units.forEach(u=>umap[u.cod]=u);
 
 // est: "ativa" (lançou algo no período) | "muda" (não lançou nada agora, mas já lançou antes)
@@ -1124,7 +1145,7 @@ function agr(d){ const ms=mesesAtivos(); let p=0,r=0;
 // série 12 meses de uma unidade (para sparkline)
 function serie(cod){
   const p=Array(12).fill(0), r=Array(12).fill(0);
-  DB.data.forEach(d=>{ if(d.u!==cod)return; for(let i=0;i<12;i++){p[i]+=d.p[i];r[i]+=d.r[i];} });
+  dadosDe(cod).forEach(d=>{ for(let i=0;i<12;i++){p[i]+=d.p[i];r[i]+=d.r[i];} });
   return {p,r};
 }
 function sparkline(cod,w=72,h=26){
@@ -1335,7 +1356,7 @@ function renderSeg(){
       <span style="margin-left:4px">${vseg==="un"?arr.length+" unidades · por valor exposto":vseg==="ct"?"contas com falha · sistêmico primeiro":"pendências por unidade e mês"}</span>
       <button class="xbtn" onclick="exportSeg()">exportar segmento</button></div>
     ${vseg==="ct"?renderContasSeg(s):vseg==="mp"?renderMapa(s):""}
-    <div class="grid g3" ${vseg!=="un"?'style="display:none"':""}>`+arr.map(o=>{const v=o.real-o.plan,calm=o.sem===0;
+    <div class="grid g3">`+(vseg!=="un"?[]:arr).map(o=>{const v=o.real-o.plan,calm=o.sem===0;
       return `<div class="card fade ${calm?'calm':''}" onclick="go({tipo:'det',seg:${js(s)},unit:${js(o.cod)}})">
         <div class="top"><div class="nm">${he(o.nome)}${o.est==="muda"?' <span class="mudo">parou de lançar</span>':""}</div>
           <span class="tag" style="${tint(s)}">${he(o.cod)}</span></div>
@@ -1351,7 +1372,9 @@ function renderSeg(){
 /* ---------- RESULTADO AGREGADO (hub e segmento) ---------- */
 // A receita fica fora da conta de pendência, mas precisa aparecer no
 // resultado — senão a variação de custo sozinha dá impressão errada.
-function resumoResultado(codigos){
+function resumoResultado(codigos){ return memo("resumo",_resumoResultado,codigos.join(",")); }
+function _resumoResultado(chave){
+  const codigos=chave?chave.split(","):[];
   const set=new Set(codigos), ms=mesesAtivos();
   let rp=0,rr=0,cp=0,cr=0,sorcN=0,sorcV=0;
   DB.data.forEach(d=>{
@@ -1406,8 +1429,7 @@ const ORDEM_NAT=["rec","ded","cd","out","fin","imp"];
 function resultado(cod){
   const ms=mesesAtivos(), g={};
   ORDEM_NAT.forEach(n=>g[n]={p:0,r:0,linhas:[]});
-  DB.data.forEach(d=>{
-    if(d.u!==cod) return;
+  dadosDe(cod).forEach(d=>{
     const n=natMap[d.a]; if(!g[n]) return;
     let p=0,r=0; ms.forEach(i=>{p+=d.p[i];r+=d.r[i];});
     if(Math.abs(p)<EPS&&Math.abs(r)<EPS) return;
@@ -1421,8 +1443,7 @@ function resultado(cod){
 // série mensal de receita e resultado, para o gráfico
 function serieResultado(cod){
   const rec=Array(12).fill(0), res=Array(12).fill(0), cus=Array(12).fill(0);
-  DB.data.forEach(d=>{
-    if(d.u!==cod) return;
+  dadosDe(cod).forEach(d=>{
     const n=natMap[d.a];
     for(let i=0;i<12;i++){
       res[i]+=d.r[i];
@@ -1484,12 +1505,12 @@ function renderResultado(cod){
 /* ---------- EXCEÇÕES: lançamentos em unidades que não deveriam ter ---------- */
 // Estas unidades saíram da operação. Não têm lançamento recorrente previsto,
 // então qualquer movimento nelas é exceção e precisa ser repassado.
-function excecoes(){
+function excecoes(){ return memo("excecoes",_excecoes); }
+function _excecoes(){
   const ms=mesesAtivos(), out=[];
   DB.units.filter(u=>u.vig).forEach(u=>{
     const linhas=[];
-    DB.data.forEach(d=>{
-      if(d.u!==u.cod) return;
+    dadosDe(u.cod).forEach(d=>{
       let p=0,r=0; ms.forEach(i=>{p+=d.p[i];r+=d.r[i];});
       if(Math.abs(r)<EPS) return;                       // só interessa o que foi lançado
       const meses=[];
@@ -1498,7 +1519,7 @@ function excecoes(){
                    p,r,ano:d.r.reduce((s,x)=>s+Math.abs(x),0),meses});
     });
     linhas.sort((x,y)=>Math.abs(y.r)-Math.abs(x.r));
-    const anoN=DB.data.filter(d=>d.u===u.cod)
+    const anoN=dadosDe(u.cod)
       .reduce((s,d)=>s+d.r.filter((v,i)=>DB.fechado[i]&&Math.abs(v)>EPS).length,0);
     out.push({u,linhas,val:linhas.reduce((s,l)=>s+Math.abs(l.r),0),anoN});
   });
@@ -1550,7 +1571,8 @@ function renderExcecoes(){
 /* ---------- ORÇAMENTO SEM LASTRO (visão do ano) ---------- */
 // Linhas orçadas em vários meses e que nunca tiveram lançamento nenhum no ano.
 // Não é falha de lançamento: é orçamento que não se sustenta. Insumo do próximo ciclo.
-function semLastro(minMeses){
+function semLastro(minMeses){ return memo("semLastro",_semLastro,minMeses); }
+function _semLastro(minMeses){
   const fech=[...Array(12).keys()].filter(i=>DB.fechado[i] && !ehParcial(i));
   const out=[];
   DB.data.forEach(d=>{
@@ -1573,7 +1595,7 @@ const cacheHist={};
 function histPendencias(cod){
   const key=cod+"|"+modo;
   if(cacheHist[key]) return cacheHist[key];
-  const linhas=DB.data.filter(d=>d.u===cod && ehPendencia(d.a) && (modo!=="rec"||ehRec(d.a)));
+  const linhas=dadosDe(cod).filter(d=>ehPendencia(d.a) && (modo!=="rec"||ehRec(d.a)));
   const out=[];
   for(let i=0;i<12;i++){
     if(!DB.fechado[i]){ out.push(null); continue; }
@@ -1597,8 +1619,7 @@ function histPendencias(cod){
 function semLancarHa(cod){
   const fech=[...Array(12).keys()].filter(i=>DB.fechado[i]&&i<=M);   // até o mês analisado
   const out=[];
-  DB.data.forEach(d=>{
-    if(d.u!==cod) return;
+  dadosDe(cod).forEach(d=>{
     if(!ehPendencia(d.a)) return;
     if(modo==="rec" && !ehRec(d.a)) return;
     let seq=0,val=0,ult=null,desde=null;
@@ -1675,8 +1696,7 @@ function perfil(d,hist){
 // contas com valor fora do padrão da própria série
 function anomalias(cod){
   const hist=baseHist(), out=[];
-  DB.data.forEach(d=>{
-    if(d.u!==cod) return;
+  dadosDe(cod).forEach(d=>{
     if(!ehPendencia(d.a)) return;
     if(modo==="rec" && !ehRec(d.a)) return;
     const {n,med,mad}=perfil(d,hist);
@@ -1693,8 +1713,7 @@ function anomalias(cod){
 // pares: conta que sumiu × conta com pico de valor parecido (possível troca)
 function paresTrocados(cod){
   const hist=baseHist(), ms=mesesAtivos(), faltam=[], picos=[];
-  DB.data.forEach(d=>{
-    if(d.u!==cod) return;
+  dadosDe(cod).forEach(d=>{
     if(!ehPendencia(d.a)) return;
     if(modo==="rec" && !ehRec(d.a)) return;
     const [p,r]=agr(d), {n,med}=perfil(d,hist);
@@ -1733,7 +1752,7 @@ function paresTrocados(cod){
 // contas com orçamento e sem lançamento de uma unidade num mês específico
 function contasDoMes(cod,i){
   const out=[];
-  const linhas=DB.data.filter(d=>d.u===cod && ehPendencia(d.a) && (modo!=="rec"||ehRec(d.a)));
+  const linhas=dadosDe(cod).filter(d=>ehPendencia(d.a) && (modo!=="rec"||ehRec(d.a)));
   const lancou=linhas.some(d=>Math.abs(d.r[i])>EPS);
   const antes=linhas.some(d=>{ for(let j=0;j<i;j++) if(DB.fechado[j]&&Math.abs(d.r[j])>EPS) return true; return false; });
   const est=lancou?"ativa":(antes?"muda":"inativa");
@@ -1796,7 +1815,7 @@ function contaNoSegmento(sg,conta){
   const uns=DB.units.filter(u=>u.seg===sg&&!u.vig);
   const linhas=[];
   uns.forEach(u=>{
-    const d=DB.data.find(x=>x.u===u.cod&&x.a===conta);
+    const d=dadosDe(u.cod).find(x=>x.a===conta);
     let p=0,r=0;
     if(d){ const [pp,rr]=agr(d); p=pp; r=rr; }
     if(Math.abs(p)<EPS&&Math.abs(r)<EPS&&!d) return;   // conta nem existe nessa unidade
@@ -1862,8 +1881,7 @@ function renderContasSeg(sg){
 /* ---------- DETALHE ---------- */
 function linhas(){
   const {aberto,est}=met(), u=view.unit, out=[];
-  DB.data.forEach(d=>{
-    if(d.u!==u) return;
+  dadosDe(u).forEach(d=>{
     if(!ehPendencia(d.a)) return;                 // receita fica na aba Resultado
     if(modo==="rec" && !ehRec(d.a)) return;
     const [p,r]=agr(d);
@@ -2430,8 +2448,10 @@ document.addEventListener("mouseover",e=>{
   tip.innerHTML=decodeURIComponent(el.dataset.tip);
   tip.style.display="block"; moveTip(e);
 });
+let _tipRaf=0, _tipEv=null;   // um reposicionamento por quadro (evita layout forçado a cada mousemove)
 document.addEventListener("mousemove",e=>{
-  if(tip.style.display==="block" && !tip.classList.contains("fixo")) moveTip(e); });
+  if(tip.style.display!=="block" || tip.classList.contains("fixo")) return;
+  _tipEv=e; if(!_tipRaf) _tipRaf=requestAnimationFrame(()=>{ _tipRaf=0; if(_tipEv) moveTip(_tipEv); }); });
 document.addEventListener("mouseout",e=>{
   if(tip.classList.contains("fixo")) return;
   if(e.target.closest("[data-tip]")) tip.style.display="none"; });
@@ -2473,8 +2493,8 @@ function semLancEscopo(){
 // top contas sem lançamento de UMA unidade (para o hover do ranking)
 function topContasUnidade(cod,n){
   const {aberto,est}=met(), out=[];
-  DB.data.forEach(d=>{
-    if(d.u!==cod||!relevante(d)) return;
+  dadosDe(cod).forEach(d=>{
+    if(!relevante(d)) return;
     const [p,r]=agr(d);
     if(statusOf(p,r,aberto,est[cod])!=="sem") return;
     out.push({a:d.a,p:Math.abs(p),cf:confDe(d)});
@@ -2618,8 +2638,7 @@ const CAB=["Conta","Descricao da conta","Natureza","Recorrente","Planejado","Rea
 // Lista completa: ignora filtro/busca da tela, mas RESPEITA modo e período.
 function linhasUnidade(cod){
   const {aberto,est}=met(), out=[];
-  DB.data.forEach(d=>{
-    if(d.u!==cod) return;
+  dadosDe(cod).forEach(d=>{
     if(modo==="rec" && !ehRec(d.a)) return;      // só recorrentes no modo recorrentes
     const [p,r]=agr(d);                          // agrega os meses do período
     if(Math.abs(p)<EPS && Math.abs(r)<EPS) return;
@@ -2700,7 +2719,8 @@ function exportGeral(){
 /* ---------- LASTRO SEM ORÇAMENTO (visão do ano) ---------- */
 // Espelho do orçamento sem lastro: contas lançadas mês após mês e nunca
 // orçadas. É gasto recorrente fora do orçamento — insumo do próximo ciclo.
-function lastroSemOrc(minMeses){
+function lastroSemOrc(minMeses){ return memo("lastroSemOrc",_lastroSemOrc,minMeses); }
+function _lastroSemOrc(minMeses){
   const fech=[...Array(12).keys()].filter(i=>DB.fechado[i] && !ehParcial(i));
   const out=[];
   DB.data.forEach(d=>{

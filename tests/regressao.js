@@ -642,6 +642,7 @@ teste("C3", "teclado: tudo que é clicável recebe foco e abre com Enter/Espaço
   ok(/^A:/.test(foco), "Tab não chegou à navegação: " + foco);
   for (let i = 0; i < 3; i++) await p.keyboard.press("Tab");
   await p.keyboard.press("Enter");
+  await p.waitForFunction(() => document.activeElement !== document.body, null, { timeout: 2000 }).catch(() => {});
   let r = await p.evaluate(() => ({ tipo: view.tipo, foco: document.activeElement.id || document.activeElement.tagName }));
   ok(r.tipo === "seg" && r.foco !== "BODY", "Enter na navegação: " + JSON.stringify(r));
   // Espaço num card abre a unidade
@@ -649,6 +650,7 @@ teste("C3", "teclado: tudo que é clicável recebe foco e abre com Enter/Espaço
   r = await p.evaluate(() => view.tipo); ok(r === "det", "Espaço no card: " + r);
   // aba via teclado mantém o foco na aba
   await p.evaluate(() => document.querySelectorAll(".abas button")[1].focus()); await p.keyboard.press("Enter");
+  await p.waitForFunction(() => document.activeElement !== document.body, null, { timeout: 2000 }).catch(() => {});
   r = await p.evaluate(() => ({ aba, foco: document.activeElement.textContent.trim().slice(0, 12) }));
   ok(r.aba === "var" && /Varia/.test(r.foco), "foco após trocar de aba: " + JSON.stringify(r));
   await p.context().close();
@@ -719,6 +721,30 @@ teste("A8", "ano vem da base (cabeçalho ou nome do arquivo), não do código", 
   ok(b.ano === 2025 && /AGO\/25/.test(b.sub) && /nome/.test(b.fonte), "nome do arquivo: " + JSON.stringify(b));
   ok(c.ano === 2026, "base 2026: " + JSON.stringify(c));
   ok(!/\/26\b|2026/.test(fs.readFileSync(NOVO, "utf8").replace(/colL[^\n]*|Planejado JAN\/2026[^\n]*/g, "")), "ano fixo no código");
+});
+
+function SEQUENCIA_TELAS() {
+  const segs = SEG.filter(s => DB.units.some(u => u.seg === s && !u.vig)), cods = Object.keys(met().a).sort();
+  let melhor = Infinity;
+  for (let k = 0; k < 3; k++) {
+    for (const c in cache) delete cache[c]; for (const c in cacheHist) delete cacheHist[c];
+    if (typeof _memo !== "undefined") _memo.clear();
+    const a = performance.now();
+    for (const m of ["geral", "rec"]) { modo = m;
+      go({ tipo: "hub" });
+      segs.forEach(s => { go({ tipo: "seg", seg: s }); setVseg("ct"); setVseg("mp"); setVseg("un"); });
+      cods.slice(0, 12).forEach(u => { go({ tipo: "det", seg: umap[u].seg, unit: u }); ["var", "res", "sin", "hist"].forEach(setAba); });
+      go({ tipo: "exc" }); go({ tipo: "lastro" }); go({ tipo: "lsorc" }); }
+    melhor = Math.min(melhor, performance.now() - a);
+  }
+  modo = "geral"; go({ tipo: "hub" });
+  return melhor;
+}
+teste("B3", "render de todas as telas mais rápido que o original", async () => {
+  const [o, n] = await Promise.all([pagina("orig"), pagina("novo")]);
+  const to = await o.evaluate(SEQUENCIA_TELAS), tn = await n.evaluate(SEQUENCIA_TELAS);
+  console.log(`        render (2 modos × hub, 6 segmentos × 4 visões, 12 unidades × 5 abas, diagnósticos): original ${to.toFixed(0)} ms · novo ${tn.toFixed(0)} ms`);
+  ok(tn < to * 0.7, "não ficou mais rápido");
 });
 
 /* ================================================================== */
