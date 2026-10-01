@@ -11,6 +11,9 @@ Painel interno de FP&A, **em um único arquivo**: `dashboard.html`.
 
 - **100% offline.** Não usa bibliotecas, CDN nem fontes externas. Uma Content-Security-Policy no
   próprio arquivo bloqueia qualquer conexão de rede, então nenhum dado sai do navegador.
+- **Visão Geral → Por conta**: contas com falha de todos os segmentos, consolidadas, com filtros
+  de segmento, alcance, natureza, fixo/variável, busca e ordenação, além de exportação do
+  recorte. Filtrar um único segmento dá exatamente a visão "Por conta" daquele segmento.
 - **Trocar base** (barra lateral) volta à tela de carga e mantém a tela atual.
 - Atalhos: `Ctrl+K` busca, `?` lista de atalhos, `G` guia de análise, `P` imprimir/PDF.
 

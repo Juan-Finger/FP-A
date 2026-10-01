@@ -199,6 +199,8 @@ const MG = "-?\\d{4,}(?:,\\d)?%";
 TEXTO_INTENCIONAL.push(["A15", o => { if (!o.body) return;
   o.body = o.body.replace(new RegExp("^" + MG + "$", "gm"), "—").replace(new RegExp("^orç\\. " + MG + "\\n", "gm"), "")
     .replace(new RegExp("\\s*margem " + MG + "( · orçada [^\\n]*)?", "g"), "").replace(new RegExp(" · orçada " + MG, "g"), ""); }]);
+// H1: a Visão Geral ganhou a alternância "Por segmento | Por conta" acima dos cards
+TEXTO_INTENCIONAL.push(["H1", (o, n, k) => { if (k === "hub" && n.body) n.body = n.body.replace("Por segmento\nPor conta\nSEGMENTOS E UNIDADES\n", ""); }]);
 // U1: unidade que recebe unificações mostra os códigos somados nela ("· inclui 4417A")
 TEXTO_INTENCIONAL.push(["U1", (o, n) => { if (n.kpis) n.kpis = n.kpis.replace(/ · inclui [^\n]*/g, ""); }]);
 // A3: a lista "Por conta" mudou (sem receita); os dados dela são conferidos no T02 e no teste A3
@@ -552,7 +554,8 @@ async function auditaTelas(p, limite = 4.5) {
   return p.evaluate(lim => {
     const res = {};
     const segs = SEG.filter(s => DB.units.some(u => u.seg === s && !u.vig)), u = Object.keys(met().a)[4];
-    const passos = [["hub", () => go({ tipo: "hub" })], ["seg", () => go({ tipo: "seg", seg: segs[1] })], ["ct", () => { setVseg("ct"); toggleConta(contasDoSegmento(segs[1])[0].a); }], ["mp", () => setVseg("mp")],
+    const passos = [["hub", () => go({ tipo: "hub" })], ["seg", () => go({ tipo: "seg", seg: segs[1] })], ["hubct", () => { go({ tipo: "hub" }); setVhub("ct"); hubFiltro("seg", segs[0]); toggleContaHub(contasHubFiltradas()[0].a); }],
+      ["ct", () => { hubFiltro("limpar"); setVhub("seg"); go({ tipo: "seg", seg: segs[1] }); setVseg("ct"); toggleConta(contasDoSegmento(segs[1])[0].a); }], ["mp", () => setVseg("mp")],
       ["det", () => { setVseg("un"); go({ tipo: "det", seg: umap[u].seg, unit: u }); setF("todos"); toggleExp(linhas()[0].a); }], ["det-var", () => setAba("var")], ["det-res", () => setAba("res")], ["det-sin", () => setAba("sin")], ["det-hist", () => setAba("hist")],
       ["exc", () => go({ tipo: "exc" })], ["lastro", () => go({ tipo: "lastro" })], ["lsorc", () => go({ tipo: "lsorc" })],
       ["tooltip", () => { go({ tipo: "hub" }); const k = document.querySelectorAll(".kpi")[1]; k.dispatchEvent(new MouseEvent("mouseover", { bubbles: true, clientX: 300, clientY: 200 })); }],
@@ -562,13 +565,13 @@ async function auditaTelas(p, limite = 4.5) {
     return res;
   }, limite);
 }
-teste("C6", "C1/C2/C6: contraste WCAG AA e fonte ≥ 11px em todas as telas, nos temas escuro e claro", async () => {
+teste("C6", "C1/C2/C6: contraste WCAG AA e fonte ≥ 11px em todas as telas, temas escuro e claro, desktop e celular", async () => {
   const falhas = [];
-  for (const tema of ["escuro", "claro"]) {
-    const p = await abre(NOVO, "plano_sint.csv");
+  for (const [tema, vp] of [["escuro"], ["claro"], ["escuro", 390], ["claro", 390]]) {
+    const p = await abre(NOVO, "plano_sint.csv", vp ? { viewport: { width: vp, height: 844 } } : {});
     await p.evaluate(([t, f]) => { window.__AUDITA__ = f; if (t === "claro") document.body.classList.add("claro"); else document.body.classList.remove("claro"); }, [tema, AUDITA_CONTRASTE.toString()]);
     const r = await auditaTelas(p);
-    for (const [k, v] of Object.entries(r)) falhas.push(`[${tema}/${k}] ${v.length} texto(s): ` + v.slice(0, 4).join(" · "));
+    for (const [k, v] of Object.entries(r)) falhas.push(`[${tema}${vp ? " celular" : ""}/${k}] ${v.length} texto(s): ` + v.slice(0, 4).join(" · "));
     await p.context().close();
   }
   ok(!falhas.length, falhas.join("\n      "));
@@ -607,7 +610,7 @@ teste("C11", "cores de segmento acompanham o tema e a troca de tema redesenha", 
   const r = await p.evaluate(() => { const esc = cor("CDs"); document.getElementById("btema").click();
     const cla = cor("CDs"), tag = document.querySelector(".card .tag") && document.querySelector(".card .tag").getAttribute("style");
     document.getElementById("btema").click(); return { esc, cla, tag }; });
-  ok(r.esc === "#AA7AD3" && r.cla === "#7A5195", JSON.stringify(r));
+  ok(r.esc === "#B484DD" && r.cla === "#784F93", JSON.stringify(r));
 });
 
 teste("C12", "semântica: h1, rótulos, aria-pressed, tema do sistema, movimento reduzido, tela larga", async () => {
@@ -639,7 +642,7 @@ teste("C3", "teclado: tudo que é clicável recebe foco e abre com Enter/Espaço
   const p = await abre(NOVO, "plano_sint.csv");
   const semFoco = await p.evaluate(async () => { const segs = SEG.filter(s => DB.units.some(u => u.seg === s && !u.vig)); const out = new Set();
     const u = Object.keys(met().a)[4];
-    const telas = [() => go({ tipo: "hub" }), () => go({ tipo: "seg", seg: segs[0] }), () => setVseg("ct"), () => setVseg("mp"), () => setVseg("un"),
+    const telas = [() => go({ tipo: "hub" }), () => setVhub("ct"), () => { toggleContaHub(contasHubFiltradas()[0].a); }, () => setVhub("seg"), () => go({ tipo: "seg", seg: segs[0] }), () => setVseg("ct"), () => setVseg("mp"), () => setVseg("un"),
       () => { go({ tipo: "det", seg: umap[u].seg, unit: u }); setF("todos"); }, () => go({ tipo: "lastro" }), () => go({ tipo: "exc" })];
     for (const f of telas) { f(); await Promise.resolve(); document.querySelectorAll("[onclick],th[data-k]").forEach(el => { if (el.tabIndex < 0 && !el.closest("[inert]") && el.getBoundingClientRect().width) out.add(el.tagName + "." + el.className.split(" ")[0]); }); }
     go({ tipo: "hub" }); return [...out]; });
@@ -820,6 +823,73 @@ teste("U1", "4205A, 4420A e 5111A viram uma unidade só (sem falso 'sem lançame
   const u = await abre(NOVO, "plano_sint.csv", { hash: "#v=det&seg=Transportes&un=5111A&mes=7" });
   ok(await u.evaluate(() => view.tipo === "det" && view.unit === "4205A"), "link antigo de 5111A não redireciona");
   await u.context().close();
+});
+
+teste("H1", "Visão Geral · Por conta: consolida todos os segmentos e bate com cada segmento", async () => {
+  const p = await pagina("novo");
+  const r = await p.evaluate(() => {
+    const falhas = [], chave = o => ({ a: o.a, sem: o.sem, val: o.val, tipo: o.tipo, tot: o.tot, uns: o.uns.map(u => u.cod).join() });
+    const segs = segsHub(), limpa = () => { hubF = { ...HUBF0, segs: [] }; };
+    // 1) filtrar um segmento = exatamente a visão "Por conta" daquele segmento
+    for (const s of segs) { limpa(); hubF.segs = [s];
+      const a = JSON.stringify(contasHubFiltradas().map(chave)), b = JSON.stringify(contasDoSegmento(s).map(chave));
+      if (a !== b) falhas.push("segmento " + s); }
+    // 2) sem filtro = soma dos segmentos (unidades com falha e R$ exposto por conta)
+    limpa(); const tudo = contasHubFiltradas(), soma = {};
+    segs.forEach(s => contasDoSegmento(s).forEach(o => { const x = soma[o.a] = soma[o.a] || { sem: 0, val: 0 }; x.sem += o.sem; x.val += o.val; }));
+    if (tudo.length !== Object.keys(soma).length) falhas.push("contas: " + tudo.length + " × " + Object.keys(soma).length);
+    tudo.forEach(o => { const x = soma[o.a]; if (!x || x.sem !== o.sem || Math.abs(x.val - o.val) > 1e-6) falhas.push("conta " + o.a); });
+    const nUn = DB.units.filter(u => !u.vig).length; if (tudo.some(o => o.tot !== nUn)) falhas.push("total de unidades");
+    // 3) filtros: cada item respeita o filtro, e o filtro não perde nenhum item
+    const casos = [["alc", "sistemico", o => o.tipo === "sistemico"], ["alc", "isolado", o => o.tipo === "isolado"],
+      ["nat", "imp", o => natMap[o.a] === "imp"], ["fv", "Variável", o => (amap[o.a].fv || "—") === "Variável"],
+      ["busca", "4.1.1.02", o => o.a.includes("4.1.1.02")]];
+    for (const [k, v, f] of casos) { limpa(); hubF[k] = v; const l = contasHubFiltradas(), esperado = tudo.filter(f);
+      if (l.length !== esperado.length || l.some(o => !f(o))) falhas.push(`filtro ${k}=${v}: ${l.length} × ${esperado.length}`); }
+    limpa(); hubF.ord = "val"; const ord = contasHubFiltradas(); if (ord.some((o, i) => i && ord[i - 1].val < o.val)) falhas.push("ordem por valor");
+    limpa(); return { falhas, n: tudo.length };
+  });
+  ok(!r.falhas.length && r.n > 0, r.falhas.slice(0, 6).join("; "));
+});
+
+teste("H2", "Visão Geral · Por conta: tela, filtros, busca, expansão, exportação e link", async () => {
+  const p = await pagina("novo");
+  await p.evaluate(() => { go({ tipo: "hub" }); setVhub("ct"); });
+  const t1 = await p.evaluate(() => ({ linhas: document.querySelectorAll("#hubct-res tbody tr.lin").length, n: contasHubFiltradas().length,
+    url: location.hash, resumo: document.getElementById("hubct-resumo").textContent.replace(/\s+/g, " ") }));
+  ok(t1.linhas === t1.n && /hv=ct/.test(t1.url) && new RegExp(t1.n + " contas").test(t1.resumo), JSON.stringify(t1));
+  // filtro de segmento pelo chip (teclado) + alcance
+  const t2 = await p.evaluate(async () => { const c = [...document.querySelectorAll("#hubct-segs .chip")].find(x => x.dataset.v === "CDs");
+    c.focus(); c.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+    const l1 = document.querySelectorAll("#hubct-res tbody tr.lin").length, esp = contasDoSegmento("CDs").length, pressed = c.getAttribute("aria-pressed");
+    document.querySelector('#hubct-alc .chip[data-v="sistemico"]').click();
+    const l2 = document.querySelectorAll("#hubct-res tbody tr.lin").length, esp2 = contasDoSegmento("CDs").filter(o => o.tipo === "sistemico").length;
+    return { l1, esp, pressed, l2, esp2 }; });
+  ok(t2.l1 === t2.esp && t2.pressed === "true" && t2.l2 === t2.esp2, JSON.stringify(t2));
+  // busca: não recria o campo, filtra e mantém o cursor
+  await p.evaluate(() => { hubFiltro("limpar"); window.__c = document.getElementById("buscahub"); });
+  await p.focus("#buscahub"); await p.keyboard.type("4.1.1.02"); await p.waitForTimeout(400);
+  const t3 = await p.evaluate(() => ({ mesmo: document.getElementById("buscahub") === window.__c, foco: document.activeElement.id,
+    linhas: document.querySelectorAll("#hubct-res tbody tr.lin").length, esp: contasHubFiltradas().length,
+    todas: [...document.querySelectorAll("#hubct-res tbody tr.lin td:first-child")].every(td => td.textContent.includes("4.1.1.02")) }));
+  ok(t3.mesmo && t3.foco === "buscahub" && t3.linhas === t3.esp && t3.todas && t3.linhas > 0, JSON.stringify(t3));
+  // expansão: todas as unidades do recorte, com segmento e total
+  const t4 = await p.evaluate(() => { hubFiltro("limpar"); const o = contasHubFiltradas()[0]; toggleContaHub(o.a);
+    const ex = document.querySelector("#hubct-res tr.exp"); const linhas = ex.querySelectorAll("tbody tr.clic").length;
+    const esp = contaNasUnidades(DB.units.filter(u => !u.vig), o.a).length;
+    return { linhas, esp, total: /Total do recorte/.test(ex.textContent), sem: ex.querySelectorAll(".st.sem").length, osem: o.sem }; });
+  ok(t4.linhas === t4.esp && t4.total && t4.sem === t4.osem, JSON.stringify(t4));
+  // exportação respeita o filtro
+  await p.evaluate(() => { hubFiltro("limpar"); hubFiltro("seg", "Transportes"); });
+  const x = await baixa(p, () => exportContasHub());
+  const ab = x.abas["Contas"], esp = await p.evaluate(() => contasHubFiltradas().map(o => [o.a, o.sem, Math.round(o.val * 100) / 100]));
+  igual(esp, ab.slice(4).map(l => [l[0], l[6], l[8]]), "exportação");
+  ok(/Transportes/.test(ab[1][0]), "filtro não registrado na planilha: " + ab[1][0]);
+  await p.evaluate(() => { hubFiltro("limpar"); setVhub("seg"); });
+  // link com a visão "Por conta"
+  const q = await abre(NOVO, "so_orcado.csv", { hash: "#hv=ct&mes=0" });
+  ok(await q.evaluate(() => vhub === "ct" && !!document.querySelector(".vbar2 button.on") && document.querySelector(".vbar2 button.on").textContent === "Por conta"), "link hv=ct");
+  await q.context().close();
 });
 
 /* ================================================================== */

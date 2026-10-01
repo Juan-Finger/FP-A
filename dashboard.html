@@ -14,7 +14,8 @@
   --cy:#22D3EE; --cy2:#67E8F9;
   --red:#F26D6D; --amb:#EFB25C; --grn:#4ADE9B;
   --tx:#E8EEF5; --mut:#8FA3B8; --dim:#7D90A6;
-  --alf:#3B9BC9; --cd:#AA7AD3; --tra:#14B8A6; --fro:#E0628A; --cor:#E0A458; --bko:#7F90A9;
+  /* cores de segmento: ≥ 4,5:1 como texto sobre o próprio tom, em fundo de cartão, linha aberta ou tabela */
+  --alf:#41A1CF; --cd:#B484DD; --tra:#14B8A6; --fro:#EA6C94; --cor:#E0A458; --bko:#899AB3; --ssg:#879AB0;
   /* texto de destaque sobre fundo tingido (pílulas, alertas) e cores "sobre ciano" */
   --fg-neg:#F79A9A; --fg-warn:#F3C784; --fg-pos:#7BE8BB; --fg-lil:#C4B5FD; --on-cy:#06202B;
   --exp-bg:#0A1420; --hm-fg:var(--tx);
@@ -28,7 +29,7 @@ body.claro{
   --cy:#0E7C94; --cy2:#0B6076;
   --red:#C0392B; --amb:#8A5A00; --grn:#1A7352;
   --tx:#132030; --mut:#4E6076; --dim:#5A6A7C;
-  --alf:#197196; --cd:#7A5195; --tra:#007467; --fro:#B7395F; --cor:#925D07; --bko:#576B82;
+  --alf:#0F678C; --cd:#784F93; --tra:#006C5F; --fro:#AD2F55; --cor:#8A5500; --bko:#4F637A; --ssg:#526274;
   --fg-neg:#B42318; --fg-warn:#8A5A00; --fg-pos:#1A7352; --fg-lil:#6D4FC2; --on-cy:#FFFFFF;
   --exp-bg:#EDF1F6; --hm-fg:#2A1D06;
 }
@@ -229,7 +230,7 @@ td.r{text-align:right}
 /* resumo da carga (usa o contêiner do guia) */
 .guial .tr2{display:flex;justify-content:space-between;gap:14px;padding:2px 0;color:var(--mut)}
 .guial .tr2 b{color:var(--tx);font-weight:500;text-align:right}
-.guial table.mini th.r{text-align:right}
+table.mini th.r{text-align:right}
 .lnk.av{color:var(--amb)}
 .segbar{display:flex;gap:3px;background:var(--s2);border:1px solid var(--line);
   border-radius:8px;padding:3px;margin:0 10px 4px}
@@ -430,6 +431,19 @@ td.hm.pc{background-image:repeating-linear-gradient(45deg,transparent,transparen
 td.hmu{cursor:pointer;white-space:nowrap;max-width:190px;overflow:hidden;text-overflow:ellipsis}
 td.hmu:hover{color:var(--cy2)}
 .mapa tbody tr:hover td{background:inherit}
+.filtros{background:var(--s1);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px;margin-bottom:14px;
+  display:flex;flex-direction:column;gap:8px}
+.frow{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.flbl{font-size:11px;color:var(--dim);letter-spacing:.06em;text-transform:uppercase;min-width:74px}
+.frow .flbl+select,.frow select+.flbl{margin-left:4px}
+.fsel{background:var(--s2);border:1px solid var(--line2);color:var(--tx);font-family:inherit;font-size:12px;
+  padding:5px 8px;border-radius:7px}
+#buscahub{flex:1;min-width:170px;background:var(--s2);border:1px solid var(--line2);border-radius:20px;padding:6px 14px;
+  color:var(--tx);font-family:inherit;font-size:12px}
+#buscahub::placeholder{color:var(--dim)}
+.chip .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:1px}
+td.segs{max-width:220px}
+td.segs .sg{display:inline-block;margin:1px 2px 1px 0}
 .vbar2{display:inline-flex;gap:2px;background:var(--s2);border:1px solid var(--line);
   border-radius:7px;padding:2px;margin-right:6px}
 .vbar2 button{background:transparent;border:none;color:var(--mut);font-family:inherit;font-size:11px;
@@ -546,6 +560,7 @@ table.mini tr.vr td{border-top:1px solid var(--line)}
   .tw thead th:first-child,.tw tbody td:first-child{position:sticky;left:0;
     background:var(--s1);z-index:1}
   .tw thead th:first-child{background:var(--s2);z-index:3}
+  body.claro .tw thead th:first-child{background:#0C2340}   /* mesmo fundo do cabeçalho no tema claro */
   .mapa table{min-width:560px}
   .expl{padding:11px 12px}
   .faixar{gap:8px;padding:10px 11px}
@@ -559,7 +574,8 @@ table.mini tr.vr td{border-top:1px solid var(--line)}
   .abas button{white-space:nowrap;font-size:12px;padding:7px 9px}
   .toolbar{gap:6px}
   .chip{font-size:11px;padding:5px 10px}
-  input#busca{flex:1 1 100%;order:9}
+  input#busca,#buscahub{flex:1 1 100%;order:9}
+  .flbl{min-width:0;width:100%}
   .gwrap{overflow-x:auto}
   .gcol{min-width:26px}
   .wrow{gap:8px;padding:9px 11px;flex-wrap:wrap}
@@ -969,7 +985,7 @@ const CFG={
 
 const SEG=["Alfandegados","CDs","Transportes","Fronteiras","Corporativo","Backoffice","Sem segmento"];
 const SEGNM={Alfandegados:"Alfandegados",CDs:"CDs",Transportes:"Transportes",Fronteiras:"Fronteiras",Corporativo:"Corporativo",Backoffice:"Backoffice",Vigiada:"Vigiada","Sem segmento":"Sem segmento"};
-const SEGVAR={Alfandegados:"--alf",CDs:"--cd",Transportes:"--tra",Fronteiras:"--fro",Corporativo:"--cor",Backoffice:"--bko","Sem segmento":"--dim"};
+const SEGVAR={Alfandegados:"--alf",CDs:"--cd",Transportes:"--tra",Fronteiras:"--fro",Corporativo:"--cor",Backoffice:"--bko","Sem segmento":"--ssg"};
 // cores de segmento do tema atual, lidas uma vez por tema (getComputedStyle a cada
 // card forçava recálculo de estilo da página inteira)
 const _cores={};
@@ -985,6 +1001,10 @@ const tint=(s,a)=>{const h=cor(s);return `background:${h}1F;color:${h}`;};
 let M = DB.fechado.lastIndexOf(true); if(M<0) M=0;
 let modo="geral";      // "geral" | "rec"
 let vseg="un";
+// Visão Geral: "seg" (segmentos e top 10) | "ct" (contas de todos os segmentos)
+let vhub="seg", expContaHub=null;
+const HUBF0={segs:[],alc:"todos",nat:"todos",fv:"todos",busca:"",ord:"sem"};
+let hubF={...HUBF0,segs:[]};
 let expConta=null;   // visão do segmento: "un" unidades | "ct" contas
 let corte=0;           // materialidade: ignora contas abaixo deste valor
 let periodo="mes";     // "mes" | "acum" | "sem"
@@ -1313,8 +1333,16 @@ function renderHub(){
        Somam <b>R$ ${fmtMi(mudas.reduce((s,o)=>s+o.expo,0))}</b> de orçamento sem realizado.</div>
      <div class="alist">${mudas.slice(0,12).map(o=>`<span class="ac" onclick="go({tipo:'det',seg:${js(o.seg)},unit:${js(o.cod)}})">
        ${he(o.nome)} <b>${o.sem}</b></span>`).join("")}</div></div>`:"";
+  const alterna=`<div class="sect"><span class="vbar2" role="group" aria-label="Visão">
+      <button class="${vhub==="seg"?"on":""}" aria-pressed="${vhub==="seg"}" onclick="setVhub('seg')">Por segmento</button>
+      <button class="${vhub==="ct"?"on":""}" aria-pressed="${vhub==="ct"}" onclick="setVhub('ct')">Por conta</button></span>
+      <span style="margin-left:4px">${vhub==="ct"?"contas de todos os segmentos":"segmentos e unidades"}</span></div>`;
+  if(vhub==="ct"){
+    document.getElementById("body").innerHTML=faixaResultado(Object.keys(a))+alerta+alterna+renderContasHub();
+    return;
+  }
   document.getElementById("body").innerHTML=
-    faixaResultado(Object.keys(a))+alerta+`
+    faixaResultado(Object.keys(a))+alerta+alterna+`
     <div class="cols2">
       <div><div class="sect">Segmentos · por valor exposto</div>
         <div class="grid g2">${cards}</div></div>
@@ -1324,10 +1352,12 @@ function renderHub(){
     </div>`;
 }
 
-/* ---------- AGREGAÇÃO POR CONTA (dentro do segmento) ---------- */
-function contasDoSegmento(sg){
+/* ---------- AGREGAÇÃO POR CONTA (um segmento ou um conjunto de unidades) ---------- */
+function contasDoSegmento(sg){ return contasDasUnidades(DB.units.filter(u=>u.seg===sg).map(u=>u.cod)); }
+// contas com falha num conjunto de unidades: quantas unidades falham, R$ exposto,
+// alcance (sistêmico/vários/isolado, relativo a ESTE conjunto) e em quais segmentos
+function contasDasUnidades(uns){
   const {aberto,est}=met();
-  const uns=DB.units.filter(u=>u.seg===sg).map(u=>u.cod);
   const set=new Set(uns), mp={};
   DB.data.forEach(d=>{
     if(!set.has(d.u)) return;
@@ -1341,17 +1371,163 @@ function contasDoSegmento(sg){
     if(Math.abs(p)>EPS) o.orc++;
     o.plan+=p; o.real+=r;
     if(st==="sem"){ o.sem++; o.val+=Math.abs(p);
-      o.uns.push({cod:d.u,nome:(umap[d.u]||{}).nome||d.u,v:Math.abs(p),muda:est[d.u]==="muda"}); }
+      o.uns.push({cod:d.u,nome:(umap[d.u]||{}).nome||d.u,seg:(umap[d.u]||{}).seg,v:Math.abs(p),muda:est[d.u]==="muda"}); }
   });
   const tot=uns.length;
   return Object.values(mp).filter(o=>o.sem>0).map(o=>{
     o.uns.sort((x,y)=>y.v-x.v);
+    const bs={}; o.uns.forEach(u=>{ bs[u.seg]=(bs[u.seg]||0)+1; });
+    o.segs=SEG.filter(s=>bs[s]).map(s=>[s,bs[s]]);        // segmentos com falha nesta conta
     o.tot=tot; o.taxa=o.sem/tot;
     o.tipo = o.taxa>=CFG.sistemico ? "sistemico" : (o.sem>CFG.varios ? "varios" : "isolado");
     return o;
   }).sort((x,y)=>y.sem-x.sem||y.val-x.val);
 }
 const TIPOLBL={sistemico:"sistêmico",varios:"vários",isolado:"isolado"};
+
+/* ---------- VISÃO GERAL · POR CONTA (todos os segmentos, com filtros) ---------- */
+const FVLBL={"Fixo":"Fixo","Variável":"Variável","—":"Sem classificação"};
+function setVhub(v){ vhub=v; expContaHub=null; renderHub(); gravaURL(); }
+function unidadesHub(){ const s=hubF.segs; return DB.units.filter(u=>!u.vig&&(!s.length||s.includes(u.seg))).map(u=>u.cod); }
+function segsHub(){ return SEG.filter(s=>DB.units.some(u=>u.seg===s&&!u.vig)); }
+// todos os filtros, menos o de alcance (usado para contar quantas há em cada alcance)
+function contasHubBase(){
+  const q=semAcento(hubF.busca).trim();
+  return contasDasUnidades(unidadesHub()).filter(o=>{
+    const ac=amap[o.a]||{};
+    if(hubF.nat!=="todos"&&natMap[o.a]!==hubF.nat) return false;
+    if(hubF.fv!=="todos"&&(ac.fv||"—")!==hubF.fv) return false;
+    if(q&&!semAcento(o.desc).includes(q)&&!o.a.toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+function contasHubFiltradas(){
+  let l=contasHubBase();
+  if(hubF.alc!=="todos") l=l.filter(o=>o.tipo===hubF.alc);
+  if(hubF.ord==="val") l=[...l].sort((x,y)=>y.val-x.val||y.sem-x.sem);
+  return l;
+}
+const filtrosHubAtivos=()=>hubF.segs.length||hubF.alc!=="todos"||hubF.nat!=="todos"||hubF.fv!=="todos"||hubF.busca;
+function hubFiltro(k,v){
+  if(k==="seg"){ if(v==="*") hubF.segs=[]; else hubF.segs=hubF.segs.includes(v)?hubF.segs.filter(x=>x!==v):[...hubF.segs,v]; }
+  else if(k==="limpar"){ hubF={...HUBF0,segs:[]}; const b=document.getElementById("buscahub"); if(b) b.value="";
+    ["natHub","fvHub","ordHub"].forEach(id=>{ const s=document.getElementById(id); if(s) s.value=id==="ordHub"?"sem":"todos"; }); }
+  else hubF[k]=v;
+  expContaHub=null; atualizaContasHub();
+}
+function toggleContaHub(a){ expContaHub=expContaHub===a?null:a; atualizaContasHub(); }
+// redesenha só o resultado (o campo de busca e os seletores não são recriados)
+function atualizaContasHub(){
+  const el=document.getElementById("hubct-res"); if(!el) return;
+  el.innerHTML=resultadoContasHub();
+  const pres=(sel,on)=>document.querySelectorAll(sel).forEach(b=>{ const x=on(b); b.classList.toggle("on",x); b.setAttribute("aria-pressed",x); });
+  pres("#hubct-segs .chip",b=>b.dataset.v==="*"?!hubF.segs.length:hubF.segs.includes(b.dataset.v));
+  const base=contasHubBase(), cnt={todos:base.length}; base.forEach(o=>cnt[o.tipo]=(cnt[o.tipo]||0)+1);
+  pres("#hubct-alc .chip",b=>b.dataset.v===hubF.alc);
+  document.querySelectorAll("#hubct-alc .chip .c").forEach(c=>{ c.textContent=cnt[c.parentElement.dataset.v]||0; });
+  const lp=document.getElementById("hubct-limpa"); if(lp) lp.hidden=!filtrosHubAtivos();
+}
+function renderContasHub(){
+  const segs=segsHub();
+  const nats=["cd","out","fin","imp"].filter(n=>DB.accts.some(a=>a.nat===n));
+  const chip=(grupo,v,txt,on,extra="")=>`<div class="chip${on?" on":""}" data-v="${he(v)}" aria-pressed="${on}" onclick="hubFiltro(${js(grupo)},${js(v)})">${txt}${extra}</div>`;
+  const base=contasHubBase(), cnt={todos:base.length}; base.forEach(o=>cnt[o.tipo]=(cnt[o.tipo]||0)+1);
+  return `<div class="filtros" role="group" aria-label="Filtros das contas">
+      <div class="frow" id="hubct-segs"><span class="flbl">Segmento</span>
+        ${chip("seg","*","Todos",!hubF.segs.length)}
+        ${segs.map(s=>chip("seg",s,`<span class="dot" style="background:${cor(s)}"></span>${SEGNM[s]}`,hubF.segs.includes(s))).join("")}</div>
+      <div class="frow" id="hubct-alc"><span class="flbl">Alcance</span>
+        ${[["todos","Todos"],["sistemico","Sistêmico"],["varios","Vários"],["isolado","Isolado"]].map(([v,t])=>
+          chip("alc",v,t,hubF.alc===v,`<span class="c num">${cnt[v]||0}</span>`)).join("")}</div>
+      <div class="frow">
+        <label class="flbl" for="natHub">Natureza</label>
+        <select id="natHub" class="fsel" onchange="hubFiltro('nat',this.value)"><option value="todos">Todas</option>
+          ${nats.map(n=>`<option value="${n}"${hubF.nat===n?" selected":""}>${NATLBL[n]}</option>`).join("")}</select>
+        <label class="flbl" for="fvHub">Tipo</label>
+        <select id="fvHub" class="fsel" onchange="hubFiltro('fv',this.value)"><option value="todos">Fixo e variável</option>
+          ${Object.entries(FVLBL).map(([v,t])=>`<option value="${he(v)}"${hubF.fv===v?" selected":""}>${t}</option>`).join("")}</select>
+        <label class="flbl" for="ordHub">Ordem</label>
+        <select id="ordHub" class="fsel" onchange="hubFiltro('ord',this.value)">
+          <option value="sem"${hubF.ord==="sem"?" selected":""}>Mais unidades com falha</option>
+          <option value="val"${hubF.ord==="val"?" selected":""}>Maior R$ exposto</option></select>
+        <input id="buscahub" type="search" aria-label="Buscar conta ou descrição" placeholder="Buscar conta ou descrição…" value="${he(hubF.busca)}">
+        <button class="xbtn" id="hubct-limpa" onclick="hubFiltro('limpar')"${filtrosHubAtivos()?"":" hidden"}>limpar filtros</button>
+        <button class="xbtn" onclick="exportContasHub()">exportar contas</button></div>
+    </div>
+    <div id="hubct-res">${resultadoContasHub()}</div>`;
+}
+let tBuscaHub=null;
+document.addEventListener("input",e=>{ if(e.target.id!=="buscahub") return;
+  hubF.busca=e.target.value; clearTimeout(tBuscaHub); tBuscaHub=setTimeout(()=>{ expContaHub=null; atualizaContasHub(); },150); });
+function resultadoContasHub(){
+  const {aberto}=met();
+  if(aberto) return `<div class="empty">Mês em aberto: sem realizado para comparar.</div>`;
+  const lst=contasHubFiltradas(), nUn=unidadesHub().length;
+  if(!lst.length) return `<div class="empty">Nenhuma conta com falha neste recorte${filtrosHubAtivos()?" — revise os filtros":""}.</div>`;
+  const sist=lst.filter(o=>o.tipo==="sistemico").length, tot=lst.reduce((s,o)=>s+o.val,0);
+  const escopo=hubF.segs.length?hubF.segs.map(s=>SEGNM[s]).join(", "):"todos os segmentos";
+  return `<div class="expl" style="border-left:3px solid var(--amb);margin-bottom:14px">
+     <div class="expl2" style="margin:0;font-size:12px;color:var(--mut)" id="hubct-resumo">
+     <b style="color:var(--tx)">${lst.length} contas</b> com falha em ${escopo} (${nUn} unidades) ·
+     <b style="color:var(--tx)">R$ ${fmtMi(tot)}</b> exposto.
+     ${sist?`<b style="color:var(--fg-neg)">${sist}</b> falham em metade ou mais das unidades do recorte —
+       costuma ser processo ou premissa de orçamento, não esquecimento de unidade.`:"Nenhuma falha atinge metade das unidades do recorte."}</div></div>
+   <div class="tw" style="margin-bottom:18px"><table><thead><tr>
+      <th>Conta</th><th>Descrição</th><th>Segmentos</th><th class="r">Unidades c/ falha</th>
+      <th class="r">R$ exposto</th><th>Alcance</th><th>Quais unidades</th>
+    </tr></thead><tbody>${lst.map(o=>`<tr class="lin ${expContaHub===o.a?'aberta':''}" aria-expanded="${expContaHub===o.a}"
+        onclick="toggleContaHub(${js(o.a)})">
+      <td class="num" style="color:var(--dim)"><span class="cx">${expContaHub===o.a?"▾":"▸"}</span>${he(o.a)}</td>
+      <td>${he(o.desc)}${o.rec&&modo!=="rec"?' <span class="cf alta" style="font-size:11px">recorrente</span>':""}</td>
+      <td class="segs">${o.segs.map(([s,n])=>`<span class="sg" style="${tint(s)}">${SEGNM[s]} ${n}</span>`).join(" ")}</td>
+      <td class="r"><span class="frac"><b>${o.sem}</b>/${o.tot}</span>
+        <span class="bar2"><i style="width:${(o.taxa*100).toFixed(0)}%"></i></span></td>
+      <td class="r num" style="color:var(--amb)">${fmtC(o.val)}</td>
+      <td><span class="tp ${o.tipo}">${TIPOLBL[o.tipo]}</span></td>
+      <td class="uns">${o.uns.slice(0,3).map(u=>`<span class="uc${u.muda?" m":""}"
+          onclick="event.stopPropagation();go({tipo:'det',seg:${js(u.seg)},unit:${js(u.cod)}})">${he(u.nome)}</span>`).join("")}
+        ${o.uns.length>3?`<span class="umais" ${T(o.uns.slice(3).map(u=>`<div class="tr2"><span>${he(u.nome)}</span><b class="num">${fmtC(u.v)}</b></div>`).join(""))}>+${o.uns.length-3}</span>`:""}</td>
+    </tr>`+(expContaHub===o.a?detalheContaHub(o.a,o.desc):"")).join("")}</tbody></table></div>`;
+}
+// uma conta em todas as unidades do recorte (segmentos filtrados)
+function detalheContaHub(conta,desc){
+  const sel=new Set(unidadesHub());
+  const ls=contaNasUnidades(DB.units.filter(u=>sel.has(u.cod)),conta);
+  const tp=ls.reduce((a,o)=>a+o.p,0), tr=ls.reduce((a,o)=>a+o.r,0);
+  const mx=Math.max(...ls.map(o=>Math.abs(o.p)||Math.abs(o.r)),1);
+  return `<tr class="exp"><td colspan="7"><div class="expbox">
+    <div class="expt">${he(desc)} · conta ${he(conta)} · ${hubF.segs.length?hubF.segs.map(s=>SEGNM[s]).join(", "):"todos os segmentos"} em ${faixaLbl()}</div>
+    <table class="mini"><thead><tr><th>Unidade</th><th>Segmento</th><th class="r">Orçado</th>
+      <th class="r">Realizado</th><th class="r">Variação</th><th></th><th>Status</th></tr></thead>
+    <tbody>${ls.map(o=>`<tr class="clic" onclick="event.stopPropagation();abreConta(${js(o.cod)},${js(conta)})">
+      <td>${he(o.nome)}</td><td><span class="sg" style="${tint(o.seg)}">${SEGNM[o.seg]}</span></td>
+      <td class="r num">${Math.abs(o.p)<EPS?"—":fmtC(o.p)}</td>
+      <td class="r num">${Math.abs(o.r)<EPS?"—":fmtC(o.r)}</td>
+      <td class="r num ${o.v<0?'neg':'pos'}">${Math.abs(o.v)<EPS?"—":fmtC(o.v)}</td>
+      <td class="r"><span class="bb" style="display:inline-block;height:5px;border-radius:3px;
+        width:${(Math.abs(o.p)/mx*60).toFixed(0)}px;background:${o.st==="sem"?"var(--red)":"var(--s3)"}"></span></td>
+      <td><span class="st ${o.st}">${ST[o.st]}</span></td></tr>`).join("")}
+      <tr class="rtot"><td>Total do recorte</td><td></td>
+        <td class="r num">${fmtC(tp)}</td><td class="r num">${fmtC(tr)}</td>
+        <td class="r num ${tr-tp<0?'neg':'pos'}">${fmtC(tr-tp)}</td><td></td><td></td></tr>
+    </tbody></table>
+    <div class="expl2">Clique numa unidade para abri-la nesta conta.</div>
+  </div></td></tr>`;
+}
+function exportContasHub(){
+  const lst=contasHubFiltradas();
+  const filtro=[hubF.segs.length?"Segmentos: "+hubF.segs.map(s=>SEGNM[s]).join(", "):"Todos os segmentos",
+    hubF.alc!=="todos"?"Alcance: "+TIPOLBL[hubF.alc]:"", hubF.nat!=="todos"?"Natureza: "+NATLBL[hubF.nat]:"",
+    hubF.fv!=="todos"?"Tipo: "+FVLBL[hubF.fv]:"", hubF.busca?"Busca: "+hubF.busca:""].filter(Boolean).join(" · ");
+  const l=[[`Contas com falha · ${faixaLbl()} · ${MODOLBL[modo]}`],[filtro+(corte>0?` · ignorando abaixo de R$ ${fmtN(corte)}`:"")],[],
+    ["Conta","Descricao da conta","Natureza","Recorrente","Fixo/Variavel","Segmentos","Unidades com falha","Unidades no recorte",
+     "R$ exposto","Alcance","Unidades com falha (maior valor primeiro)"]];
+  lst.forEach(o=>{ const ac=amap[o.a]||{};
+    l.push([o.a,o.desc,natureza(o.a),o.rec?"Sim":"Nao",FVLBL[ac.fv||"—"]||ac.fv,o.segs.map(([s,n])=>SEGNM[s]+" ("+n+")").join(", "),
+      o.sem,o.tot,round2(o.val),TIPOLBL[o.tipo],o.uns.map(u=>u.nome).join("; ")]); });
+  baixaXLSX(`contas_${modo==="rec"?"recorrentes_":""}${limpaNome(faixaLbl())}_${hoje()}.xlsx`,
+    [{nome:"Contas",linhas:l,hdr:4,larg:[15,42,16,11,16,34,12,12,15,11,60],titulos:[1]}]);
+}
 
 /* ---------- SEGMENTO ---------- */
 function renderSeg(){
@@ -1824,9 +2000,10 @@ function renderMapa(sg){
 
 // tabela de contas do segmento
 // Uma conta, todas as unidades ativas do segmento, orçado x realizado no período.
-function contaNoSegmento(sg,conta){
+function contaNoSegmento(sg,conta){ return contaNasUnidades(DB.units.filter(u=>u.seg===sg&&!u.vig),conta); }
+// uma conta em cada unidade do conjunto: orçado × realizado no período
+function contaNasUnidades(uns,conta){
   const {aberto,est}=met();
-  const uns=DB.units.filter(u=>u.seg===sg&&!u.vig);
   const linhas=[];
   uns.forEach(u=>{
     const d=dadosDe(u.cod).find(x=>x.a===conta);
@@ -1834,7 +2011,7 @@ function contaNoSegmento(sg,conta){
     if(d){ const [pp,rr]=agr(d); p=pp; r=rr; }
     if(Math.abs(p)<EPS&&Math.abs(r)<EPS&&!d) return;   // conta nem existe nessa unidade
     const st=statusOf(p,r,aberto,est[u.cod]);
-    linhas.push({cod:u.cod,nome:u.nome,p,r,v:r-p,st,
+    linhas.push({cod:u.cod,nome:u.nome,seg:u.seg,p,r,v:r-p,st,
                  cf:d?confDe(d):"baixa"});
   });
   // ordem: pendências primeiro, depois maior orçado
@@ -3063,6 +3240,7 @@ function gravaURL(){
   if(modo!=="geral") p.set("m",modo);
   if(periodo!=="mes") p.set("p",periodo);
   if(corte>0) p.set("c",corte);
+  if(view.tipo==="hub"&&vhub==="ct") p.set("hv","ct");
   p.set("mes",M);
   history.replaceState(null,"","#"+p.toString());
   }catch(e){ urlOk=false; }   // segue funcionando, só não guarda o estado no endereço
@@ -3076,6 +3254,7 @@ function leURL(){
   if(p.has("p")) periodo=["acum","sem"].includes(p.get("p"))?p.get("p"):"mes";
   if(p.has("c")) corte=+p.get("c")||0;
   if(p.has("mes")){ const i=+p.get("mes"); if(i>=0&&i<12) M=i; }
+  if(p.get("hv")==="ct") vhub="ct";
   const v=p.get("v"), sg=p.get("seg"), un=p.get("un");
   if(["lastro","lsorc","exc"].includes(v)) view.tipo=v;
   else if(v==="seg"&&sg&&DB.units.some(u=>u.seg===sg)){ view.tipo="seg"; view.seg=sg; }
