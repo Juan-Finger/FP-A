@@ -79,7 +79,8 @@ def principal():
                         if rnd.random() < .004: r[i] = round(r[i] * 9, 2)  # anomalia
                 out.append(linha(c, desc[c], u, f"Unidade {u} – Filial", p, r))
                 d = NOVAS.get(u, u)   # mesma linha já com a unidade de destino (para o painel original)
-                out_orig.append(linha(c, desc[c], d, f"Unidade {d} – Filial", p, r))
+                # conta fundida leva a descrição do destino (no painel atual a do destino prevalece)
+                out_orig.append(linha(c, desc[FUNDIR.get(c, c)], d, f"Unidade {d} – Filial", p, r))
     escreve("plano_sint.csv", out)
     # O painel original não conhece as unificações novas: recebe a base com elas já aplicadas
     # no próprio CSV (mesmo efeito da regra), para a comparação continuar valendo.
@@ -146,12 +147,19 @@ def bordas():
     escreve("unificacao.csv", [linha("4.1.1.01.1.01", "Desc", "4420A", "Unidade X", so_p, [0.0] * 12),
                                linha("4.1.1.01.1.01", "Desc", "5111A", "Unidade X", [0.0] * 12, so_r),
                                linha("4.1.1.04.1.01", "Desc", "4205A", "Unidade X", so_p, so_r)])
+    # fusão PPR: provisão (98) lançada em SET, PPR (99) só orçado; a linha da 98 vem primeiro
+    p99 = [-1000.0] * 12
+    escreve("fusao.csv", [linha("4.1.1.01.1.98", "Provisão PPR Colaboradores", "4101A", "U", [0.0] * 12, [-400.0] * 8 + [-500.0] + [0.0] * 3),
+                          linha("4.1.1.01.1.99", "PPR Colaboradores", "4101A", "U", p99, [-600.0] * 8 + [0.0] * 4)])
+    t_out = __import__("datetime").datetime(2026, 10, 1, 9, 0).timestamp()   # setembro em aberto, com dados
+    os.utime(os.path.join(TMP, "fusao.csv"), (t_out, t_out))
     # mesma base em UTF-8
     escreve("utf8.csv", [linha("4.1.1.01.1.01", "Manutenção – veículos", "4101A", "São Paulo", v, v)], enc="utf-8")
     escreve("cp1252.csv", [linha("4.1.1.01.1.01", "Manutenção – veículos", "4101A", "São Paulo", v, v)])
 
 
 NOVAS = novas_unificacoes()
+FUNDIR = json.loads(re.search(r"const _FUNDIR=(\{.*?\});", open(os.path.join(AQUI, "..", "dashboard.html"), encoding="utf-8").read()).group(1))
 
 if __name__ == "__main__":
     principal()

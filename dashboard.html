@@ -792,7 +792,7 @@ function _detectaAno(h,info){
 
 /* Agregação conta × unidade. Regras de negócio idênticas ao gerador Python. */
 function _agregador(info){
-  const comb=new Map(), unit_desc=new Map(), acct_desc=new Map();
+  const comb=new Map(), unit_desc=new Map(), acct_desc=new Map(), descPropria=new Set(), fus={};
   const carga={arquivo:(info&&info.nome)||"",tamanho:(info&&info.tamanho)||0,modificado:(info&&info.modificado)||0,
     encoding:(info&&info.encoding)||"",linhas:0,usadas:0,vazias:0,naoA:0,dummy:0,semConta:0,curtas:0,
     invalidos:0,amostrasInv:[],cabecalho:{erros:[],nota:""}};
@@ -815,17 +815,21 @@ function _agregador(info){
     if(uo==="DUMMYA"){carga.dummy++;return;}
     if(!uo.endsWith("A")){carga.naoA++;return;}
     const u=_UNIFICAR[uo]||uo;
-    let c=_limpa(_cel(l,_CC)); if(!c){carga.semConta++;return;}
-    c=_FUNDIR[c]||c;
+    const co=_limpa(_cel(l,_CC)); if(!co){carga.semConta++;return;}
+    const c=_FUNDIR[co]||co;                  // contas equivalentes somam no destino
     if(l.length<_COLMIN) carga.curtas++;
     carga.usadas++;
     if(!unit_desc.has(u)||uo===u) unit_desc.set(u,_limpa(_cel(l,_CUD)));
-    if(!acct_desc.has(c)) acct_desc.set(c,_limpa(_cel(l,_CCD)));
+    // descrição: a 1ª linha da PRÓPRIA conta prevalece (a conta fundida não troca o nome do destino)
+    if(!acct_desc.has(c)||(co===c&&!descPropria.has(c))){ acct_desc.set(c,_limpa(_cel(l,_CCD))); if(co===c) descPropria.add(c); }
+    const f=co!==c?(fus[co]=fus[co]||{origem:co,destino:c,desc:_limpa(_cel(l,_CCD)),linhas:0,uns:new Set(),p:new Array(12).fill(0),r:new Array(12).fill(0)}):null;
+    if(f){ f.linhas++; f.uns.add(u); }
     const k=c+"\u0000"+u;
     let o=comb.get(k); if(!o){o=[new Array(12).fill(0),new Array(12).fill(0)];comb.set(k,o);}
     for(let i=0;i<12;i++){
-      o[0][i]+=_num(_cel(l,_PLAN[i]),inv,li,_PLAN[i]);
-      o[1][i]+=_num(_cel(l,_REAL[i]),inv,li,_REAL[i]);
+      const pv=_num(_cel(l,_PLAN[i]),inv,li,_PLAN[i]), rv=_num(_cel(l,_REAL[i]),inv,li,_REAL[i]);
+      o[0][i]+=pv; o[1][i]+=rv;
+      if(f){ f.p[i]+=pv; f.r[i]+=rv; }
     }
   }
   function inv(t,linha,col){carga.invalidos++;
@@ -862,6 +866,10 @@ function _agregador(info){
     const emAberto=carga.fechamento.meses.map((x,i)=>fechado[i]&&+ref<x.abreEm);
     // conferência: totais por mês (todas as unidades "A", inclusive vigiadas)
     carga.totais=_MESES.map((m,i)=>{let p=0,r=0;for(const d of data){p+=d.p[i];r+=d.r[i];}return {p,r};});
+    // o que cada conta fundida trouxe (para conferir, ex.: a Provisão PPR somada no PPR)
+    carga.fusoes=Object.keys(_FUNDIR).map(o=>{ const f=fus[o];
+      return f?{origem:o,destino:f.destino,desc:f.desc,linhas:f.linhas,unidades:f.uns.size,p:f.p,r:f.r}
+              :{origem:o,destino:_FUNDIR[o],desc:"",linhas:0,unidades:0,p:new Array(12).fill(0),r:new Array(12).fill(0)}; });
     carga.semSegmento=units.filter(u=>u.seg==="Sem segmento").map(u=>u.cod+" "+u.nome);
     carga.semClassif=accts.filter(a=>!CLASSIF[a.cod]&&!["rec","ded"].includes(a.nat)).map(a=>a.cod+" "+a.desc);
     const d=new Date(),z=n=>String(n).padStart(2,"0");
@@ -1086,6 +1094,13 @@ const amap={}; DB.accts.forEach(a=>amap[a.cod]=a);
 const ALIAS={};
 Object.entries(_UNIFICAR).forEach(([o,d])=>{ (ALIAS[d]=ALIAS[d]||[]).push(o); });
 const ehVigUn=cod=>!!(umap[cod]&&umap[cod].vig);   // unidade vigiada (tela de Exceções)
+// contas fundidas em cada conta: destino → [origens]
+const ALIAS_CONTA={};
+Object.entries(_FUNDIR).forEach(([o,d])=>{ (ALIAS_CONTA[d]=ALIAS_CONTA[d]||[]).push(o); });
+// nome da conta fundida (ex.: "Provisão PPR Colaboradores"), para a busca achar o destino por ele
+const DESC_FUNDIDA={}; ((DB.carga&&DB.carga.fusoes)||[]).forEach(f=>{ if(f.desc) DESC_FUNDIDA[f.origem]=f.desc; });
+const textoBusca=a=>[(amap[a]||{}).desc||"",a,...(ALIAS_CONTA[a]||[]).flatMap(o=>[o,DESC_FUNDIDA[o]||""])].join(" ");
+const incluiConta=a=>ALIAS_CONTA[a]?` <span class="nat" title="${he(ALIAS_CONTA[a].map(o=>o+(DESC_FUNDIDA[o]?" "+DESC_FUNDIDA[o]:"")).join("; "))}">· inclui ${ALIAS_CONTA[a].map(he).join(", ")}</span>`:"";
 const inclui=cod=>ALIAS[cod]&&ALIAS[cod].length?" · inclui "+ALIAS[cod].join(", "):"";
 // linhas de cada unidade, na mesma ordem de DB.data (as somas continuam idênticas)
 const PORU=new Map();
@@ -1418,7 +1433,7 @@ function contasHubBase(){
     const ac=amap[o.a]||{};
     if(hubF.nat!=="todos"&&natMap[o.a]!==hubF.nat) return false;
     if(hubF.fv!=="todos"&&(ac.fv||"—")!==hubF.fv) return false;
-    if(q&&!semAcento(o.desc).includes(q)&&!o.a.toLowerCase().includes(q)) return false;
+    if(q&&!semAcento(textoBusca(o.a)).includes(q)) return false;
     return true;
   });
 }
@@ -1499,7 +1514,7 @@ function resultadoContasHub(){
     </tr></thead><tbody>${lst.map(o=>`<tr class="lin ${expContaHub===o.a?'aberta':''}" aria-expanded="${expContaHub===o.a}"
         onclick="toggleContaHub(${js(o.a)})">
       <td class="num" style="color:var(--dim)"><span class="cx">${expContaHub===o.a?"▾":"▸"}</span>${he(o.a)}</td>
-      <td>${he(o.desc)}${o.rec&&modo!=="rec"?' <span class="cf alta" style="font-size:11px">recorrente</span>':""}</td>
+      <td>${he(o.desc)}${incluiConta(o.a)}${o.rec&&modo!=="rec"?' <span class="cf alta" style="font-size:11px">recorrente</span>':""}</td>
       <td class="segs">${o.segs.map(([s,n])=>`<span class="sg" style="${tint(s)}">${SEGNM[s]} ${n}</span>`).join(" ")}</td>
       <td class="r"><span class="frac"><b>${o.sem}</b>/${o.tot}</span>
         <span class="bar2"><i style="width:${(o.taxa*100).toFixed(0)}%"></i></span></td>
@@ -1857,7 +1872,7 @@ function renderSemLancarHa(cod){
      <table class="mini"><thead><tr><th>Conta</th><th class="r">Meses seguidos</th>
        <th class="r">Orçado acumulado</th><th>Desde</th><th>Último lançamento</th></tr></thead>
      <tbody>${lst.slice(0,15).map(o=>`<tr>
-       <td>${he(o.desc)}${o.rec&&modo!=="rec"?' <span class="cf alta" style="font-size:11px">recorrente</span>':""}</td>
+       <td>${he(o.desc)}${incluiConta(o.a)}${o.rec&&modo!=="rec"?' <span class="cf alta" style="font-size:11px">recorrente</span>':""}</td>
        <td class="r"><span class="frac"><b>${o.seq}</b></span>
          <span class="bar2"><i style="width:${(o.seq/mx*100).toFixed(0)}%;background:${o.seq>=4?"var(--red)":"var(--amb)"}"></i></span></td>
        <td class="r num" style="color:var(--amb)">${fmtC(o.val)}</td>
@@ -2079,7 +2094,7 @@ function renderContasSeg(sg){
     </tr></thead><tbody>${lst.map(o=>`<tr class="lin ${expConta===o.a?'aberta':''}"
         onclick="toggleConta(${js(o.a)})">
       <td class="num" style="color:var(--dim)"><span class="cx">${expConta===o.a?"▾":"▸"}</span>${he(o.a)}</td>
-      <td>${he(o.desc)}${o.rec&&modo!=="rec"?' <span class="cf alta" style="font-size:11px">recorrente</span>':""}</td>
+      <td>${he(o.desc)}${incluiConta(o.a)}${o.rec&&modo!=="rec"?' <span class="cf alta" style="font-size:11px">recorrente</span>':""}</td>
       <td class="r"><span class="frac"><b>${o.sem}</b>/${o.tot}</span>
         <span class="bar2"><i style="width:${(o.taxa*100).toFixed(0)}%"></i></span></td>
       <td class="r num" style="color:var(--amb)">${fmtC(o.val)}</td>
@@ -2134,7 +2149,7 @@ function linhasFiltradas(base){
   let rows=[...base];
   if(view.filtro!=="todos") rows=rows.filter(r=>r.st===view.filtro);
   if(view.busca){const q=view.busca.toLowerCase();
-    rows=rows.filter(r=>r.desc.toLowerCase().includes(q)||r.a.includes(q));}
+    rows=rows.filter(r=>textoBusca(r.a).toLowerCase().includes(q));}
   const k=view.sk,dir=view.sd;
   rows.sort((x,y)=>{let A,B;
     if(k==="st"){A=STO[x.st];B=STO[y.st];return dir*(A-B)||Math.abs(y.v)-Math.abs(x.v);}
@@ -2152,7 +2167,7 @@ function corpoDet(rows){
   const mxv=Math.max(...rows.map(r=>Math.abs(r.v)),1);
   return rows.length?rows.map(r=>`<tr class="lin ${expandida===r.a?'aberta':''}" onclick="toggleExp(${js(r.a)})">
       <td class="num" style="color:var(--dim)"><span class="cx">${expandida===r.a?"▾":"▸"}</span>${he(r.a)}</td>
-      <td>${he(r.desc)}</td>
+      <td>${he(r.desc)}${incluiConta(r.a)}</td>
       <td class="r num">${fmtC(r.p)}</td>
       <td class="r num">${fmtC(r.r)}</td>
       <td class="r num ${r.v<0?'neg':'pos'}">${fmtC(r.v)}
@@ -2452,7 +2467,7 @@ function montaPal(q){
   if(termo){
     const codsEscopo=new Set(unsEscopo.filter(u=>!u.vig).map(u=>u.cod));
     const achadas=DB.accts.filter(a=>
-      semAcento(a.desc).includes(termo) || a.cod.includes(termo));
+      semAcento(textoBusca(a.cod)).includes(termo));
     const {aberto,est}=met();
     achadas.slice(0,12).forEach(a=>{
       const ocor=[];
@@ -3254,6 +3269,13 @@ function abreCarga(){
       <div class="gp"><div class="gpt">Totais por mês — todas as unidades A (inclusive vigiadas)</div>
         <table class="mini" style="margin-top:6px"><thead><tr><th>Mês</th><th class="r">Planejado</th><th class="r">Realizado</th><th class="r">Variação</th><th></th></tr></thead>
         <tbody>${tot}</tbody></table></div>
+      ${(c.fusoes||[]).map(f=>`<div class="gp"><div class="gpt">Conta fundida: ${he(f.origem)} → ${he(f.destino)}</div>
+        <div class="gpd">${f.linhas?`${n(f.linhas)} linha(s) de ${n(f.unidades)} unidade(s) da ${he(f.origem)} somadas em <b>${he((amap[f.destino]||{}).desc||f.destino)}</b>.
+          Se a conta de destino aparece sem lançamento, confira abaixo se a ${he(f.origem)} tinha realizado no mês.`
+          :`Nenhuma linha da ${he(f.origem)} nesta base.`}</div>
+        ${f.linhas?`<table class="mini" style="margin-top:6px"><thead><tr><th>Mês</th><th class="r">Orçado (${he(f.origem)})</th><th class="r">Realizado (${he(f.origem)})</th><th></th></tr></thead>
+          <tbody>${DB.meses.map((m,i)=>DB.fechado[i]?`<tr><td>${rotMes(i)}</td><td class="r num">${fmtC(f.p[i])}</td><td class="r num">${fmtC(f.r[i])}</td>
+            <td class="nat">${ehAberto(i)?"em aberto":""}</td></tr>`:"").join("")}</tbody></table>`:""}</div>`).join("")}
       ${(c.semClassif||[]).length?`<div class="gp"><div class="gpt">Contas fora da tabela de classificação (${c.semClassif.length})</div>
         <div class="gpd">São tratadas como não recorrentes. Se alguma deveria ser recorrente, atualize a tabela CLASSIF.</div>${lista(c.semClassif,10)}</div>`:""}
     </div>

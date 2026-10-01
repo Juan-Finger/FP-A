@@ -161,7 +161,8 @@ teste("T01", "payload idêntico ao painel original e ao gerador Python", async (
   const po = payloadBasico(await o.evaluate(() => window.__DB__));
   const pn = payloadBasico(await n.evaluate(() => window.__DB__));
   igual(po, pn, "payload do painel novo difere do original");
-  const py = payloadBasico(JSON.parse(cp.execFileSync("python3", [path.join(__dirname, "oraculo_python.py"), CSV("plano_sint.csv")],
+  // Python lê a mesma base que o original (unificações e descrição das contas fundidas já aplicadas no CSV)
+  const py = payloadBasico(JSON.parse(cp.execFileSync("python3", [path.join(__dirname, "oraculo_python.py"), CSV("plano_sint_orig.csv")],
                                                       { maxBuffer: 1 << 28 }).toString()));
   igual(py, pn, "payload do painel novo difere do gerador Python");
 });
@@ -203,6 +204,8 @@ TEXTO_INTENCIONAL.push(["A15", o => { if (!o.body) return;
 TEXTO_INTENCIONAL.push(["H1", (o, n, k) => { if (k === "hub" && n.body) n.body = n.body.replace("Por segmento\nPor conta\nSEGMENTOS E UNIDADES\n", ""); }]);
 // A11: Exceções ganhou a dica de clique nas contas
 TEXTO_INTENCIONAL.push(["A11", (o, n, k) => { if (k === "exc" && n.body) n.body = n.body.replace(/ Clique numa conta para abrir a unidade nela\./g, "").replace(/\nClique numa conta para abrir a unidade nela\./g, ""); }]);
+// F2: conta que recebe fusão mostra "· inclui 4.1.1.01.1.98"
+TEXTO_INTENCIONAL.push(["F2", (o, n) => { for (const k of ["body", "kpis"]) if (n[k]) n[k] = n[k].replace(/ · inclui 4\.1\.1\.01\.1\.98/g, ""); }]);
 // U1: unidade que recebe unificações mostra os códigos somados nela ("· inclui 4417A")
 TEXTO_INTENCIONAL.push(["U1", (o, n) => { if (n.kpis) n.kpis = n.kpis.replace(/ · inclui [^\n]*/g, ""); }]);
 // A3: a lista "Por conta" mudou (sem receita); os dados dela são conferidos no T02 e no teste A3
@@ -912,6 +915,28 @@ teste("H2", "Visão Geral · Por conta: tela, filtros, busca, expansão, exporta
   const q = await abre(NOVO, "so_orcado.csv", { hash: "#hv=ct&mes=0" });
   ok(await q.evaluate(() => vhub === "ct" && !!document.querySelector(".vbar2 button.on") && document.querySelector(".vbar2 button.on").textContent === "Por conta"), "link hv=ct");
   await q.context().close();
+});
+
+teste("F2", "PPR: provisão (98) soma no PPR (99), que mantém o próprio nome; resumo mostra o que veio da 98", async () => {
+  const p = await abre(NOVO, "fusao.csv");
+  const r = await p.evaluate(() => { const d = DB.data.find(x => x.a === "4.1.1.01.1.99");
+    view.unit = "4101A"; const l = linhas().find(x => x.a === "4.1.1.01.1.99");
+    abreCarga(); const res = document.getElementById("guia").innerText; fechaGuia();
+    go({ tipo: "det", seg: umap["4101A"].seg, unit: "4101A" }); setF("todos");
+    const tela = document.querySelector(".tw tbody").innerText;
+    abrePal(); montaPal("4.1.1.01.1.98"); let busca = palItens.some(i => i.x === "4.1.1.01.1.99");
+    montaPal("provisao ppr"); busca = busca && palItens.some(i => i.x === "4.1.1.01.1.99"); fechaPal();
+    view.busca = "Provisão"; busca = busca && linhasFiltradas(linhas()).some(x => x.a === "4.1.1.01.1.99"); view.busca = "";
+    hubF = { ...HUBF0, segs: [], busca: "Provisão" }; const nHub = contasHubBase().length; hubF = { ...HUBF0, segs: [] };
+    return { contas: DB.accts.map(a => a.cod + " " + a.desc).join("|"), mes: DB.meses[M], set: d.r[8], st: l.st, real: l.r,
+      f: DB.carga.fusoes[0], res, tela: /inclui 4\.1\.1\.01\.1\.98/.test(tela), busca }; });
+  ok(r.contas === "4.1.1.01.1.99 PPR Colaboradores", "contas: " + r.contas);
+  ok(r.mes === "SET" && r.set === -500 && r.real === -500 && r.st !== "sem", "SET do PPR: " + JSON.stringify({ m: r.mes, set: r.set, st: r.st }));
+  ok(r.f.linhas === 1 && r.f.r[8] === -500, "registro da fusão: " + JSON.stringify(r.f));
+  ok(/4\.1\.1\.01\.1\.98 → 4\.1\.1\.01\.1\.99/.test(r.res) && /SET\/26\s+0,00\s+−500,00\s+em aberto/.test(r.res), "resumo: " + r.res.slice(r.res.indexOf("fundida"), r.res.indexOf("fundida") + 400));
+  ok(r.tela && r.busca, "tela/busca: " + JSON.stringify({ t: r.tela, b: r.busca }));
+  igual(pyPayload("fusao.csv").data, payloadBasico(await p.evaluate(() => window.__DB__)).data, "valores diferentes do Python");
+  await p.context().close();
 });
 
 /* ================================================================== */
