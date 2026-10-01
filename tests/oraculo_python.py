@@ -16,4 +16,7 @@ g.CSV_ENCODING = "cp1252"     # o navegador lê "ISO-8859-1" como windows-1252
 html = open(os.path.join(AQUI, "referencia", "dashboard_original.html"), encoding="utf-8").read()
 clas = {k: tuple(v) for k, v in json.loads(re.search(r"const CLASSIF=(\{.*?\});", html).group(1)).items()}
 segmap = json.loads(re.search(r"const SEGMAP=(\{.*?\});", html).group(1))
+# As unificações são configuração de negócio: o oráculo usa as do painel atual e confere o algoritmo.
+atual = open(os.path.join(AQUI, "..", "dashboard.html"), encoding="utf-8").read()
+g.UNIFICAR = json.loads(re.search(r"const _UNIFICAR=(\{.*?\});", atual).group(1))
 print(json.dumps(g.carrega_base(sys.argv[1], clas, segmap), ensure_ascii=False))

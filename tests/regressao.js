@@ -73,6 +73,8 @@ async function abre(html, csv, opts = {}) {
 }
 const cache = {};
 async function pagina(qual, csv = "plano_sint.csv") {
+  // o original recebe a mesma base com as unificações novas já aplicadas no CSV
+  if (qual === "orig" && csv === "plano_sint.csv") csv = "plano_sint_orig.csv";
   const k = qual + "|" + csv;
   if (!cache[k]) cache[k] = await abre(qual === "orig" ? ORIG : NOVO, csv);
   return cache[k];
@@ -197,6 +199,8 @@ const MG = "-?\\d{4,}(?:,\\d)?%";
 TEXTO_INTENCIONAL.push(["A15", o => { if (!o.body) return;
   o.body = o.body.replace(new RegExp("^" + MG + "$", "gm"), "—").replace(new RegExp("^orç\\. " + MG + "\\n", "gm"), "")
     .replace(new RegExp("\\s*margem " + MG + "( · orçada [^\\n]*)?", "g"), "").replace(new RegExp(" · orçada " + MG, "g"), ""); }]);
+// U1: unidade que recebe unificações mostra os códigos somados nela ("· inclui 4417A")
+TEXTO_INTENCIONAL.push(["U1", (o, n) => { if (n.kpis) n.kpis = n.kpis.replace(/ · inclui [^\n]*/g, ""); }]);
 // A3: a lista "Por conta" mudou (sem receita); os dados dela são conferidos no T02 e no teste A3
 TEXTO_INTENCIONAL.push(["A3", (o, n, k) => { if (k.startsWith("ct:")) { delete o.body; delete n.body; } }]);
 // A4: mapa e histórico mudam para unidades que ainda não tinham começado a lançar (conferido no T02 e no A4)
@@ -795,6 +799,27 @@ teste("R2", "mês fechado: tem realizado E a data do arquivo passou 7 dias corri
   // ano seguinte: dezembro com realizado fecha a partir de 08/01
   const c = await com("fech_prox_ano.csv", new Date(2027, 0, 8, 0, 0));
   ok(c.fechados.endsWith("AGO,DEZ"), "dezembro no ano seguinte: " + c.fechados);
+});
+
+teste("U1", "4205A, 4420A e 5111A viram uma unidade só (sem falso 'sem lançamento')", async () => {
+  const p = await abre(NOVO, "unificacao.csv");
+  const r = await p.evaluate(() => { M = 7; periodo = "mes"; for (const k in cache) delete cache[k];
+    const o = met().a["4205A"];
+    return { unidades: DB.units.map(u => u.cod).join(), sem: o && o.sem, sorc: o && o.sorc,
+             linhas: DB.data.length, st: (() => { view.unit = "4205A"; return linhas().map(l => l.st).join(); })() }; });
+  igual({ unidades: "4205A", sem: 0, sorc: 0, linhas: 2, st: "ok,ok" }, r, "unificação");
+  igual(pyPayload("unificacao.csv"), payloadBasico(await p.evaluate(() => window.__DB__)), "difere do Python");
+  await p.context().close();
+  const q = await pagina("novo");
+  ok(await q.evaluate(() => !umap["4420A"] && !umap["5111A"] && !!umap["4205A"]), "unidades de origem ainda aparecem na base principal");
+  const r2 = await q.evaluate(() => { abrePal(); montaPal("5111"); const achou = palItens.some(i => i.x === "4205A"); fechaPal();
+    go({ tipo: "det", seg: "Transportes", unit: "4205A" }); const sub = document.querySelectorAll(".kpi .sub")[0].textContent;
+    abreCarga(); const res = document.getElementById("guia").innerText; fechaGuia(); go({ tipo: "hub" });
+    return { achou, sub, res: /4420A \+ 5111A → 4205A/.test(res) }; });
+  igual({ achou: true, sub: "4205A · inclui 4420A, 5111A", res: true }, r2, "unificação visível");
+  const u = await abre(NOVO, "plano_sint.csv", { hash: "#v=det&seg=Transportes&un=5111A&mes=7" });
+  ok(await u.evaluate(() => view.tipo === "det" && view.unit === "4205A"), "link antigo de 5111A não redireciona");
+  await u.context().close();
 });
 
 /* ================================================================== */

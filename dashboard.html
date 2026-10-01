@@ -666,7 +666,10 @@ const CLASSIF={"3.1.1.01.1.06":["Recorrente","—"],"4.1.1.01.1.01":["Não recor
 const SEGMAP={"4101A":"Alfandegados","4102A":"Alfandegados","4103A":"Corporativo","4201A":"CDs","4202A":"CDs","4204A":"CDs","4205A":"Transportes","4401A":"Corporativo","4403A":"Alfandegados","4404A":"Alfandegados","4405A":"Transportes","4406A":"Alfandegados","4407A":"Alfandegados","4408A":"CDs","4409A":"Corporativo","4410A":"CDs","4412A":"Alfandegados","4413A":"Fronteiras","4414A":"Fronteiras","4415A":"Fronteiras","4416A":"Fronteiras","4417A":"CDs","4418A":"CDs","4419A":"Alfandegados","4420A":"Transportes","4421A":"Transportes","4422A":"CDs","4423A":"Fronteiras","4424A":"CDs","4801A":"Alfandegados","5001A":"Transportes","5002A":"CDs","5101A":"Transportes","5102A":"Transportes","5103A":"Corporativo","5104A":"Transportes","5106A":"CDs","5107A":"CDs","5108A":"CDs","5109A":"CDs","5110A":"CDs","5111A":"Transportes"};
 /* ==== Constantes portadas de gerar_dashboard.py ==== */
 const _VIG=new Set(["4801A","4419A","5106A","4402A","5110A","5003A","5103A"]);
-const _UNIFICAR={"4417A":"4418A","5002A":"5001A"};
+// Unidades somadas em outra (origem → destino): orçado e realizado vão para o destino.
+// 4205A/4420A/5111A são a mesma unidade em empresas diferentes: separadas, uma conta
+// orçada numa e lançada noutra virava falso "sem lançamento".
+const _UNIFICAR={"4417A":"4418A","5002A":"5001A","4420A":"4205A","5111A":"4205A"};
 const _COD_EQUIV={"4001A":"4103A"};
 const _SEG_MANUAL={"4402A":"CDs","4425A":"Fronteiras","5003A":"Transportes"};
 const _FUNDIR={"4.1.1.01.1.98":"4.1.1.01.1.99"};
@@ -1051,6 +1054,10 @@ const ST={sem:"Sem lançamento",sorc:"Sem orçamento",ana:"Analisar",ok:"Ok com 
 const STO={sem:0,sorc:1,ana:2,ok:3,zer:4,abr:5};
 
 const amap={}; DB.accts.forEach(a=>amap[a.cod]=a);
+// códigos que foram somados em cada unidade (unificações): destino → [origens]
+const ALIAS={};
+Object.entries(_UNIFICAR).forEach(([o,d])=>{ (ALIAS[d]=ALIAS[d]||[]).push(o); });
+const inclui=cod=>ALIAS[cod]&&ALIAS[cod].length?" · inclui "+ALIAS[cod].join(", "):"";
 // linhas de cada unidade, na mesma ordem de DB.data (as somas continuam idênticas)
 const PORU=new Map();
 DB.data.forEach(d=>{ let l=PORU.get(d.u); if(!l){ l=[]; PORU.set(d.u,l); } l.push(d); });
@@ -1243,7 +1250,7 @@ function renderKpis(){
    ${view.tipo==="det"
      ? `<div class="kpi" ${T(tpOrc)}><div class="lbl">${modo==="rec"?"Recorrentes orçadas":"Contas com orçamento"}</div>
           <div class="v num">${scope[0]?scope[0].orc:0}</div>
-          <div class="sub">${he(umap[view.unit].cod)}</div></div>`
+          <div class="sub">${he(umap[view.unit].cod)}${inclui(view.unit)}</div></div>`
      : `<div class="kpi" ${T(tpOrc)}><div class="lbl">Unidades</div><div class="v num">${un}</div>
           <div class="sub">${view.tipo==="hub"?"todos os segmentos":SEGNM[view.seg]}</div></div>`}
    <div class="kpi r" ${T(tpSem)}><div class="lbl">${modo==="rec"?"Recorrentes sem lançamento":"Contas sem lançamento"}</div>
@@ -2237,7 +2244,8 @@ function montaPal(q){
 
   // unidades
   unsEscopo.forEach(u=>{
-    if(termo && !semAcento(u.nome).includes(termo) && !u.cod.toLowerCase().includes(termo)) return;
+    const cods=[u.cod,...(ALIAS[u.cod]||[])];   // acha a unidade também pelos códigos unificados nela
+    if(termo && !semAcento(u.nome).includes(termo) && !cods.some(c=>c.toLowerCase().includes(termo))) return;
     res.push({t:SEGNM[u.seg]||u.seg,n:u.nome,x:u.cod,
       go:()=>u.vig?go({tipo:"exc"}):go({tipo:"det",seg:u.seg,unit:u.cod})});
   });
@@ -3031,7 +3039,8 @@ function abreCarga(){
         ${lin("Ignoradas — unidade fora da família A",n(c.naoA),1)}${lin("Ignoradas — DUMMYA",n(c.dummy),1)}
         ${lin("Ignoradas — sem código de conta",n(c.semConta),1)}${lin("Ignoradas — linhas vazias",n(c.vazias),1)}
         ${lin("Combinações conta × unidade",n(DB.data.length))}
-        ${lin("Unidades",n(DB.units.length)+" ("+DB.units.filter(u=>u.vig).length+" vigiadas)")}${lin("Contas",n(DB.accts.length))}</div></div>
+        ${lin("Unidades",n(DB.units.length)+" ("+DB.units.filter(u=>u.vig).length+" vigiadas)")}${lin("Contas",n(DB.accts.length))}
+        ${Object.keys(ALIAS).length?lin("Unidades unificadas",Object.entries(ALIAS).map(([d,o])=>he(o.join(" + ")+" → "+d)).join(" · ")):""}</div></div>
       <div class="gp"><div class="gpt">Totais por mês — todas as unidades A (inclusive vigiadas)</div>
         <table class="mini" style="margin-top:6px"><thead><tr><th>Mês</th><th class="r">Planejado</th><th class="r">Realizado</th><th class="r">Variação</th><th></th></tr></thead>
         <tbody>${tot}</tbody></table></div>
@@ -3070,7 +3079,8 @@ function leURL(){
   const v=p.get("v"), sg=p.get("seg"), un=p.get("un");
   if(["lastro","lsorc","exc"].includes(v)) view.tipo=v;
   else if(v==="seg"&&sg&&DB.units.some(u=>u.seg===sg)){ view.tipo="seg"; view.seg=sg; }
-  else if(v==="det"&&un&&umap[un]){ view.tipo="det"; view.unit=un; view.seg=umap[un].seg; }
+  else if(v==="det"&&un&&umap[_UNIFICAR[un]||un]){ const u2=_UNIFICAR[un]||un;   // link antigo de unidade unificada
+    view.tipo="det"; view.unit=u2; view.seg=umap[u2].seg; }
   return true;
   }catch(e){ return false; }
 }

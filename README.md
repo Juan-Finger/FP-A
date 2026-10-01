@@ -74,6 +74,10 @@ alteradas**.
   da carga mostra, para cada mês em aberto, o motivo e o prazo de ajustes.
 - **Pendências:** só a família 3 (receita e dedução) fica fora. A 4.2 e a 4.3 contam como
   pendência e aparecem em "Custos e despesas".
+- **Unidades unificadas** (orçado e realizado somados no destino): 4417A → 4418A, 5002A → 5001A
+  e 4420A + 5111A → 4205A (a mesma unidade em empresas diferentes). O painel mostra
+  "inclui 4420A, 5111A" na unidade, acha a unidade pelos códigos antigos na busca e
+  redireciona links antigos.
 - **Segmentos:** unidades 6xxx–9xxx são Backoffice pela regra do código. O `SEGMAP` não tem
   (nem precisa ter) entradas para elas.
 

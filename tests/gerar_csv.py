@@ -44,6 +44,14 @@ def escreve(nome, linhas, enc="cp1252"):
     os.utime(caminho, (DATA_EXPORT, DATA_EXPORT))
 
 
+def novas_unificacoes():
+    """Unificações do painel atual que o original não tinha (origem -> destino)."""
+    rx = r"const _UNIFICAR=(\{.*?\});"
+    atual = json.loads(re.search(rx, open(os.path.join(AQUI, "..", "dashboard.html"), encoding="utf-8").read()).group(1))
+    orig = json.loads(re.search(rx, html).group(1))
+    return {k: v for k, v in atual.items() if orig.get(k) != v}
+
+
 def principal():
     rnd = random.Random(7)
     contas = list(CLASSIF) + ["3.1.1.01.1.01", "3.1.1.01.1.02", "3.1.1.02.1.01",
@@ -53,7 +61,7 @@ def principal():
                             "4425A", "4417A", "5002A", "4001A", "DUMMYA"]
     nao_a = [u[:-1] + "S" for u in unids[:30]]
     novas = set(unids[3:6])            # unidades que só começam a lançar em JUN
-    out = []
+    out, out_orig = [], []
     for rep in range(7):
         for u in unids + nao_a:
             for c in rnd.sample(contas, 55):
@@ -70,7 +78,12 @@ def principal():
                         if u in novas and i < 5: r[i] = 0.0
                         if rnd.random() < .004: r[i] = round(r[i] * 9, 2)  # anomalia
                 out.append(linha(c, desc[c], u, f"Unidade {u} – Filial", p, r))
+                d = NOVAS.get(u, u)   # mesma linha já com a unidade de destino (para o painel original)
+                out_orig.append(linha(c, desc[c], d, f"Unidade {d} – Filial", p, r))
     escreve("plano_sint.csv", out)
+    # O painel original não conhece as unificações novas: recebe a base com elas já aplicadas
+    # no próprio CSV (mesmo efeito da regra), para a comparação continuar valendo.
+    escreve("plano_sint_orig.csv", out_orig)
 
 
 def bordas():
@@ -127,10 +140,18 @@ def bordas():
     r[4] = 0.0; r[11] = -50.0
     escreve("fechamento.csv", [linha("4.1.1.01.1.01", "Desc", "4101A", "U", v, r),
                                linha("4.1.1.04.1.01", "Desc", "4101A", "U", v, [-90.0] * 4 + [0.0] + [-90.0] * 3 + [0.0] * 4)])
+    # unificação: conta orçada em 4420A e lançada em 5111A (mesma unidade, empresas diferentes)
+    so_p = [-100.0] * 12
+    so_r = [-100.0] * 8 + [0.0] * 4
+    escreve("unificacao.csv", [linha("4.1.1.01.1.01", "Desc", "4420A", "Unidade X", so_p, [0.0] * 12),
+                               linha("4.1.1.01.1.01", "Desc", "5111A", "Unidade X", [0.0] * 12, so_r),
+                               linha("4.1.1.04.1.01", "Desc", "4205A", "Unidade X", so_p, so_r)])
     # mesma base em UTF-8
     escreve("utf8.csv", [linha("4.1.1.01.1.01", "Manutenção – veículos", "4101A", "São Paulo", v, v)], enc="utf-8")
     escreve("cp1252.csv", [linha("4.1.1.01.1.01", "Manutenção – veículos", "4101A", "São Paulo", v, v)])
 
+
+NOVAS = novas_unificacoes()
 
 if __name__ == "__main__":
     principal()
