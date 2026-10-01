@@ -692,8 +692,10 @@ const _FUNDIR={"4.1.1.01.1.98":"4.1.1.01.1.99"};
 const _REC_EXTRA=new Set(["4.1.1.02.1.09"]);
 const _MESES=["JAN","FEV","MAR","ABR","MAI","JUN","JUL","AGO","SET","OUT","NOV","DEZ"];
 // Fechamento: o mês corrido é fechado até o 2º dia útil do mês seguinte, com ajustes
-// possíveis depois. Um mês só conta como FECHADO quando o arquivo foi exportado depois
-// de 7 dias corridos do fim do mês (ex.: agosto fecha a partir de 08/09, 00:00).
+// possíveis depois. Um mês com realizado entra na análise assim que começa; ele fica
+// EM ABERTO até o arquivo ser exportado depois de 7 dias corridos do fim do mês
+// (ex.: agosto fecha a partir de 08/09, 00:00). Mês futuro em relação à data do arquivo
+// (ex.: provisão lançada em dezembro) não entra.
 const _PRAZO_FECHAMENTO_DIAS=7;
 const _PLAN=[8,10,12,14,16,18,20,22,24,26,28,30];
 const _REAL=[9,11,13,15,17,19,21,23,25,27,29,31];
@@ -844,21 +846,25 @@ function _agregador(info){
     const accts=[...acct_desc.keys()].sort().map(c=>({cod:c,desc:acct_desc.get(c),nat:nat(c),rec:(CLASSIF[c]||["—","—"])[0],fv:(CLASSIF[c]||["—","—"])[1],r:ehRec(c)?1:0}));
     const mes_abs=new Array(12).fill(0);
     for(const d of data) for(let i=0;i<12;i++) mes_abs[i]+=Math.abs(d.r[i]);
-    // Mês fechado = tem realizado E a base foi exportada depois da semana de ajustes.
-    // Referência: data do arquivo exportado (sem ela, a data da importação).
+    // Mês na análise = tem realizado e já começou na data de referência.
+    // Em aberto = ainda não passou a semana de ajustes. Referência: data do arquivo
+    // exportado (sem ela, a data da importação).
     const ref=carga.modificado?new Date(carga.modificado):new Date();
     carga.fechamento={referencia:+ref,fonte:carga.modificado?"data do arquivo exportado":"data da importação (o arquivo não informou a data)",
       prazoDias:_PRAZO_FECHAMENTO_DIAS,
       meses:_MESES.map((m,i)=>({temReal:Math.abs(mes_abs[i])>1,
+        inicio:+new Date(carga.ano,i,1),                                      // 1º dia do mês
         abreEm:+new Date(carga.ano,i+1,1+_PRAZO_FECHAMENTO_DIAS)}))};       // 1º instante após o prazo
-    const fechado=carga.fechamento.meses.map(x=>x.temReal&&+ref>=x.abreEm);
+    // "fechado" no payload = mês que entra na análise (fechado ou em aberto com dados)
+    const fechado=carga.fechamento.meses.map(x=>x.temReal&&+ref>=x.inicio);
+    const emAberto=carga.fechamento.meses.map((x,i)=>fechado[i]&&+ref<x.abreEm);
     // conferência: totais por mês (todas as unidades "A", inclusive vigiadas)
     carga.totais=_MESES.map((m,i)=>{let p=0,r=0;for(const d of data){p+=d.p[i];r+=d.r[i];}return {p,r};});
     carga.semSegmento=units.filter(u=>u.seg==="Sem segmento").map(u=>u.cod+" "+u.nome);
     carga.semClassif=accts.filter(a=>!CLASSIF[a.cod]&&!["rec","ded"].includes(a.nat)).map(a=>a.cod+" "+a.desc);
     const d=new Date(),z=n=>String(n).padStart(2,"0");
     const gerado=d.getFullYear()+"-"+z(d.getMonth()+1)+"-"+z(d.getDate())+"T"+z(d.getHours())+":"+z(d.getMinutes());
-    return {meses:_MESES,fechado,units,accts,data,gerado,ano:carga.ano,carga};
+    return {meses:_MESES,fechado,emAberto,units,accts,data,gerado,ano:carga.ano,carga};
   }
   return {linha,fim};
 }
@@ -1975,7 +1981,7 @@ function renderMapa(sg){
     const lista=cs.slice(0,8).map(c=>`<div class="tr2"><span>${he(c.desc)}</span>
         <b class="num">${fmtC(c.v)}</b></div>`).join("");
     return `<td class="hm${m.parcial?" pc":""}${m.muda?" muda":""}" style="background:${bg}"
-      ${T(`<b>${rotMes(m.i)}</b>${m.parcial?' <span style="color:var(--fg-warn)">(fechamento parcial)</span>':""}
+      ${T(`<b>${rotMes(m.i)}</b>${ehAberto(m.i)?` <span style="color:var(--fg-warn)">(em aberto até ${prazoMes(m.i)})</span>`:""}${m.parcial?' <span style="color:var(--fg-warn)">(fechamento parcial)</span>':""}
         <div class="tl">${m.n} conta(s) com orçamento e sem lançamento · R$ ${fmtMi(m.val)}</div>
         ${m.muda?'<div class="tl" style="color:var(--fg-neg)">A unidade não lançou nada neste mês.</div>':""}
         ${lista?`<div class="tsep"></div>${lista}`:""}
@@ -1986,9 +1992,9 @@ function renderMapa(sg){
       <div class="expl2" style="margin:0;font-size:12px;color:var(--mut)">
       Cada linha é uma unidade, cada coluna um mês. Quanto mais forte a cor, mais contas
       ficaram sem lançamento. <span style="color:var(--fg-neg)">Vermelho cheio</span> = a unidade não
-      lançou nada naquele mês. Faixas hachuradas são meses em fechamento parcial.</div></div>
+      lançou nada naquele mês. Faixas hachuradas são meses em fechamento parcial ou em aberto (marcados com *).</div></div>
     <div class="tw mapa"><table><thead><tr><th>Unidade</th>
-      ${meses.map(i=>`<th class="hmh${ehParcial(i)?" pc":""}">${DB.meses[i]}</th>`).join("")}
+      ${meses.map(i=>`<th class="hmh${ehParcial(i)||ehAberto(i)?" pc":""}"${ehAberto(i)?` title="em aberto até ${prazoMes(i)}"`:""}>${DB.meses[i]}${ehAberto(i)?"*":""}</th>`).join("")}
       <th class="r">Total</th></tr></thead>
     <tbody>${linhas.map(l=>{
       const tot=l.h.filter(Boolean).reduce((s,m)=>s+m.n,0);
@@ -2175,7 +2181,7 @@ function renderDet(){
      <div class="hpg">${hp.map((m,i)=>{
         if(!m||m.inativa) return `<div class="hpc off"${m?` ${T(`<b>${rotMes(m.i)}</b><div class="tl">A unidade ainda não tinha lançado nada no ano até este mês.</div>`)}`:""}><div class="hpb"></div><div class="hpm">${DB.meses[i]}</div></div>`;
         const alt=Math.max(3,Math.round(m.n/mx0*46));
-        return `<div class="hpc${i===M?" atual":""}${m.parcial?" parc":""}" ${T(`<b>${rotMes(m.i)}</b>${m.parcial?' <span style="color:var(--fg-warn)">(fechamento parcial)</span>':""}
+        return `<div class="hpc${i===M?" atual":""}${m.parcial?" parc":""}" ${T(`<b>${rotMes(m.i)}</b>${ehAberto(m.i)?` <span style="color:var(--fg-warn)">(em aberto até ${prazoMes(m.i)})</span>`:""}${m.parcial?' <span style="color:var(--fg-warn)">(fechamento parcial)</span>':""}
            <div class="tl">${m.n} conta(s) com orçamento e sem lançamento</div>
            <div class="tl">R$ ${fmtMi(m.val)} exposto</div>
            ${m.muda?'<div class="tl" style="color:var(--fg-neg)">A unidade não lançou NADA neste mês.</div>':""}`)}>
@@ -3123,13 +3129,18 @@ var render=function(){
     `${faixaLbl()} · ${aberto?statusMesCarga(M).replace(" · sem realizado"," · sem realizado importado"):PERLBL[periodo]}`
     +(modo==="rec"?` <span class="modotag">${N_REC} contas recorrentes</span>`:"")
     +(corte>0?` <span class="modotag" style="background:rgba(143,163,184,.14);color:var(--mut)">ignorando abaixo de R$ ${fmtN(corte)}</span>`:"")
+    +(mesesAtivos().some(ehAberto)?(()=>{ const ab=mesesAtivos().filter(ehAberto);
+      return ` <span class="modotag parc" ${T(`<b>Mês em aberto</b>
+        <div class="tl">${ab.map(rotMes).join(", ")} ainda está na semana de ajustes do fechamento (até ${prazoMes(ab[ab.length-1])}).
+        Os números já aparecem, mas podem mudar até o fechamento.</div>`)}>em aberto · prazo de ajustes até ${prazoMes(ab[ab.length-1])}</span>`; })():"")
     +(mesesAtivos().some(ehParcial)?` <span class="modotag parc" ${T(`<b>Fechamento parcial</b>
         <div class="tl">Este mês tem bem menos lançamentos que os demais (${PARCIAL.tot[M]||0} contra ~${PARCIAL.med} de mediana).
         Provavelmente ainda está sendo lançado, então as pendências tendem a cair.</div>
         <div class="tl">Meses parciais ficam fora do cálculo de tendência.</div>`)}>fechamento parcial</span>`:"");
   const ms2=document.getElementById("mstatus");
-  ms2.classList.toggle("open",aberto);
-  document.getElementById("mstxt").textContent=aberto?"em aberto":`${met().ms.length} mês(es)`;
+  const temAberto=mesesAtivos().some(ehAberto);
+  ms2.classList.toggle("open",aberto||temAberto);
+  document.getElementById("mstxt").textContent=aberto?"sem realizado":temAberto?`${met().ms.length} mês(es) · em aberto`:`${met().ms.length} mês(es)`;
   // barra do topo (celular): copia título e subtítulo já atualizados
   const tt=document.getElementById("tbtitulo"), ts=document.getElementById("tbsub");
   if(tt){ tt.textContent=document.getElementById("title").textContent;
@@ -3179,12 +3190,16 @@ function avisosCarga(){
   return a;
 }
 // status de um mês no resumo da carga, com o motivo quando está em aberto
+const ehAberto=i=>!!(DB.emAberto&&DB.emAberto[i]);
+// último dia do prazo de ajustes do mês (ex.: "07/10")
+function prazoMes(i){ const f=DB.carga&&DB.carga.fechamento&&DB.carga.fechamento.meses[i];
+  return f?new Date(f.abreEm-86400000).toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"}):""; }
 function statusMesCarga(i){
-  if(DB.fechado[i]) return ehParcial(i)?"fechado · parcial":"fechado";
   const f=DB.carga&&DB.carga.fechamento&&DB.carga.fechamento.meses[i];
-  if(!f||!f.temReal) return "em aberto · sem realizado";
-  const ult=new Date(f.abreEm-86400000);
-  return "em aberto · prazo de ajustes até "+ult.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"});
+  if(ehAberto(i)) return "em aberto · prazo de ajustes até "+prazoMes(i)+(ehParcial(i)?" · parcial":"");
+  if(DB.fechado[i]) return ehParcial(i)?"fechado · parcial":"fechado";
+  if(f&&f.temReal) return "futuro · lançamento antecipado (fora da análise)";
+  return "em aberto · sem realizado";
 }
 function abreCarga(){
   const c=DB.carga||{}, el=document.getElementById("guia");
@@ -3285,7 +3300,7 @@ render=protege(render,"render");
 (function init(){
   const sel=document.getElementById("mes");
   sel.innerHTML=DB.meses.map((m,i)=>
-    `<option value="${i}" ${i===M?"selected":""}>${rotMes(i)}${DB.fechado[i]?"":" · em aberto"}</option>`).join("");
+    `<option value="${i}" ${i===M?"selected":""}>${rotMes(i)}${ehAberto(i)?" · em aberto":DB.fechado[i]?"":" · sem dados"}</option>`).join("");
   // se veio link com estado, aplica antes do primeiro render
   sel.onchange=()=>{M=+sel.value;render();};
   const pi=document.getElementById("palin");

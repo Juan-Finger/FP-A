@@ -780,28 +780,33 @@ teste("R1", "SEGMAP sem as entradas 6xxx–9xxx; unidades 6–9 continuam Backof
   igual({ mortas: [], fora: [] }, r, "SEGMAP");
 });
 
-teste("R2", "mês fechado: tem realizado E a data do arquivo passou 7 dias corridos do fim do mês", async () => {
+teste("R2", "mês em aberto (na semana de ajustes) aparece com os dados, marcado como em aberto; futuro fica de fora", async () => {
   const com = async (nome, data) => {
     const f = CSV(nome); fs.copyFileSync(CSV("fechamento.csv"), f); fs.utimesSync(f, data, data);
     const p = await abre(NOVO, nome);
     const r = await p.evaluate(() => { abreCarga(); const t = document.getElementById("guia").innerText; fechaGuia();
-      return { fechados: DB.meses.filter((m, i) => DB.fechado[i]).join(","), padrao: DB.meses[M], resumo: t,
-               opcao: [...document.querySelectorAll("#mes option")][7].textContent,
-               subAgo: (M = 7, render(), document.getElementById("subtitle").textContent) }; });
+      return { usados: DB.meses.filter((m, i) => DB.fechado[i]).join(","), abertos: DB.meses.filter((m, i) => DB.emAberto[i]).join(","),
+               padrao: DB.meses[M], resumo: t, opcao: [...document.querySelectorAll("#mes option")][7].textContent,
+               sub: document.getElementById("subtitle").textContent, kpi: document.querySelectorAll(".kpi .v")[1].textContent,
+               status: document.getElementById("mstxt").textContent, dez: [...document.querySelectorAll("#mes option")][11].textContent }; });
     await p.context().close(); return r;
   };
-  // 07/09 23:59: agosto ainda na semana de ajustes; maio sem realizado; dezembro (provisão) no futuro
+  // 07/09 23:59: agosto na semana de ajustes → aparece COM os dados, marcado em aberto; maio sem realizado; dezembro (provisão) é futuro
   const a = await com("fech_0709.csv", new Date(2026, 8, 7, 23, 59));
-  igual({ fechados: "JAN,FEV,MAR,ABR,JUN,JUL", padrao: "JUL" }, { fechados: a.fechados, padrao: a.padrao }, "exportado em 07/09 23:59");
-  ok(/AGO\/26[^\n]*em aberto[^\n]*07\/09/.test(a.resumo), "resumo não explica o prazo de agosto: " + a.resumo.match(/AGO\/26[^\n]*/));
-  ok(/em aberto/.test(a.opcao), "seletor de mês não marca agosto em aberto: " + a.opcao);
-  ok(/em aberto · prazo de ajustes até 07\/09/.test(a.subAgo), "subtítulo de agosto na semana de ajustes: " + a.subAgo);
-  // 08/09 00:00: passou a semana → agosto fechado
+  igual({ usados: "JAN,FEV,MAR,ABR,JUN,JUL,AGO", abertos: "AGO", padrao: "AGO" }, { usados: a.usados, abertos: a.abertos, padrao: a.padrao }, "exportado em 07/09 23:59");
+  ok(a.kpi !== "—", "mês em aberto sem números: " + a.kpi);
+  ok(/em aberto · prazo de ajustes até 07\/09/.test(a.sub) && /em aberto/.test(a.status), "selo de em aberto: " + a.sub + " | " + a.status);
+  ok(/AGO\/26[^\n]*em aberto[^\n]*07\/09/.test(a.resumo) && /DEZ\/26[^\n]*futuro/.test(a.resumo), "resumo: " + a.resumo.match(/(AGO|DEZ)\/26[^\n]*/g));
+  ok(/em aberto/.test(a.opcao) && /futuro|sem dados/.test(a.dez), "seletor: " + a.opcao + " | " + a.dez);
+  // 08/09 00:00: passou a semana → agosto fechado, sem selo
   const b = await com("fech_0809.csv", new Date(2026, 8, 8, 0, 0));
-  igual({ fechados: "JAN,FEV,MAR,ABR,JUN,JUL,AGO", padrao: "AGO" }, { fechados: b.fechados, padrao: b.padrao }, "exportado em 08/09 00:00");
-  // ano seguinte: dezembro com realizado fecha a partir de 08/01
+  igual({ usados: "JAN,FEV,MAR,ABR,JUN,JUL,AGO", abertos: "", padrao: "AGO" }, { usados: b.usados, abertos: b.abertos, padrao: b.padrao }, "exportado em 08/09 00:00");
+  ok(!/em aberto/.test(b.sub), "selo em mês fechado: " + b.sub);
+  // ano seguinte: dezembro deixa de ser futuro (em aberto até 07/01, fechado a partir de 08/01)
   const c = await com("fech_prox_ano.csv", new Date(2027, 0, 8, 0, 0));
-  ok(c.fechados.endsWith("AGO,DEZ"), "dezembro no ano seguinte: " + c.fechados);
+  ok(c.usados.endsWith("AGO,DEZ") && c.abertos === "" && c.padrao === "DEZ", "dezembro no ano seguinte: " + JSON.stringify(c));
+  const d = await com("fech_prox_ano2.csv", new Date(2027, 0, 3, 9, 0));
+  ok(d.abertos === "DEZ" && d.padrao === "DEZ", "dezembro em aberto em 03/01: " + JSON.stringify({ a: d.abertos, p: d.padrao }));
 });
 
 teste("U1", "4205A, 4420A e 5111A viram uma unidade só (sem falso 'sem lançamento')", async () => {

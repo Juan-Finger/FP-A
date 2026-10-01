@@ -70,11 +70,14 @@ alteradas**.
 
 ## Regras confirmadas
 
-- **Mês fechado:** o mês precisa ter realizado **e** o CSV precisa ter sido exportado depois de
+- **Meses e fechamento:** um mês com realizado entra na análise assim que começa e aparece
+  com todos os números. Ele fica marcado como **em aberto** até o CSV ser exportado depois de
   **7 dias corridos** após o fim do mês (o fechamento vai até o 2º dia útil, com ajustes na
-  primeira semana). Exemplo: agosto fecha a partir de 08/09, 00:00. A referência é a data do
-  arquivo exportado (a data da importação só entra se o arquivo não informar data). O Resumo
-  da carga mostra, para cada mês em aberto, o motivo e o prazo de ajustes.
+  primeira semana). Exemplo: base de setembro exportada em 01/10 mostra setembro com os dados e
+  o selo "em aberto · prazo de ajustes até 07/10"; a partir de 08/10, setembro fica fechado.
+  O mês em aberto conta normalmente em todas as análises. O painel abre no mês mais recente
+  com dados. Mês futuro em relação à data do arquivo (ex.: provisão lançada em dezembro) fica
+  fora. A referência é a data do arquivo exportado.
 - **Pendências:** só a família 3 (receita e dedução) fica fora. A 4.2 e a 4.3 contam como
   pendência e aparecem em "Custos e despesas".
 - **Unidades unificadas** (orçado e realizado somados no destino): 4417A → 4418A, 5002A → 5001A
