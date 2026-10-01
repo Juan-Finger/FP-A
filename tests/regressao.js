@@ -201,6 +201,8 @@ TEXTO_INTENCIONAL.push(["A15", o => { if (!o.body) return;
     .replace(new RegExp("\\s*margem " + MG + "( · orçada [^\\n]*)?", "g"), "").replace(new RegExp(" · orçada " + MG, "g"), ""); }]);
 // H1: a Visão Geral ganhou a alternância "Por segmento | Por conta" acima dos cards
 TEXTO_INTENCIONAL.push(["H1", (o, n, k) => { if (k === "hub" && n.body) n.body = n.body.replace("Por segmento\nPor conta\nSEGMENTOS E UNIDADES\n", ""); }]);
+// A11: Exceções ganhou a dica de clique nas contas
+TEXTO_INTENCIONAL.push(["A11", (o, n, k) => { if (k === "exc" && n.body) n.body = n.body.replace(/ Clique numa conta para abrir a unidade nela\./g, "").replace(/\nClique numa conta para abrir a unidade nela\./g, ""); }]);
 // U1: unidade que recebe unificações mostra os códigos somados nela ("· inclui 4417A")
 TEXTO_INTENCIONAL.push(["U1", (o, n) => { if (n.kpis) n.kpis = n.kpis.replace(/ · inclui [^\n]*/g, ""); }]);
 // A3: a lista "Por conta" mudou (sem receita); os dados dela são conferidos no T02 e no teste A3
@@ -514,14 +516,29 @@ teste("A13", "exportação: centavos, contagens que fecham e unidade sem pendên
   await p.evaluate(() => { corte = 0; go({ tipo: "hub" }); });
 });
 
-teste("A11", "unidade vigiada nunca abre no detalhe (sem métricas) nem quebra a exportação", async () => {
+teste("A11", "Exceções: clicar na conta abre a unidade vigiada nela; detalhe da vigiada funciona", async () => {
   const p = await pagina("novo");
-  const r = await p.evaluate(() => { const v = DB.units.find(u => u.vig);
-    go({ tipo: "det", seg: v.seg, unit: v.cod }); const t1 = view.tipo;
-    go({ tipo: "hub" }); abreConta(v.cod, DB.accts[0].cod); const t2 = view.tipo;
-    let erro = null; try { view.unit = v.cod; exportUnidade(); } catch (e) { erro = e.message; }
-    go({ tipo: "hub" }); return { t1, t2, erro }; });
-  igual({ t1: "exc", t2: "exc", erro: null }, r, "vigiada");
+  const r = await p.evaluate(() => {
+    go({ tipo: "exc" });
+    const tr = document.querySelector(".exT tbody tr[onclick]");
+    if (!tr) return { erro: "linhas de Exceções sem clique" };
+    const conta = tr.querySelector("td").textContent.trim(); tr.click();
+    const out = { tipo: view.tipo, vig: !!(umap[view.unit] || {}).vig, busca: view.busca, filtro: view.filtro,
+      linhas: [...document.querySelectorAll(".tw tbody tr.lin td:first-child")].map(td => td.textContent.replace(/[▸▾]/g, "").trim()),
+      kpis: [...document.querySelectorAll(".kpi .lbl")].map(x => x.textContent).join("|"),
+      crumb: document.getElementById("crumb").textContent };
+    out.contaOk = out.linhas.length >= 1 && out.linhas.includes(conta);
+    let erro = null; try { exportUnidade(); } catch (e) { erro = e.message; } out.erroExp = erro;
+    document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })); out.volta = view.tipo;
+    go({ tipo: "hub" }); return out; });
+  ok(!r.erro, r.erro);
+  ok(r.tipo === "det" && r.vig && r.filtro === "todos" && r.contaOk, "não abriu a vigiada na conta: " + JSON.stringify(r));
+  ok(/Contas com movimento/.test(r.kpis) && /Exceções/.test(r.crumb), "detalhe da vigiada: " + r.kpis + " | " + r.crumb);
+  ok(r.erroExp === null && r.volta === "exc", "exportação/Esc: " + JSON.stringify({ e: r.erroExp, v: r.volta }));
+  // a exportação da vigiada gera a aba da unidade
+  const x = await baixa(p, () => { const v = DB.units.find(u => u.vig); view.tipo = "det"; view.unit = v.cod; view.seg = v.seg; exportUnidade(); });
+  ok(Object.keys(x.abas).length === 2, "exportação da vigiada: " + Object.keys(x.abas));
+  await p.evaluate(() => go({ tipo: "hub" }));
 });
 
 /* Auditoria de contraste WCAG: todo texto visível, com fundo efetivo (camadas

@@ -413,6 +413,8 @@ table.mini th.r{text-align:right}
 .exbox.limpa2{border-left:3px solid var(--grn);opacity:.6}
 .exh{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .exn{font-size:14px;font-weight:500}
+.exn.lnkun{cursor:pointer} .exn.lnkun:hover{color:var(--cy2);text-decoration:underline}
+.exT tr.clic{cursor:pointer} .exT tr.clic:hover td{background:var(--s2)}
 .exq{font-size:11.5px;color:var(--fg-neg)}
 .exok{font-size:11.5px;color:var(--fg-pos)}
 .exano{margin-left:auto;font-size:11px;color:var(--dim)}
@@ -1083,6 +1085,7 @@ const amap={}; DB.accts.forEach(a=>amap[a.cod]=a);
 // códigos que foram somados em cada unidade (unificações): destino → [origens]
 const ALIAS={};
 Object.entries(_UNIFICAR).forEach(([o,d])=>{ (ALIAS[d]=ALIAS[d]||[]).push(o); });
+const ehVigUn=cod=>!!(umap[cod]&&umap[cod].vig);   // unidade vigiada (tela de Exceções)
 const inclui=cod=>ALIAS[cod]&&ALIAS[cod].length?" · inclui "+ALIAS[cod].join(", "):"";
 // linhas de cada unidade, na mesma ordem de DB.data (as somas continuam idênticas)
 const PORU=new Map();
@@ -1213,7 +1216,7 @@ function renderNav(){
     + segs.map(s=>`<a class="${view.seg===s&&view.tipo!=='hub'?'on':''}" onclick="go({tipo:'seg',seg:${js(s)}})">
        <span class="dot" style="background:${cor(s)}"></span>${SEGNM[s]}
        <span class="n">${bys[s]||0}</span></a>`).join("")
-    + (UNS_VIG.length?`<a class="${view.tipo==='exc'?'on':''}" onclick="go({tipo:'exc'})">
+    + (UNS_VIG.length?`<a class="${view.tipo==='exc'||(view.tipo==='det'&&ehVigUn(view.unit))?'on':''}" onclick="go({tipo:'exc'})">
        <span class="dot" style="background:var(--red)"></span>Exceções
        <span class="n">${totalExcecoes()||""}</span></a>`:"")
     + `<div class="navlbl" style="padding:14px 8px 7px">Diagnóstico do ano</div>
@@ -1226,7 +1229,19 @@ function renderNav(){
 }
 
 /* ---------- KPIs ---------- */
+// cartões do detalhe de uma unidade vigiada: movimento (que não deveria existir)
+function renderKpisVigiada(){
+  const o=excecoes().find(x=>x.u.cod===view.unit)||{linhas:[],val:0,anoN:0};
+  const orc=o.linhas.reduce((s,l)=>s+l.p,0);
+  document.getElementById("kpis").innerHTML=`
+   <div class="kpi ${o.linhas.length?"r":"g"}"><div class="lbl">Contas com movimento</div><div class="v num">${o.linhas.length}</div>
+     <div class="sub">${he(view.unit)}${inclui(view.unit)} · vigiada</div></div>
+   <div class="kpi r"><div class="lbl">Valor lançado</div><div class="v num">${fmtMi(o.val)}</div><div class="sub">${faixaLbl()}</div></div>
+   <div class="kpi a"><div class="lbl">Orçado nessas contas</div><div class="v num">${fmtMi(orc)}</div><div class="sub">no período</div></div>
+   <div class="kpi"><div class="lbl">Lançamentos no ano</div><div class="v num">${o.anoN}</div><div class="sub">conta × mês</div></div>`;
+}
 function renderKpis(){
+  if(view.tipo==="det"&&ehVigUn(view.unit)){ renderKpisVigiada(); return; }
   const {a,aberto}=met();
   let sem=0,afe=0,plan=0,real=0,un=0,expo=0,alta=0;
   const scope=Object.values(a).filter(o=>
@@ -1745,7 +1760,7 @@ function renderExcecoes(){
      e deve ser repassado. Elas funcionam como sentinela: se algo aparecer, algum lançamento
      foi para o lugar errado ou a unidade ainda está ativa sem que o cadastro reflita isso.</div></div>
    ${lst.map(o=>`<div class="exbox ${o.linhas.length?"alerta2":"limpa2"}">
-      <div class="exh"><span class="exn">${he(o.u.nome)}</span>
+      <div class="exh"><span class="exn lnkun" onclick="go({tipo:'det',seg:${js(o.u.seg)},unit:${js(o.u.cod)}})">${he(o.u.nome)}</span>
         <span class="tag" style="background:rgba(143,163,184,.12);color:var(--mut)">${he(o.u.cod)}</span>
         ${o.linhas.length
           ? `<span class="exq">${o.linhas.length} conta(s) · R$ ${fmtMi(o.val)} em ${faixaLbl()}</span>`
@@ -1753,14 +1768,14 @@ function renderExcecoes(){
         <span class="exano">${o.anoN} lançamentos no ano</span></div>
       ${o.linhas.length?`<table class="mini exT"><thead><tr><th>Conta</th><th>Descrição</th>
          <th>Natureza</th><th class="r">Orçado</th><th class="r">Lançado</th><th>Meses com lançamento</th></tr></thead>
-         <tbody>${o.linhas.slice(0,12).map(l=>`<tr>
+         <tbody>${o.linhas.slice(0,12).map(l=>`<tr class="clic" onclick="abreConta(${js(o.u.cod)},${js(l.a)})">
            <td class="num" style="color:var(--dim)">${he(l.a)}</td><td>${he(l.desc)}</td>
            <td class="nat">${l.nat}</td>
            <td class="r num">${Math.abs(l.p)<EPS?"—":fmtC(l.p)}</td>
            <td class="r num" style="color:var(--fg-neg)">${fmtC(l.r)}</td>
            <td class="nat">${l.meses.join(" ")}</td></tr>`).join("")}
          </tbody></table>
-         ${o.linhas.length>12?`<div class="expl2">…e mais ${o.linhas.length-12} contas.</div>`:""}`:""}
+         <div class="expl2">${o.linhas.length>12?`…e mais ${o.linhas.length-12} contas. `:""}Clique numa conta para abrir a unidade nela.</div>`:""}
     </div>`).join("")}`;
 }
 
@@ -2079,7 +2094,7 @@ function renderContasSeg(sg){
 function linhas(){
   const {aberto,est}=met(), u=view.unit, out=[];
   dadosDe(u).forEach(d=>{
-    if(!ehPendencia(d.a)) return;                 // receita fica na aba Resultado
+    if(!ehPendencia(d.a) && !ehVigUn(u)) return;  // receita fica na aba Resultado (na vigiada, todo movimento conta)
     if(modo==="rec" && !ehRec(d.a)) return;
     const [p,r]=agr(d);
     if(Math.abs(p)<EPS && Math.abs(r)<EPS) return;
@@ -2430,7 +2445,7 @@ function montaPal(q){
     const cods=[u.cod,...(ALIAS[u.cod]||[])];   // acha a unidade também pelos códigos unificados nela
     if(termo && !semAcento(u.nome).includes(termo) && !cods.some(c=>c.toLowerCase().includes(termo))) return;
     res.push({t:SEGNM[u.seg]||u.seg,n:u.nome,x:u.cod,
-      go:()=>u.vig?go({tipo:"exc"}):go({tipo:"det",seg:u.seg,unit:u.cod})});
+      go:()=>go({tipo:"det",seg:u.seg,unit:u.cod})});
   });
 
   // contas: devolve a conta E em qual unidade ela está, dentro do escopo
@@ -2494,12 +2509,11 @@ function palGo(i){ const o=palItens[i]; if(!o||!o.go)return; fechaPal(); o.go();
 // Abre a unidade e deixa a tabela só com a conta indicada.
 function abreConta(unidade,conta){
   const u=umap[unidade]; if(!u) return;
-  if(u.vig){ go({tipo:"exc"}); return; }
   const ac=amap[conta];
   go({tipo:"det",seg:u.seg,unit:unidade});
   view.filtro="todos";
   view.busca=ac?ac.desc:conta;
-  aba="pend";
+  aba=u.vig?"var":"pend";
   renderDet();
 }
 document.addEventListener("keydown",e=>{
@@ -2545,7 +2559,7 @@ document.addEventListener("keydown",e=>{
     if(i!==j){ e.preventDefault(); setAba(ord[j]); } return; }
   if(e.key==="Escape"){
     if(document.getElementById("guia").classList.contains("on")){ fechaGuia(); return; }
-    if(view.tipo==="det") go({tipo:"seg",seg:view.seg});
+    if(view.tipo==="det") go(ehVigUn(view.unit)?{tipo:"exc"}:{tipo:"seg",seg:view.seg});
     else if(view.tipo!=="hub") go({tipo:"hub"});
   }
 });
@@ -2905,7 +2919,10 @@ function exportaConjunto(uns,nomeArq){
   baixaXLSX(nomeArq,abas);
 }
 function exportUnidade(){
-  const {a}=met(), o=a[view.unit];
+  const {a}=met(); let o=a[view.unit];
+  if(!o&&ehVigUn(view.unit)){ const u=umap[view.unit], ls=linhasUnidade(u.cod);   // vigiada: fora de met()
+    o={cod:u.cod,nome:u.nome,seg:u.seg,sem:0,orc:ls.filter(l=>Math.abs(l.p)>EPS).length,expo:0,
+       plan:ls.reduce((s,l)=>s+l.p,0),real:ls.reduce((s,l)=>s+l.r,0)}; }
   if(!o) return;
   exportaConjunto([o],`variacao_${modo==="rec"?"recorrentes_":""}${limpaNome(o.nome)}_${limpaNome(faixaLbl())}_${hoje()}.xlsx`);
 }
@@ -3087,9 +3104,9 @@ function exportLastro(){
 
 /* ---------- roteamento ---------- */
 function go(v){
-  if(v.tipo==="det" && umap[v.unit] && umap[v.unit].vig) v={tipo:"exc"};   // vigiada tem tela própria
   view={...view,...v};
-  if(v.tipo==="det"){ aba="pend"; view.filtro="sem"; view.busca=""; view.sk="st"; view.sd=1; }
+  // vigiada: o que importa é o movimento, não a pendência → abre em "Variações", com todas as contas
+  if(v.tipo==="det"){ const vg=ehVigUn(view.unit); aba=vg?"var":"pend"; view.filtro=vg?"todos":"sem"; view.busca=""; view.sk="st"; view.sd=1; }
   else { view.filtro="todos"; view.busca=""; view.sk="st"; view.sd=1; aba="pend"; }
   expandida=null;
   render();
@@ -3123,7 +3140,8 @@ var render=function(){
     document.getElementById("title").innerHTML=he(u.nome)
       +(e2&&e2.est==="muda"?' <span class="mudo big">não lançou nada no período</span>':"");
     cb.innerHTML=`<span onclick="go({tipo:'hub'})">Visão geral</span><i>›</i>`
-      +`<span onclick="go({tipo:'seg',seg:${js(view.seg)}})">${SEGNM[view.seg]}</span><i>›</i>${he(u.cod)}`;
+      +(u.vig?`<span onclick="go({tipo:'exc'})">Exceções</span>`:`<span onclick="go({tipo:'seg',seg:${js(view.seg)}})">${SEGNM[view.seg]}</span>`)
+      +`<i>›</i>${he(u.cod)}`;
   }
   document.getElementById("subtitle").innerHTML=
     `${faixaLbl()} · ${aberto?statusMesCarga(M).replace(" · sem realizado"," · sem realizado importado"):PERLBL[periodo]}`
