@@ -179,6 +179,14 @@ def bordas():
     HDR[5] = "Campo 6"
     escreve("provisao_cab.csv", pv)
     HDR = h0
+    # periodicidade (orçado 100 todo mês; realizado: T em MAR e JUN; U em FEV e MAI; W JAN–JUL;
+    # V sem orçamento e com realizado JAN–AGO, para AGO ser um mês com dados)
+    per = []
+    for conta, meses_r in [("4.1.1.08.1.06", [2, 5]), ("4.1.1.04.1.06", [1, 4]), ("4.1.1.02.1.09", list(range(7)))]:
+        per.append(linha(conta, "Desc " + conta, "4101A", "Unidade 4101A", [-100.0] * 12,
+                         [(-100.0 if i in meses_r else 0.0) for i in range(12)]))
+    per.append(linha("4.1.1.07.1.01", "Desc V", "4101A", "Unidade 4101A", [0.0] * 12, [-100.0] * 8 + [0.0] * 4))
+    escreve("periodo.csv", per)
     # mesma base em UTF-8
     escreve("utf8.csv", [linha("4.1.1.01.1.01", "Manutenção – veículos", "4101A", "São Paulo", v, v)], enc="utf-8")
     escreve("cp1252.csv", [linha("4.1.1.01.1.01", "Manutenção – veículos", "4101A", "São Paulo", v, v)])

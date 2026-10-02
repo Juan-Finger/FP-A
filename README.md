@@ -14,6 +14,15 @@ Painel interno de FP&A, **em um único arquivo**: `dashboard.html`.
 - **Visão Geral → Por conta**: contas com falha de todos os segmentos, consolidadas, com filtros
   de segmento, alcance, natureza, fixo/variável, busca e ordenação, além de exportação do
   recorte. Filtrar um único segmento dá exatamente a visão "Por conta" daquele segmento.
+- **Exportar provisão** (Por conta, segmento ou unidade): planilha no layout
+  Conta contábil · Valor · Centro de custo, com as pendências do mês. O centro de custo é formado
+  pelos 4 primeiros dígitos da unidade + os 4 últimos do CC da base.
+- **Editar recorrentes e periodicidade** (barra lateral): marca/desmarca as contas tratadas como
+  recorrentes e define em que meses cada conta deve ter lançamento (bimestral, trimestral,
+  quadrimestral, semestral, anual ou meses escolhidos). Fora desses meses, ou se já houve
+  lançamento no ciclo, a conta aparece como **Fora do ciclo** e não conta como pendência. O padrão
+  observado nos lançamentos é sugerido ("usar"). Os ajustes ficam salvos no navegador e podem ser
+  exportados/importados como `fpa-ajustes.json` para levar a outro computador ou ao time.
 - **Trocar base** (barra lateral) volta à tela de carga e mantém a tela atual.
 - Atalhos: `Ctrl+K` busca, `?` lista de atalhos, `G` guia de análise, `P` imprimir/PDF.
 

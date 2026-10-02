@@ -185,7 +185,7 @@ td.r{text-align:right}
 .st.ana{background:rgba(239,178,92,.13);color:var(--fg-warn)}
 .st.sorc{background:rgba(167,139,250,.15);color:var(--fg-lil)}
 .st.ok{background:rgba(74,222,155,.13);color:var(--fg-pos)}
-.st.zer{background:rgba(143,163,184,.10);color:var(--mut)}
+.st.zer,.st.cic{background:rgba(143,163,184,.10);color:var(--mut)}
 .st.abr{background:rgba(34,211,238,.11);color:var(--cy2)}
 .cls{color:var(--dim);font-size:11px}
 .empty{padding:44px;text-align:center;color:var(--dim);font-size:13px}
@@ -232,6 +232,19 @@ td.r{text-align:right}
 .guial .tr2 b{color:var(--tx);font-weight:500;text-align:right}
 table.mini th.r{text-align:right}
 .lnk.av{color:var(--amb)}
+.ajlnk{display:block;font-size:11.5px;margin:4px 12px 0;text-align:left}
+.guiabox.largo{width:min(860px,100%)}
+.ajtop{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:2px 0 8px}
+.ajtop input[type=search]{flex:1;min-width:160px}
+#ajrec{width:100%;border-collapse:collapse;font-size:12px}
+#ajrec th{text-align:left;font-weight:500;color:var(--mut);font-size:11px;padding:4px 6px;border-bottom:1px solid var(--line2);position:sticky;top:0;background:var(--s1)}
+#ajrec td{padding:4px 6px;border-bottom:1px solid var(--line);vertical-align:top}
+#ajrec tr.mud td:first-child{box-shadow:inset 3px 0 0 var(--cy)}
+#ajrec .ajd{color:var(--mut);font-size:11px}
+#ajrec .ajm{display:flex;flex-wrap:wrap;gap:2px 6px;margin-top:4px}
+#ajrec .ajm label{display:flex;gap:3px;align-items:center;font-size:10.5px;color:var(--mut)}
+#ajrec input{accent-color:var(--cy)}
+#ajrec .fsel{padding:3px 6px;font-size:11.5px}
 .segbar{display:flex;gap:3px;background:var(--s2);border:1px solid var(--line);
   border-radius:8px;padding:3px;margin:0 10px 4px}
 .segbar button{flex:1;background:transparent;border:none;color:var(--mut);font-family:inherit;
@@ -634,6 +647,7 @@ table.mini tr.vr td{border-top:1px solid var(--line)}
       <button data-m="geral" class="on">Plano geral</button>
       <button data-m="rec">Recorrentes</button>
     </div>
+    <button class="lnk ajlnk" id="bajrec" title="Escolher quais contas são recorrentes e em que meses cada uma deve ter lançamento">editar recorrentes e periodicidade</button>
     <div class="navlbl">Navegação</div>
     <nav class="nav" id="nav"></nav>
     </div>
@@ -812,9 +826,9 @@ function _detectaAno(h,info){
 
 /* Agregação conta × unidade. Regras de negócio idênticas ao gerador Python. */
 function _agregador(info){
-  const comb=new Map(), unit_desc=new Map(), acct_desc=new Map(), descPropria=new Set(), fus={}, ccMap=new Map();
+  const comb=new Map(), unit_desc=new Map(), acct_desc=new Map(), descPropria=new Set(), fus={}, ccList=[];
   let ccCols=[];
-  const P=new Array(12), R=new Array(12);     // valores da linha atual (reaproveitados)
+  const CCX=[];                                 // acumuladores de CC da linha atual (reaproveitados)
   const carga={arquivo:(info&&info.nome)||"",tamanho:(info&&info.tamanho)||0,modificado:(info&&info.modificado)||0,
     encoding:(info&&info.encoding)||"",linhas:0,usadas:0,vazias:0,naoA:0,dummy:0,semConta:0,curtas:0,
     invalidos:0,amostrasInv:[],cabecalho:{erros:[],nota:""}};
@@ -849,22 +863,31 @@ function _agregador(info){
     const f=co!==c?(fus[co]=fus[co]||{origem:co,destino:c,desc:_limpa(_cel(l,_CCD)),linhas:0,uns:new Set(),p:new Array(12).fill(0),r:new Array(12).fill(0)}):null;
     if(f){ f.linhas++; f.uns.add(u); }
     const k=c+"\u0000"+u;
-    let o=comb.get(k); if(!o){o=[new Array(12).fill(0),new Array(12).fill(0)];comb.set(k,o);}
-    for(let i=0;i<12;i++){
-      const pv=_num(_cel(l,_PLAN[i]),inv,li,_PLAN[i]), rv=_num(_cel(l,_REAL[i]),inv,li,_REAL[i]);
-      o[0][i]+=pv; o[1][i]+=rv; P[i]=pv; R[i]=rv;
-      if(f){ f.p[i]+=pv; f.r[i]+=rv; }
-    }
+    let o=comb.get(k); if(!o){o=[new Array(12).fill(0),new Array(12).fill(0),new Map()];comb.set(k,o);}
     // detalhamento por centro de custo, com a unidade ORIGINAL (o CC contábil usa 5002, não 5001);
     // fica pendurado na própria combinação conta × unidade (mapa pequeno, chave curta)
-    const sub=o[2]||(o[2]=new Map());
-    for(let j=0;j<ccCols.length;j++){
-      const col=ccCols[j], bruto=_cel(l,col), k3=ccCols.length===1?uo+"|"+bruto:j+"|"+uo+"|"+bruto;
+    const sub=o[2], nc=ccCols.length;
+    for(let j=0;j<nc;j++){
+      const col=ccCols[j], bruto=_cel(l,col), k3=nc===1?(uo===u?bruto:uo+"|"+bruto):j+"|"+uo+"|"+bruto;
       let x=sub.get(k3);
-      if(!x){ const cc=_limpa(bruto); x={a:c,uo,u,col,cc,p:new Array(12).fill(0),r:new Array(12).fill(0)}; sub.set(k3,x); ccMap.set(c+"\u0000"+k3,x);
+      if(!x){ const cc=_limpa(bruto); x={a:c,uo,u,col,cc,p:new Array(12).fill(0),r:new Array(12).fill(0)}; sub.set(k3,x); ccList.push(x);
         const cd=carga.ccCandidatas[j]; if(cd.exemplos.length<5&&!cd.exemplos.includes(cc)) cd.exemplos.push(cc); }
-      const xp=x.p, xr=x.r;
-      for(let i=0;i<12;i++){ xp[i]+=P[i]; xr[i]+=R[i]; }
+      CCX[j]=x;
+    }
+    const op=o[0], or=o[1];
+    if(nc===1&&!f){                              // caminho comum: uma coluna de CC, conta sem fusão
+      const xp=CCX[0].p, xr=CCX[0].r;
+      for(let i=0;i<12;i++){
+        const pv=_num(_cel(l,_PLAN[i]),inv,li,_PLAN[i]), rv=_num(_cel(l,_REAL[i]),inv,li,_REAL[i]);
+        op[i]+=pv; or[i]+=rv; xp[i]+=pv; xr[i]+=rv;
+      }
+    } else {
+      for(let i=0;i<12;i++){
+        const pv=_num(_cel(l,_PLAN[i]),inv,li,_PLAN[i]), rv=_num(_cel(l,_REAL[i]),inv,li,_REAL[i]);
+        op[i]+=pv; or[i]+=rv;
+        if(f){ f.p[i]+=pv; f.r[i]+=rv; }
+        for(let j=0;j<nc;j++){ CCX[j].p[i]+=pv; CCX[j].r[i]+=rv; }
+      }
     }
   }
   function inv(t,linha,col){carga.invalidos++;
@@ -910,7 +933,7 @@ function _agregador(info){
     const d=new Date(),z=n=>String(n).padStart(2,"0");
     const gerado=d.getFullYear()+"-"+z(d.getMonth()+1)+"-"+z(d.getDate())+"T"+z(d.getHours())+":"+z(d.getMinutes());
     const cc=[], qual={};
-    for(const x of ccMap.values()){
+    for(const x of ccList){
       const q=qual[x.col]=qual[x.col]||{n:0,ok:0}; q.n++; if(String(x.cc).replace(/\D/g,"").length>=4) q.ok++;
       if(x.p.some(v=>Math.abs(v)>0.005)||x.r.some(v=>Math.abs(v)>0.005))
         cc.push({a:x.a,uo:x.uo,u:x.u,col:x.col,cc:x.cc,p:x.p.map(_compacta),r:x.r.map(_compacta)});
@@ -1080,7 +1103,82 @@ const VIG=new Set(UNS_VIG);
 const NATLBL={rec:"Receita",ded:"Dedução",cd:"Custo/Despesa",out:"Outras rec./desp.",
               fin:"Result. financeiro",imp:"Impostos"};
 const ehRec=c=>recSet.has(c);
-const N_REC=recSet.size;
+let N_REC=recSet.size;
+
+/* ---------- AJUSTES DO ANALISTA (recorrência e periodicidade por conta) ----------
+   Não vêm da base: ficam salvos no navegador e podem ser exportados/importados como
+   arquivo .json (e, com a pasta escolhida na tela de carga, gravados em fpa-ajustes.json).
+     rec:   {conta: true|false}   sobrepõe a planilha de classificação
+     meses: {conta: [0..11]}      meses em que a conta deve ter lançamento (ausente = todo mês) */
+const AJ_VAZIO=()=>({versao:1,rec:{},meses:{}});
+let AJUSTES=AJ_VAZIO();
+function validaAjustes(o){
+  const ok=o&&typeof o==="object"&&o.rec&&typeof o.rec==="object"&&o.meses&&typeof o.meses==="object"
+    &&Object.values(o.rec).every(v=>typeof v==="boolean")
+    &&Object.values(o.meses).every(m=>Array.isArray(m)&&m.every(i=>Number.isInteger(i)&&i>=0&&i<12));
+  if(!ok) throw new Error("Arquivo de ajustes inválido: esperado {rec:{…}, meses:{…}} exportado pelo painel.");
+  return {versao:1,rec:{...o.rec},meses:Object.fromEntries(Object.entries(o.meses).map(([k,v])=>[k,[...new Set(v)].sort((a,b)=>a-b)]).filter(([k,v])=>v.length&&v.length<12))};
+}
+function aplicaAjustes(){
+  recSet.clear();
+  DB.accts.forEach(a=>{ const v=a.cod in AJUSTES.rec?AJUSTES.rec[a.cod]:!!a.r; if(v) recSet.add(a.cod); });
+  N_REC=recSet.size;
+  for(const k in cache) delete cache[k];
+  for(const k in cacheHist) delete cacheHist[k];
+  _memo.clear();
+}
+function salvaAjustes(o){
+  AJUSTES=validaAjustes(o);
+  try{ localStorage.setItem("fpa-ajustes",JSON.stringify(AJUSTES)); }catch(e){}
+  if(window.__gravaAjustesPasta__) window.__gravaAjustesPasta__(textoAjustes());   // pasta (tela de carga)
+  aplicaAjustes();
+  if(window.__APP_PRONTO__) render();
+}
+const textoAjustes=()=>JSON.stringify({...AJUSTES,salvoEm:new Date().toISOString()},null,1);
+function importaAjustesTexto(t){ let o; try{ o=JSON.parse(t); }catch(e){ throw new Error("Arquivo de ajustes inválido: não é JSON."); } salvaAjustes(o); }
+
+// periodicidade: a conta só é cobrada no mês esperado e se nada foi lançado no ciclo
+// (do mês esperado anterior até ele)
+const esperado=(a,i)=>{ const ms=AJUSTES.meses[a]; return !ms||ms.includes(i); };
+function foraDoCiclo(d,meses){
+  const ms=AJUSTES.meses[d.a]; if(!ms) return false;
+  const esp=meses.filter(i=>ms.includes(i));
+  if(!esp.length) return true;                                // nenhum mês esperado no período
+  const i=esp[esp.length-1], ant=ms.filter(x=>x<i).pop();
+  for(let j=ant==null?0:ant+1;j<=i;j++) if(DB.fechado[j]&&Math.abs(d.r[j])>EPS) return true;
+  return false;
+}
+// status de uma linha conta × unidade, já considerando a periodicidade da conta
+function statusConta(d,p,r,aberto,estU,meses){
+  const st=statusOf(p,r,aberto,estU);
+  return st==="sem"&&foraDoCiclo(d,meses||mesesAtivos())?"cic":st;
+}
+const MESES_ABR=["JAN","FEV","MAR","ABR","MAI","JUN","JUL","AGO","SET","OUT","NOV","DEZ"];
+function tipoPeriodo(ms){
+  if(!ms||ms.length>=12) return "mensal";
+  if(ms.length===1) return "anual";
+  const d=ms.slice(1).map((x,k)=>x-ms[k]);
+  if(d.every(x=>x===d[0])&&ms.length*d[0]===12) return {2:"bimestral",3:"trimestral",4:"quadrimestral",6:"semestral"}[d[0]]||"personalizada";
+  return "personalizada";
+}
+const perTexto=ms=>ms?`${tipoPeriodo(ms)} (${ms.map(i=>MESES_ABR[i]).join(", ")})`:"mensal";
+// classificação exibida: a da planilha ou a ajustada pelo analista, mais a periodicidade
+function recTexto(a){
+  const r=a in AJUSTES.rec?(AJUSTES.rec[a]?"Recorrente":"Não recorrente")+" (ajustado)":((amap[a]||{}).rec||"—");
+  return r+(AJUSTES.meses[a]?" · "+perTexto(AJUSTES.meses[a]):"");
+}
+// meses em que a conta costuma ser lançada (maioria das unidades), completando o ciclo
+function sugereMeses(a){
+  const fech=[...Array(12).keys()].filter(i=>DB.fechado[i]);
+  const cont=fech.map(i=>DB.data.filter(d=>d.a===a&&!VIG.has(d.u)&&Math.abs(d.r[i])>EPS).length);
+  const mx=Math.max(0,...cont); if(!mx) return null;
+  const obs=fech.filter((i,k)=>cont[k]>=Math.max(1,mx*0.5));
+  if(obs.length===fech.length) return null;                 // lança todo mês: mensal
+  if(obs.length<2) return null;                             // pouco histórico para dizer o ciclo
+  const d=obs.slice(1).map((x,k)=>x-obs[k]);
+  if(d.every(x=>x===d[0])&&[2,3,4,6].includes(d[0])){ const out=[]; for(let i=obs[0]%d[0];i<12;i+=d[0]) out.push(i); return out; }
+  return null;                                               // sem ciclo regular (ex.: parou de lançar)
+}
 
 // ano da base (detectado na carga) — nada de ano fixo no código
 const ANO=DB.ano||new Date().getFullYear(), AA=String(ANO).slice(-2);
@@ -1130,8 +1228,8 @@ const fmtMi=n=>{const a=Math.abs(n);
   if(a>=999500)return (n<0?"−":"")+(a/1e6).toFixed(1).replace(".",",")+" mi";
   if(a>=1e3)return (n<0?"−":"")+(a/1e3).toFixed(0)+" mil"; return fmtC(n);};
 
-const ST={sem:"Sem lançamento",sorc:"Sem orçamento",ana:"Analisar",ok:"Ok com o orçado",zer:"Zerado",abr:"Mês em aberto"};
-const STO={sem:0,sorc:1,ana:2,ok:3,zer:4,abr:5};
+const ST={sem:"Sem lançamento",sorc:"Sem orçamento",ana:"Analisar",ok:"Ok com o orçado",zer:"Zerado",cic:"Fora do ciclo",abr:"Mês em aberto"};
+const STO={sem:0,sorc:1,ana:2,ok:3,zer:4,cic:5,abr:6};
 
 const amap={}; DB.accts.forEach(a=>amap[a.cod]=a);
 // códigos que foram somados em cada unidade (unificações): destino → [origens]
@@ -1185,7 +1283,7 @@ function refMeses(){
   return out;
 }
 function confDe(d){
-  const ref=refMeses(); if(!ref.length) return "nd";          // sem mês anterior para comparar
+  const ref=refMeses().filter(i=>esperado(d.a,i)); if(!ref.length) return "nd";   // sem mês anterior (esperado) para comparar
   const n=ref.filter(i=>Math.abs(d.r[i])>EPS).length;
   if(n===0) return "baixa";
   if(n>=ref.length-1) return "alta";
@@ -1234,7 +1332,7 @@ function met(){
     let p=0,r=0; ms.forEach(i=>{p+=d.p[i];r+=d.r[i];});
     o.plan+=p; o.real+=r;
     if(Math.abs(p)>EPS) o.orc++;
-    const stt=statusOf(p,r,aberto,est[d.u]);
+    const stt=statusConta(d,p,r,aberto,est[d.u],ms);
     if(stt==="sem"){
       o.sem++; o.expo+=Math.abs(p); o.pSem+=p;
       if(confDe(d)==="alta") o.alta++;
@@ -1445,7 +1543,7 @@ function contasDasUnidades(uns){
     if(modo==="rec" && !ehRec(d.a)) return;
     const [p,r]=agr(d);
     if(corte>0 && Math.abs(p)<corte && Math.abs(r)<corte) return;
-    const st=statusOf(p,r,aberto,est[d.u]);
+    const st=statusConta(d,p,r,aberto,est[d.u]);
     const o=mp[d.a]=mp[d.a]||{a:d.a,desc:(amap[d.a]||{}).desc||d.a,rec:ehRec(d.a),
                               orc:0,sem:0,val:0,uns:[],plan:0,real:0};
     if(Math.abs(p)>EPS) o.orc++;
@@ -1650,7 +1748,7 @@ function dadosProvisao(o){
     if(!uns.has(d.u)||!relevante(d)) return;
     if(o.contas==="sel"&&!provSel.has(d.a)) return;
     const p=d.p[M], r=d.r[M];
-    const sem=statusOf(p,r,false,est[d.u])==="sem";
+    const sem=statusConta(d,p,r,false,est[d.u],[M])==="sem";
     const parc=!sem&&o.parcial&&Math.abs(p)>EPS&&Math.abs(r)>EPS&&Math.sign(p)===Math.sign(r)&&Math.abs(r)<Math.abs(p)-EPS;
     if(!sem&&!parc) return;
     let total=o.valor==="media"&&ant.length?ant.reduce((s,i)=>s+Math.abs(d.r[i]),0)/ant.length:Math.abs(p);
@@ -1975,6 +2073,8 @@ function _semLastro(minMeses){
 
 /* ---------- HISTÓRICO DE PENDÊNCIAS POR MÊS ---------- */
 const cacheHist={};
+try{ const s=localStorage.getItem("fpa-ajustes"); if(s) AJUSTES=validaAjustes(JSON.parse(s)); }catch(e){ AJUSTES=AJ_VAZIO(); }
+aplicaAjustes();
 function histPendencias(cod){
   const key=cod+"|"+modo;
   if(cacheHist[key]) return cacheHist[key];
@@ -1988,7 +2088,7 @@ function histPendencias(cod){
     let n=0,val=0;
     linhas.forEach(d=>{
       const p=d.p[i],r=d.r[i];
-      if(statusOf(p,r,false,est)==="sem"){n++;val+=Math.abs(p);}
+      if(statusConta(d,p,r,false,est,[i])==="sem"){n++;val+=Math.abs(p);}
     });
     out.push({mes:DB.meses[i],n,val,muda:est==="muda",inativa:est==="inativa",parcial:ehParcial(i),i});
   }
@@ -2008,7 +2108,7 @@ function semLancarHa(cod){
     let seq=0,val=0,ult=null,desde=null;
     for(let k=fech.length-1;k>=0;k--){
       const i=fech[k];
-      if(ehParcial(i)) continue;                 // mês parcial não conta nem interrompe
+      if(ehParcial(i)||!esperado(d.a,i)) continue;   // mês parcial ou fora do ciclo não conta nem interrompe
       const temO=Math.abs(d.p[i])>EPS, temR=Math.abs(d.r[i])>EPS;
       if(temR){ ult=DB.meses[i]; break; }
       if(temO){ seq++; val+=Math.abs(d.p[i]); desde=DB.meses[i]; }
@@ -2141,7 +2241,7 @@ function contasDoMes(cod,i){
   const est=lancou?"ativa":(antes?"muda":"inativa");
   linhas.forEach(d=>{
     const p=d.p[i], r=d.r[i];
-    if(statusOf(p,r,false,est)!=="sem") return;
+    if(statusConta(d,p,r,false,est,[i])!=="sem") return;
     out.push({a:d.a,desc:(amap[d.a]||{}).desc||d.a,v:Math.abs(p),rec:ehRec(d.a)});
   });
   return out.sort((x,y)=>y.v-x.v);
@@ -2203,7 +2303,7 @@ function contaNasUnidades(uns,conta){
     let p=0,r=0;
     if(d){ const [pp,rr]=agr(d); p=pp; r=rr; }
     if(Math.abs(p)<EPS&&Math.abs(r)<EPS&&!d) return;   // conta nem existe nessa unidade
-    const st=statusOf(p,r,aberto,est[u.cod]);
+    const st=d?statusConta(d,p,r,aberto,est[u.cod]):statusOf(p,r,aberto,est[u.cod]);
     linhas.push({cod:u.cod,nome:u.nome,seg:u.seg,p,r,v:r-p,st,
                  cf:d?confDe(d):"baixa"});
   });
@@ -2275,10 +2375,10 @@ function linhas(){
     const ac=amap[d.a]||{desc:"",rec:"—",fv:"—"};
     out.push({a:d.a,desc:ac.desc,p,r,v:r-p,
       pct:Math.abs(p)>EPS?(r-p)/Math.abs(p):null,
-      st:statusOf(p,r,aberto,est[u]), cf:confDe(d),
+      st:statusConta(d,p,r,aberto,est[u]), cf:confDe(d),
       nat:natureza(d.a), fav:favor(r-p), hist:histDe(d),
       rec:ehRec(d.a), d,
-      cls:(ac.fv||"—")+" · "+(ac.rec||"—")});});
+      cls:(ac.fv||"—")+" · "+recTexto(d.a)});});
   return out;
 }
 // tabela mês a mês de uma conta (expansão da linha)
@@ -2351,7 +2451,7 @@ function atualizaTabelaDet(){
 function renderDet(){
   const base=linhas();
   const cont={todos:base.length}; base.forEach(r=>cont[r.st]=(cont[r.st]||0)+1);
-  const chips=[["todos","Todas"],["sem","Sem lançamento"],["sorc","Sem orçamento"],["ana","Analisar"],["ok","Ok"],["zer","Zerado"]]
+  const chips=[["todos","Todas"],["sem","Sem lançamento"],["sorc","Sem orçamento"],["ana","Analisar"],["ok","Ok"],["zer","Zerado"],["cic","Fora do ciclo"]]
     .filter(([k])=>k==="todos"||cont[k])
     .map(([k,l])=>`<div class="chip ${view.filtro===k?'on':''}" onclick="setF(${js(k)})">${l}<span class="c num">${cont[k]||0}</span></div>`).join("");
 
@@ -2635,7 +2735,7 @@ function montaPal(q){
         const [p,r]=agr(d);
         if(Math.abs(p)<EPS && Math.abs(r)<EPS) return;
         ocor.push({u:d.u,nome:(umap[d.u]||{}).nome||d.u,
-                   st:statusOf(p,r,aberto,est[d.u]),v:Math.abs(p)||Math.abs(r)});
+                   st:statusConta(d,p,r,aberto,est[d.u]),v:Math.abs(p)||Math.abs(r)});
       });
       // pendências primeiro, depois maior valor
       ocor.sort((x,y)=>(x.st==="sem"?0:1)-(y.st==="sem"?0:1)||y.v-x.v);
@@ -2877,7 +2977,7 @@ function semLancEscopo(){
   DB.data.forEach(d=>{
     if(!un.has(d.u)||!relevante(d)) return;
     const [p,r]=agr(d);
-    if(statusOf(p,r,aberto,est[d.u])!=="sem") return;
+    if(statusConta(d,p,r,aberto,est[d.u])!=="sem") return;
     out.push({u:d.u,a:d.a,p,cf:confDe(d),hist:histDe(d)});
   });
   return out;
@@ -2888,7 +2988,7 @@ function topContasUnidade(cod,n){
   dadosDe(cod).forEach(d=>{
     if(!relevante(d)) return;
     const [p,r]=agr(d);
-    if(statusOf(p,r,aberto,est[cod])!=="sem") return;
+    if(statusConta(d,p,r,aberto,est[cod])!=="sem") return;
     out.push({a:d.a,p:Math.abs(p),cf:confDe(d)});
   });
   out.sort((x,y)=>y.p-x.p);
@@ -3038,9 +3138,9 @@ function linhasUnidade(cod){
     out.push({a:d.a,desc:ac.desc,nat:natureza(d.a),p,r,v:r-p,d,
       pct:Math.abs(p)>EPS?((r-p)/Math.abs(p)*100):null,
       fav:favor(r-p),
-      st:statusOf(p,r,aberto,est[cod]), cf:confDe(d), hist:histDe(d),
+      st:statusConta(d,p,r,aberto,est[cod]), cf:confDe(d), hist:histDe(d),
       rec:ehRec(d.a)?"Sim":"Nao",
-      cls:(ac.fv||"—")+" · "+(ac.rec||"—")});
+      cls:(ac.fv||"—")+" · "+recTexto(d.a)});
   });
   out.sort((x,y)=>(STO[x.st]-STO[y.st])||Math.abs(y.p)-Math.abs(x.p));
   return out;
@@ -3366,9 +3466,99 @@ function carimbo(){
   el.innerHTML=txt+`<br><button class="lnk${av.length?" av":""}" id="bcarga">${av.length?`⚠ ${av.length} aviso(s) na carga`:"Resumo da carga"}</button>`
     +` · <button class="lnk" id="btroca" title="Volta à tela de carga mantendo a tela atual no endereço">Trocar base</button>`;
   document.getElementById("bcarga").onclick=()=>{ if(window.fechaMenu) fechaMenu(); abreCarga(); };
+  const baj=document.getElementById("bajrec"); if(baj) baj.onclick=()=>{ if(window.fechaMenu) fechaMenu(); abreAjustesRec(); };
   // nova base: recarrega a página (o endereço guarda a tela atual) e volta à tela de carga
   document.getElementById("btroca").onclick=()=>location.reload();
   }catch(e){}
+}
+
+/* ---------- editor de recorrentes e periodicidade ---------- */
+let ajRasc=null, ajFiltro={q:"",ver:"todas"};
+const PER_PASSO={bimestral:2,trimestral:3,quadrimestral:4,semestral:6,anual:12};
+function contasAjuste(){
+  const usadas=new Set(DB.data.map(d=>d.a));
+  return DB.accts.filter(a=>usadas.has(a.cod)&&!a.cod.startsWith("3"));
+}
+const recRasc=a=>a.cod in ajRasc.rec?ajRasc.rec[a.cod]:!!a.r;
+function linhaAjuste(a){
+  const ms=ajRasc.meses[a.cod], tp=tipoPeriodo(ms), sug=sugereMeses(a.cod), mud=(a.cod in ajRasc.rec)||!!ms;
+  const ops=["mensal","bimestral","trimestral","quadrimestral","semestral","anual","personalizada"].map(t=>`<option${t===tp?" selected":""}>${t}</option>`).join("");
+  return `<tr data-a="${he(a.cod)}"${mud?' class="mud"':""}>
+    <td><input type="checkbox" class="ajr"${recRasc(a)?" checked":""} aria-label="Recorrente: ${he(a.cod)}" onchange="ajRec(${js(a.cod)},this.checked)"></td>
+    <td><b>${he(a.cod)}</b> ${he(a.desc||"")}<div class="ajd">planilha: ${a.r?"recorrente":"não recorrente"}${sug?` · lançamentos observados: ${perTexto(sug)} <button class="lnk" onclick="ajUsa(${js(a.cod)})">usar</button>`:""}</div></td>
+    <td><select class="fsel" aria-label="Periodicidade: ${he(a.cod)}" onchange="ajPer(${js(a.cod)},this.value)">${ops}</select>
+      ${ms?`<div class="ajm">${MESES_ABR.map((m,i)=>`<label><input type="checkbox"${ms.includes(i)?" checked":""} onchange="ajMes(${js(a.cod)},${i},this.checked)">${m}</label>`).join("")}</div>`:""}</td></tr>`;
+}
+function desenhaAjustes(){
+  const tb=document.querySelector("#ajrec tbody"); if(!tb) return;
+  const q=semAcento(ajFiltro.q);
+  const lst=contasAjuste().filter(a=>(!q||semAcento(a.cod+" "+(a.desc||"")).includes(q))
+    &&(ajFiltro.ver==="todas"||(ajFiltro.ver==="rec"?recRasc(a):(a.cod in ajRasc.rec)||!!ajRasc.meses[a.cod])));
+  tb.innerHTML=lst.map(linhaAjuste).join("")||`<tr><td colspan="3" class="ajd">Nenhuma conta com esse filtro.</td></tr>`;
+  const n=Object.keys(ajRasc.rec).length+Object.keys(ajRasc.meses).filter(k=>!(k in ajRasc.rec)).length;
+  document.getElementById("ajInfo").textContent=`${lst.length} conta(s) · ${n} ajustada(s)`;
+}
+function redesenhaLinha(cod){
+  const tr=document.querySelector(`#ajrec tr[data-a="${CSS.escape(cod)}"]`);
+  if(tr) tr.outerHTML=linhaAjuste(amap[cod]);
+}
+function ajRec(cod,v){ if(v===!!amap[cod].r) delete ajRasc.rec[cod]; else ajRasc.rec[cod]=v; redesenhaLinha(cod); }
+function ajPer(cod,t){
+  if(t==="mensal"){ delete ajRasc.meses[cod]; }
+  else if(t!=="personalizada"){
+    const ini=(ajRasc.meses[cod]||sugereMeses(cod)||[0])[0], passo=PER_PASSO[t], out=[];
+    for(let i=ini%passo;i<12;i+=passo) out.push(i);
+    ajRasc.meses[cod]=t==="anual"?[ini]:out;
+  } else if(!ajRasc.meses[cod]) ajRasc.meses[cod]=[...Array(12).keys()];
+  redesenhaLinha(cod);
+}
+function ajMes(cod,i,on){
+  const s=new Set(ajRasc.meses[cod]||[...Array(12).keys()]); on?s.add(i):s.delete(i);
+  const ms=[...s].sort((a,b)=>a-b);
+  if(ms.length===12) delete ajRasc.meses[cod]; else ajRasc.meses[cod]=ms;
+  redesenhaLinha(cod);
+}
+function ajUsa(cod){ const s=sugereMeses(cod); if(s) ajRasc.meses[cod]=s; else delete ajRasc.meses[cod]; redesenhaLinha(cod); }
+function abreAjustesRec(){
+  ajRasc={rec:{...AJUSTES.rec},meses:JSON.parse(JSON.stringify(AJUSTES.meses))};
+  const el=document.getElementById("guia");
+  el.innerHTML=`<div class="guiabox largo" role="dialog" aria-modal="true" aria-labelledby="ajt">
+    <div class="guiah"><div><h2 class="gt" id="ajt">Recorrentes e periodicidade</h2>
+      <div class="gs">Desmarque contas que não devem ser cobradas como recorrentes. Em contas lançadas só em alguns meses
+      (bimestral, trimestral…), escolha os meses: fora deles, ou se já houve lançamento no ciclo, a conta aparece como
+      "Fora do ciclo" em vez de "Sem lançamento".</div></div>
+      <button class="gx" aria-label="Fechar" onclick="fechaGuia()">✕</button></div>
+    <div class="guial">
+      <div class="ajtop"><input type="search" class="fsel" placeholder="buscar conta" aria-label="Buscar conta"
+          value="${he(ajFiltro.q)}" oninput="ajFiltro.q=this.value;desenhaAjustes()">
+        <select class="fsel" aria-label="Mostrar" onchange="ajFiltro.ver=this.value;desenhaAjustes()">
+          ${[["todas","Todas as contas"],["rec","Só recorrentes"],["aj","Só ajustadas"]].map(([v,t])=>`<option value="${v}"${ajFiltro.ver===v?" selected":""}>${t}</option>`).join("")}</select>
+        <span class="ajd" id="ajInfo" role="status" aria-live="polite"></span></div>
+      <table id="ajrec"><thead><tr><th>Rec.</th><th>Conta</th><th>Periodicidade</th></tr></thead><tbody></tbody></table>
+      <div class="provbt">
+        <button class="xbtn" onclick="exportaAjustes()">exportar ajustes (.json)</button>
+        <label class="xbtn" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.querySelector('input').click()}">importar ajustes
+          <input type="file" accept=".json,application/json" hidden onchange="importaAjustesArq(this)"></label>
+        <button class="xbtn" onclick="if(confirm('Descartar todos os ajustes e voltar à classificação da planilha?')){ajRasc={rec:{},meses:{}};desenhaAjustes();}">restaurar padrão</button>
+        <span style="flex:1"></span>
+        <button class="xbtn" onclick="fechaGuia()">cancelar</button>
+        <button class="xbtn" id="ajSalvar" onclick="salvaAjustes({versao:1,...ajRasc});fechaGuia()">salvar</button></div>
+    </div>
+    <div class="guiaf">Os ajustes ficam salvos neste navegador${window.__gravaAjustesPasta__?" e no arquivo fpa-ajustes.json da pasta":""}. Exporte o .json para levar a outro computador ou compartilhar com o time.</div></div>`;
+  el.classList.add("on"); modal(el,true); el.querySelector(".gx").focus();
+  desenhaAjustes();
+}
+function exportaAjustes(){
+  const t=JSON.stringify({versao:1,...ajRasc,salvoEm:new Date().toISOString()},null,1);
+  const el=document.createElement("a"); el.href=URL.createObjectURL(new Blob([t],{type:"application/json"}));
+  el.download="fpa-ajustes.json"; document.body.appendChild(el); el.click(); document.body.removeChild(el);
+  URL.revokeObjectURL(el.href);
+}
+function importaAjustesArq(inp){
+  const f=inp.files&&inp.files[0]; if(!f) return;
+  f.text().then(t=>{ const o=validaAjustes(JSON.parse(t)); ajRasc={rec:o.rec,meses:o.meses}; desenhaAjustes(); })
+   .catch(e=>alert(/ajustes/.test(e.message)?e.message:"Arquivo de ajustes inválido: não é JSON."));
+  inp.value="";
 }
 
 /* ---------- resumo da carga (conciliação com o Plano) ---------- */
@@ -3555,6 +3745,7 @@ render=protege(render,"render");
   document.querySelectorAll("#perbar button").forEach(b=>b.onclick=()=>{
     periodo=b.dataset.p; sincronizaBotoes(); render();});
   render();
+  window.__APP_PRONTO__=true;
   if(DB.carga&&(DB.carga.invalidos||DB.carga.curtas)) abreCarga();
 })();
 </script>

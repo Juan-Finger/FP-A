@@ -976,6 +976,59 @@ teste("P1", "provisão: conta, valor e centro de custo (unidade + 4 últimos do 
   await q.context().close();
 });
 
+teste("R3", "periodicidade: fora do mês esperado ou já lançado no ciclo não é pendência", async () => {
+  const p = await abre(NOVO, "periodo.csv");
+  const r = await p.evaluate(() => {
+    const st = (a, m) => { M = m; periodo = "mes"; for (const k in cache) delete cache[k]; view.unit = "4101A";
+      const l = linhas().find(x => x.a === a); return l ? l.st : "-"; };
+    const antes = { tAgo: st("4.1.1.08.1.06", 7), uJun: st("4.1.1.04.1.06", 5), uMar: st("4.1.1.04.1.06", 2) };
+    const sug = sugereMeses("4.1.1.08.1.06");
+    salvaAjustes({ versao: 1, rec: {}, meses: { "4.1.1.08.1.06": [2, 5, 8, 11], "4.1.1.04.1.06": [2, 5, 8, 11] } });
+    const depois = { tAgo: st("4.1.1.08.1.06", 7), tJun: st("4.1.1.08.1.06", 5), uJun: st("4.1.1.04.1.06", 5), uMar: st("4.1.1.04.1.06", 2),
+      wAgo: st("4.1.1.02.1.09", 7), tFev: st("4.1.1.08.1.06", 1) };
+    M = 7; for (const k in cache) delete cache[k];
+    const kpi = met().a["4101A"].sem;
+    const prov = dadosProvisao({ escopo: "todos", contas: "todas", valor: "orc", parcial: false, ppr: false }).linhas.map(l => l.conta);
+    const hist = histPendencias("4101A").slice(0, 8).map(m => m && m.n).join(",");
+    salvaAjustes({ versao: 1, rec: {}, meses: {} });
+    return { antes, sug, depois, kpi, prov, hist }; });
+  igual({ tAgo: "sem", uJun: "sem", uMar: "sem" }, r.antes, "sem periodicidade");
+  igual([2, 5, 8, 11], r.sug, "sugestão pelo padrão observado (MAR, JUN → trimestral)");
+  // T: AGO não é mês esperado; JUN lançou. U: JUN e MAR sem lançamento, mas lançou em MAI e FEV (no ciclo). W segue mensal.
+  igual({ tAgo: "cic", tJun: "ok", uJun: "cic", uMar: "cic", wAgo: "sem", tFev: "cic" }, r.depois, "com trimestral MAR/JUN/SET/DEZ");
+  ok(r.kpi === 1 && r.prov.join() === "4.1.1.02.1.09", "KPI/provisão só com a mensal: " + JSON.stringify({ k: r.kpi, p: r.prov }));
+  ok(r.hist === "0,0,0,0,0,0,0,1", "histórico: " + r.hist);
+  await p.context().close();
+});
+
+teste("R4", "editar recorrentes: marca/desmarca, salva no navegador, exporta e importa", async () => {
+  const p = await abre(NOVO, "periodo.csv");
+  const r = await p.evaluate(() => {
+    const antes = [...recSet].sort();
+    abreAjustesRec();
+    const linha = cod => [...document.querySelectorAll("#ajrec tbody tr")].find(tr => tr.dataset.a === cod);
+    linha("4.1.1.08.1.06").querySelector("input.ajr").click();       // estava recorrente → deixa de ser
+    linha("4.1.1.02.1.09").querySelector("input.ajr").click();
+    document.getElementById("ajSalvar").click();
+    const depois = [...recSet].sort(), nrec = N_REC, aberto = document.getElementById("guia").classList.contains("on");
+    let guardado = null; try { guardado = JSON.parse(localStorage.getItem("fpa-ajustes")); } catch (e) {}
+    view.unit = "4101A"; const cls = linhas().find(l => l.a === "4.1.1.08.1.06").cls;
+    const json = textoAjustes();
+    salvaAjustes({ versao: 1, rec: {}, meses: {} }); const limpo = [...recSet].sort();
+    importaAjustesTexto(json); const reimportado = [...recSet].sort();
+    let erro = null; try { importaAjustesTexto('{"x":1}'); } catch (e) { erro = e.message; }
+    salvaAjustes({ versao: 1, rec: {}, meses: {} });
+    return { antes, depois, nrec, aberto, guardado, cls, limpo, reimportado, erro }; });
+  const esperado = r.antes.filter(a => a !== "4.1.1.08.1.06" && a !== "4.1.1.02.1.09");
+  igual(esperado, r.depois, "recorrentes depois de editar");
+  ok(r.nrec === esperado.length && !r.aberto, "N_REC/janela: " + JSON.stringify({ n: r.nrec, a: r.aberto }));
+  igual({ "4.1.1.08.1.06": false, "4.1.1.02.1.09": false }, r.guardado && r.guardado.rec, "salvo no navegador");
+  ok(/ajustad/.test(r.cls), "classificação não indica ajuste: " + r.cls);
+  igual(r.antes, r.limpo, "restaurar padrão"); igual(r.depois, r.reimportado, "reimportar");
+  ok(/ajustes/i.test(r.erro || ""), "arquivo inválido aceito: " + r.erro);
+  await p.context().close();
+});
+
 /* ================================================================== */
 (async () => {
   const filtro = process.argv.slice(2).filter(a => !a.startsWith("--"));
