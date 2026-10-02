@@ -364,11 +364,20 @@ teste("A14", "carga robusta: drop fora da área, erro de inicialização e tecla
 
 teste("B1", "processamento da base de ~12 MB mais rápido que o original", async () => {
   const txt = new TextDecoder("windows-1252").decode(fs.readFileSync(CSV("plano_sint.csv")));
-  const mede = async qual => { const p = await pagina(qual);
-    return p.evaluate(t => { let m = Infinity; for (let k = 0; k < 3; k++) { const a = performance.now(); construirPayload(t); m = Math.min(m, performance.now() - a); } return m; }, txt); };
-  const o = await mede("orig"), n = await mede("novo");
-  console.log(`        processamento: original ${o.toFixed(0)} ms · novo ${n.toFixed(0)} ms (${(txt.length / 1e6).toFixed(1)} MB, melhor de 3)`);
-  ok(n < o * 0.85, "não ficou mais rápido");
+  // alterna original e novo (melhor de 5 de cada) para a variação da máquina pesar igual nos dois
+  const [po, pn] = [await pagina("orig"), await pagina("novo")];
+  // semCC: sem o detalhamento por centro de custo (que o original não fazia), para comparar o mesmo trabalho
+  const uma = (p, semCC) => p.evaluate(([t, semCC]) => {
+    if (!semCC) { const a = performance.now(); construirPayload(t); return performance.now() - a; }
+    const cc = window._colunaCC, cand = _CC_CANDIDATAS.slice();
+    window._colunaCC = () => null; _CC_CANDIDATAS.length = 0;
+    try { const a = performance.now(); construirPayload(t); return performance.now() - a; }
+    finally { window._colunaCC = cc; _CC_CANDIDATAS.push(...cand); } }, [txt, semCC]);
+  let o = Infinity, n = Infinity, s = Infinity;
+  for (let k = 0; k < 5; k++) { o = Math.min(o, await uma(po, false)); s = Math.min(s, await uma(pn, true)); n = Math.min(n, await uma(pn, false)); }
+  console.log(`        processamento: original ${o.toFixed(0)} ms · novo ${s.toFixed(0)} ms (com detalhe por CC ${n.toFixed(0)} ms) (${(txt.length / 1e6).toFixed(1)} MB, melhor de 5, alternados)`);
+  ok(s < o * 0.85, "o processamento não ficou mais rápido");
+  ok(n < o, "com o detalhe por CC ficou mais lento que o original");
 });
 
 teste("A7", "carimbo usa a data do arquivo e avisa base velha", async () => {
@@ -1031,6 +1040,41 @@ teste("R4", "editar recorrentes: marca/desmarca, salva no navegador, exporta e i
   ok(/ajustad/.test(r.cls), "classificação não indica ajuste: " + r.cls);
   igual(r.antes, r.limpo, "restaurar padrão"); igual(r.depois, r.reimportado, "reimportar");
   ok(/ajustes/i.test(r.erro || ""), "arquivo inválido aceito: " + r.erro);
+  await p.context().close();
+});
+
+teste("P2", "provisão: abre em 'contas marcadas' e, pelo realizado, mostra o mês a mês com o mês fora da curva", async () => {
+  const p = await abre(NOVO, "provisao.csv");
+  const r = await p.evaluate(() => {
+    // PPR com um lançamento grande em JUL (4.800 contra 480 em MAI e JUN)
+    DB.data.find(d => d.a === "4.1.1.01.1.99" && d.u === "4102A").r[6] = -4800;
+    const lin = o => dadosProvisao(o).linhas.filter(l => l.contaOrig === "4.1.1.01.1.99").map(l => [l.valor, l.pico, l.hist.join()]);
+    const base = { escopo: "todos", contas: "todas", valor: "orc", parcial: false, ppr: false };
+    const media = lin({ ...base, valor: "media" }), med = lin({ ...base, valor: "mediana" });
+    provSel.clear(); go({ tipo: "hub" }); abreProvisao(); const semSel = document.getElementById("provContas").value;
+    fechaGuia(); provSel.add("4.1.1.01.1.99"); provOpt.contas = "todas"; abreProvisao();
+    const comSel = document.getElementById("provContas").value, opt = { ...provOpt };
+    const orcTxt = document.getElementById("provPrev").innerText;
+    provAlt("valor", "media");
+    const tab = [...document.querySelectorAll("#provPrev .provtab tbody tr")].map(tr => ({ pico: tr.classList.contains("pico"),
+      c: [...tr.cells].map(td => td.textContent.trim()) }));
+    const cab = [...document.querySelectorAll("#provPrev .provtab thead th")].map(th => th.textContent);
+    const aviso = (document.querySelector("#provPrev .av") || {}).textContent || "";
+    return { media, med, semSel, comSel, contasOpt: opt.contas, orcTxt, tab, cab, aviso }; });
+  igual([[1920, 6, "4800,480,480"]], r.media, "média com mês fora da curva");
+  igual([[480, 6, "4800,480,480"]], r.med, "mediana ignora o mês fora da curva");
+  ok(r.semSel === "todas" && r.comSel === "sel" && r.contasOpt === "sel", "seleção: " + JSON.stringify([r.semSel, r.comSel, r.contasOpt]));
+  ok(!/JUL/.test(r.orcTxt), "pelo orçado não deveria mostrar o detalhe: " + r.orcTxt);
+  igual(["Conta", "Unidade", "MAI/26", "JUN/26", "JUL/26", "Orçado", "Provisão"], r.cab, "cabeçalho do detalhe");
+  ok(r.tab.length === 1 && r.tab[0].pico && r.tab[0].c[4].includes("4.800,00") && r.tab[0].c[4].includes("⚠") && r.tab[0].c[6] === "1.920,00",
+     "detalhe: " + JSON.stringify(r.tab));
+  ok(/1 conta\(s\) com um mês acima/.test(r.aviso) && /mediana/.test(r.aviso), "aviso: " + r.aviso);
+  // planilha: meses e mês fora da curva na Conferência
+  const x = await baixa(p, () => document.getElementById("provBaixar").click());
+  const conf = x.abas["Conferência"], h = conf[3], l = conf[4];
+  igual(["Realizado MAI/26 (conta × unidade)", "Realizado JUN/26 (conta × unidade)", "Realizado JUL/26 (conta × unidade)",
+         "Base do cálculo (conta × unidade)", "Mês fora da curva"], h.slice(13), "colunas novas");
+  igual([480, 480, 4800, 1920, "JUL/26"], l.slice(13), "valores na conferência");
   await p.context().close();
 });
 

@@ -22,7 +22,10 @@ Painel interno de FP&A, **em um único arquivo**: `dashboard.html`.
   recorte. Filtrar um único segmento dá exatamente a visão "Por conta" daquele segmento.
 - **Exportar provisão** (Por conta, segmento ou unidade): planilha no layout
   Conta contábil · Valor · Centro de custo, com as pendências do mês. O centro de custo é formado
-  pelos 4 primeiros dígitos da unidade + os 4 últimos do CC da base.
+  pelos 4 primeiros dígitos da unidade + os 4 últimos do CC da base. Contas marcadas na lista já abrem
+  selecionadas. Pelo realizado (média ou mediana dos 3 meses anteriores), a janela mostra quanto
+  veio em cada mês e destaca o mês acima de 2× a mediana (`CFG.provPico`), que inflaria a média; a
+  aba Conferência da planilha traz os mesmos meses.
 - **Editar recorrentes e periodicidade** (barra lateral): marca/desmarca as contas tratadas como
   recorrentes e define em que meses cada conta deve ter lançamento (bimestral, trimestral,
   quadrimestral, semestral, anual ou meses escolhidos). Fora desses meses, ou se já houve

@@ -468,6 +468,15 @@ th.selc,td.selc{width:30px;padding-right:0}
 .provchk input{margin-top:3px;accent-color:var(--cy)}
 .provprev{background:var(--s2);border-radius:8px;padding:10px 12px;font-size:12.5px;color:var(--tx);margin-top:8px}
 .provprev .av{color:var(--fg-warn);display:block;margin-top:4px}
+.provdet{margin-top:10px}
+.provtab caption{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.provtab{max-height:240px;overflow:auto;margin-top:6px;border:1px solid var(--line);border-radius:6px}
+.provtab table{width:100%;border-collapse:collapse;font-size:11.5px}
+.provtab th{position:sticky;top:0;background:var(--s2);color:var(--mut);font-weight:500;text-align:left;padding:4px 7px;border-bottom:1px solid var(--line2)}
+.provtab td{padding:3px 7px;border-bottom:1px solid var(--line);white-space:nowrap}
+.provtab .num{text-align:right;font-variant-numeric:tabular-nums}
+.provtab td.alto{color:var(--fg-warn);font-weight:600}
+.provdet .gs{font-size:11.5px;color:var(--mut);margin-top:4px}
 .provbt{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
 td.segs .sg{display:inline-block;margin:1px 2px 1px 0}
 .vbar2{display:inline-flex;gap:2px;background:var(--s2);border:1px solid var(--line);
@@ -1204,6 +1213,7 @@ const CFG={
   tendencia:{minMeses:6, piora:1.3, melhora:0.7},
   anomalia:{minMeses:4, dispMin:0.15, z:4, minValor:20000},
   pares:{minMeses:4, minValor:5000, pico:0.8, razMesmo:0.75, razOutro:0.95, pesoOutro:0.6},
+  provPico:2,              // provisão pelo realizado: mês acima de 2× a mediana dos 3 meses é "fora da curva"
 };
 
 const SEG=["Alfandegados","CDs","Transportes","Fronteiras","Corporativo","Backoffice","Sem segmento"];
@@ -1892,7 +1902,9 @@ function dadosProvisao(o){
     const sem=statusConta(d,p,r,false,est[d.u],[M])==="sem";
     const parc=!sem&&o.parcial&&Math.abs(p)>EPS&&Math.abs(r)>EPS&&Math.sign(p)===Math.sign(r)&&Math.abs(r)<Math.abs(p)-EPS;
     if(!sem&&!parc) return;
-    let total=o.valor==="media"&&ant.length?ant.reduce((s,i)=>s+Math.abs(d.r[i]),0)/ant.length:Math.abs(p);
+    const hist=ant.map(i=>Math.abs(d.r[i])), med=hist.length?mediana(hist):0;
+    const pico=hist.findIndex(v=>v>EPS&&v>CFG.provPico*med);      // mês que puxa a média para cima
+    let total=!ant.length||o.valor==="orc"?Math.abs(p):o.valor==="mediana"?med:hist.reduce((s,v)=>s+v,0)/hist.length;
     if(parc) total=Math.max(0,total-Math.abs(r));
     total=round2(total); if(total<EPS) return;
     const ccs=ccDe(d.a,d.u,col).filter(x=>Math.abs(x.p[M])>EPS), base=ccs.reduce((s,x)=>s+Math.abs(x.p[M]),0);
@@ -1900,18 +1912,26 @@ function dadosProvisao(o){
     const lin=(x,v)=>{ const uni=x?((String(x.uo).match(/\d+/)||[""])[0]).slice(0,4):"", c4=x?String(x.cc).replace(/\D/g,"").slice(-4):"";
       out.push({conta:(o.ppr&&PROV_CONTA[d.a])||d.a,valor:v,cc:uni+c4,ccOk:uni.length===4&&c4.length===4,
         contaOrig:d.a,desc:ac.desc||d.a,uo:x?x.uo:d.u,u:d.u,nome:un.nome||d.u,seg:un.seg,ccBase:x?x.cc:"",
-        orc:x?Math.abs(x.p[M]):Math.abs(p),real:x?Math.abs(x.r[M]):Math.abs(r),status:sem?"sem lançamento":"abaixo do orçado"}); };
+        orc:x?Math.abs(x.p[M]):Math.abs(p),real:x?Math.abs(x.r[M]):Math.abs(r),status:sem?"sem lançamento":"abaixo do orçado",
+        hist,pico:pico<0?null:ant[pico],orcUn:Math.abs(p),totalUn:total}); };
     if(!ccs.length){ lin(null,total); return; }
     let resto=total;
     ccs.forEach((x,k)=>{ const v=k===ccs.length-1?round2(resto):round2(total*Math.abs(x.p[M])/base); resto=round2(resto-v); if(v>=EPS) lin(x,v); });
   });
   out.sort((x,y)=>x.conta.localeCompare(y.conta)||x.cc.localeCompare(y.cc));
-  return {linhas:out,total:round2(out.reduce((s,l)=>s+l.valor,0))};
+  return {linhas:out,total:round2(out.reduce((s,l)=>s+l.valor,0)),ant};
+}
+// uma linha por conta × unidade (as linhas de CC somadas), para o detalhe mês a mês
+function provPorContaUnidade(linhas){
+  const m=new Map();
+  linhas.forEach(l=>{ const k=l.contaOrig+"\u0000"+l.u; const g=m.get(k);
+    if(g) g.valor=round2(g.valor+l.valor); else m.set(k,{...l}); });
+  return [...m.values()];
 }
 function abreProvisao(){
   const esc=escoposProvisao();
   if(!provOpt.escopo||!esc.some(e=>e.v===provOpt.escopo)) provOpt.escopo=esc[esc.length-1].v;
-  if(!provSel.size) provOpt.contas="todas";
+  provOpt.contas=provSel.size?"sel":"todas";     // contas marcadas na lista já entram selecionadas
   const c=DB.carga||{}, cands=c.ccCandidatas||[], colAtual=colunaProvisao();
   const sel=(id,k,ops)=>`<select id="${id}" class="fsel" onchange="provAlt('${k}',this.value)">${ops.map(([v,t])=>`<option value="${he(v)}"${String(provOpt[k]==null?colAtual:provOpt[k])===String(v)?" selected":""}>${t}</option>`).join("")}</select>`;
   const el=document.getElementById("guia");
@@ -1923,7 +1943,7 @@ function abreProvisao(){
       <div class="provform">
         <label class="pl" for="provEsc">Unidades</label>${sel("provEsc","escopo",esc.map(e=>[e.v,he(e.t)]))}
         <label class="pl" for="provContas">Contas</label>${sel("provContas","contas",[["todas","Todas as pendentes do escopo"]].concat(provSel.size?[["sel",`Só as ${provSel.size} marcadas na lista`]]:[]))}
-        <label class="pl" for="provValor">Valor</label>${sel("provValor","valor",[["orc","Orçado do mês"],["media","Média do realizado (3 últimos meses)"]])}
+        <label class="pl" for="provValor">Valor</label>${sel("provValor","valor",[["orc","Orçado do mês"],["media","Média do realizado (3 últimos meses)"],["mediana","Mediana do realizado (3 últimos meses) — ignora um mês fora da curva"]])}
         <label class="pl" for="provCol">Centro de custo</label>${sel("provCol","col",cands.map(x=>[x.col,`Coluna ${x.col+1}${x.nome?" · "+he(x.nome):""} — ex.: ${x.exemplos.slice(0,3).map(he).join(", ")||"vazia"}${x.col===c.colCC?" (pelo cabeçalho)":x.col===c.ccSugerida?" (sugerida pelos valores)":""}`]))}
         <label class="provchk"><input type="checkbox" id="provParcial"${provOpt.parcial?" checked":""} onchange="provAlt('parcial',this.checked)">
           Incluir contas lançadas abaixo do orçado (provisiona a diferença)</label>
@@ -1938,26 +1958,48 @@ function abreProvisao(){
   el.classList.add("on"); modal(el,true); el.querySelector(".gx").focus();
   atualizaPrevProvisao();
 }
-function provAlt(k,v){ provOpt[k]=k==="col"?+v:v; atualizaPrevProvisao(); }
+function provAlt(k,v){ provOpt[k]=k==="col"?+v:v;
+  const s=document.getElementById({escopo:"provEsc",contas:"provContas",valor:"provValor",col:"provCol"}[k]);
+  if(s&&s.value!==String(provOpt[k])) s.value=String(provOpt[k]);
+  atualizaPrevProvisao(); }
 function atualizaPrevProvisao(){
   const el=document.getElementById("provPrev"); if(!el) return;
-  const {linhas,total}=dadosProvisao(provOpt), ruins=linhas.filter(l=>!l.ccOk).length;
-  el.innerHTML=linhas.length?`<b>${linhas.length} linha(s)</b> · R$ <b class="num">${fmtC(total)}</b> · ${new Set(linhas.map(l=>l.contaOrig)).size} conta(s) ·
+  const {linhas,total,ant}=dadosProvisao(provOpt), ruins=linhas.filter(l=>!l.ccOk).length;
+  el.innerHTML=(linhas.length?`<b>${linhas.length} linha(s)</b> · R$ <b class="num">${fmtC(total)}</b> · ${new Set(linhas.map(l=>l.contaOrig)).size} conta(s) ·
     ${new Set(linhas.map(l=>l.u)).size} unidade(s)${ruins?`<span class="av">⚠ ${ruins} linha(s) com centro de custo incompleto — confira a coluna de centro de custo.</span>`:""}`
-    :`Nenhuma pendência para provisionar com estas opções em ${rotMes(M)}.`;
+    :`Nenhuma pendência para provisionar com estas opções em ${rotMes(M)}.`)+detalheRealizado(linhas,ant);
   const b=document.getElementById("provBaixar"); if(b) b.disabled=!linhas.length;
 }
+// pelo realizado: mostra quanto veio em cada mês, com o mês fora da curva em destaque
+function detalheRealizado(linhas,ant){
+  if(provOpt.valor==="orc"||!linhas.length) return "";
+  if(!ant.length) return `<span class="av">Não há mês anterior fechado: o valor usado é o orçado do mês.</span>`;
+  const g=provPorContaUnidade(linhas).sort((x,y)=>(y.pico!=null)-(x.pico!=null)||y.valor-x.valor);
+  const nPico=g.filter(l=>l.pico!=null).length, MAX=60;
+  const ms=[...ant].reverse(), idx=ms.map(i=>ant.indexOf(i));
+  return `<div class="provdet">
+    ${nPico?`<span class="av">⚠ ${nPico} conta(s) com um mês acima de ${CFG.provPico}× a mediana dos outros${provOpt.valor==="media"?" — a média fica inflada; confira ou use a mediana":""}.</span>`:""}
+    <div class="provtab"><table><caption>Realizado dos meses usados no cálculo, por conta e unidade</caption>
+      <thead><tr><th>Conta</th><th>Unidade</th>${ms.map(i=>`<th class="num">${rotMes(i)}</th>`).join("")}<th class="num">Orçado</th><th class="num">Provisão</th></tr></thead>
+      <tbody>${g.slice(0,MAX).map(l=>`<tr${l.pico!=null?' class="pico"':""}><td title="${he(l.desc)}">${he(l.contaOrig)}</td><td>${he(l.u)}</td>
+        ${idx.map((k,j)=>`<td class="num${ms[j]===l.pico?" alto":""}"${ms[j]===l.pico?' title="Fora da curva"':""}>${fmtC(l.hist[k])}${ms[j]===l.pico?" ⚠":""}</td>`).join("")}
+        <td class="num">${fmtC(l.orcUn)}</td><td class="num"><b>${fmtC(l.valor)}</b></td></tr>`).join("")}</tbody></table></div>
+    ${g.length>MAX?`<div class="gs">Mostrando ${MAX} de ${g.length}; a planilha (aba Conferência) traz todas.</div>`:""}</div>`;
+}
 function exportProvisao(){
-  const {linhas,total}=dadosProvisao(provOpt); if(!linhas.length) return;
+  const {linhas,total,ant}=dadosProvisao(provOpt); if(!linhas.length) return;
   const esc=escoposProvisao().find(e=>e.v===provOpt.escopo)||{t:"todos"};
+  const pelaReal=provOpt.valor!=="orc"&&ant.length, ms=pelaReal?[...ant].reverse():[];
   const lay=[["Conta contábil","Valor","Centro de custo"]].concat(linhas.map(l=>[l.conta,l.valor,l.ccOk?+l.cc:l.cc]));
   const conf=[[`Provisão · ${rotMes(M)}${ehAberto(M)?" (em aberto)":""} · ${MODOLBL[modo]} · ${esc.t}`],
-    [`${linhas.length} linha(s) · R$ ${fmtC(total)} · valor: ${provOpt.valor==="media"?"média do realizado dos 3 meses anteriores":"orçado do mês"}${provOpt.parcial?" · inclui lançadas abaixo do orçado":""}${provOpt.ppr?" · PPR na 4.1.1.01.1.98":""}`],[],
-    ["Conta contábil","Conta no painel","Descrição","Unidade","Unidade no painel","Nome da unidade","Segmento","CC na base","Centro de custo","Orçado do mês (CC)","Realizado do mês (CC)","Valor provisionado","Situação"]]
-    .concat(linhas.map(l=>[l.conta,l.contaOrig,l.desc,l.uo,l.u,l.nome,SEGNM[l.seg]||l.seg,l.ccBase,l.ccOk?+l.cc:l.cc,round2(l.orc),round2(l.real),l.valor,l.status+(l.ccOk?"":" · CC incompleto")]));
+    [`${linhas.length} linha(s) · R$ ${fmtC(total)} · valor: ${!pelaReal?"orçado do mês":provOpt.valor==="media"?"média do realizado dos meses anteriores":"mediana do realizado dos meses anteriores"}${provOpt.parcial?" · inclui lançadas abaixo do orçado":""}${provOpt.ppr?" · PPR na 4.1.1.01.1.98":""}`],[],
+    ["Conta contábil","Conta no painel","Descrição","Unidade","Unidade no painel","Nome da unidade","Segmento","CC na base","Centro de custo","Orçado do mês (CC)","Realizado do mês (CC)","Valor provisionado","Situação"]
+     .concat(ms.map(i=>`Realizado ${rotMes(i)} (conta × unidade)`),pelaReal?["Base do cálculo (conta × unidade)","Mês fora da curva"]:[])]
+    .concat(linhas.map(l=>[l.conta,l.contaOrig,l.desc,l.uo,l.u,l.nome,SEGNM[l.seg]||l.seg,l.ccBase,l.ccOk?+l.cc:l.cc,round2(l.orc),round2(l.real),l.valor,l.status+(l.ccOk?"":" · CC incompleto")]
+      .concat(ms.map(i=>round2(l.hist[ant.indexOf(i)])),pelaReal?[round2(l.totalUn),l.pico!=null?rotMes(l.pico):""]:[])));
   baixaXLSX(`provisao_${limpaNome(esc.t)}_${limpaNome(rotMes(M))}_${hoje()}.xlsx`,
     [{nome:"Provisão",linhas:lay,hdr:1,larg:[18,15,16],int:[2]},
-     {nome:"Conferência",linhas:conf,hdr:4,larg:[16,16,40,10,10,30,14,14,14,16,16,16,22],titulos:[1],int:[8]}]);
+     {nome:"Conferência",linhas:conf,hdr:4,larg:[16,16,40,10,10,30,14,14,14,16,16,16,22].concat(ms.map(()=>16),pelaReal?[18,12]:[]),titulos:[1],int:[8]}]);
 }
 
 /* ---------- SEGMENTO ---------- */
