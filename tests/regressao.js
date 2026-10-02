@@ -1104,7 +1104,10 @@ teste("X1", "acessibilidade (axe-core): nenhuma violação nas telas principais 
     segmento: () => { vhub = "seg"; go({ tipo: "seg", seg: "CDs" }); },
     unidade: () => { const u = DB.units.find(u => u.seg === "CDs"); go({ tipo: "unit", unit: u.cod, seg: u.seg }); },
     exceções: () => go({ tipo: "exc" }), provisão: () => { go({ tipo: "hub" }); abreProvisao(); },
-    recorrentes: () => { fechaGuia(); abreAjustesRec(); }, "resumo da carga": () => { fechaGuia(); abreCarga(); } };
+    recorrentes: () => { fechaGuia(); abreAjustesRec(); }, "resumo da carga": () => { fechaGuia(); abreCarga(); },
+    justificativas: () => { fechaGuia(); salvaNota(M, DB.data[0].u, DB.data[0].a, "teste de acessibilidade"); abreNotas(); },
+    "linha aberta com justificativa": () => { fechaGuia(); const u = DB.data[0].u; go({ tipo: "det", unit: u, seg: umap[u].seg }); setF("todos"); toggleExp(DB.data[0].a); },
+    comparação: () => { abreComparacao(); } };
   const falhas = [];
   for (const cs of ["dark", "light"]) {
     const p = await abre(NOVO, "plano_sint.csv", { colorScheme: cs });
@@ -1170,14 +1173,18 @@ async function abrePasta(arquivos, opts = {}) {
   await ctx.addInitScript(([arqs, semFS]) => {
     if (semFS) { delete window.showDirectoryPicker; return; }
     window.__gravados__ = []; window.__picker__ = 0;
+    window.__arquivosFake__ = Object.fromEntries(arqs.filter(a => /\.json$/.test(a.nome)).map(a => [a.nome, a.txt]));
     const itens = arqs.map(a => ({ kind: "file", name: a.nome,
       getFile: async () => new File([a.txt], a.nome, { lastModified: a.ms }) }));
     window.showDirectoryPicker = async () => { window.__picker__++; return {
       kind: "directory", name: "Base FP&A",
       values: async function* () { for (const i of itens) yield i; },
       queryPermission: async () => "granted", requestPermission: async () => "granted",
-      getFileHandle: async nome => ({ createWritable: async () => { let t = "";
-        return { write: async x => { t += x; }, close: async () => { window.__gravados__.push([nome, t]); } }; } }) }; };
+      getFileHandle: async (nome, op) => {
+        if (!(nome in window.__arquivosFake__) && !(op && op.create)) throw new DOMException("não existe", "NotFoundError");
+        return { getFile: async () => new File([window.__arquivosFake__[nome] || ""], nome),
+          createWritable: async () => { let t = "";
+            return { write: async x => { t += x; }, close: async () => { window.__arquivosFake__[nome] = t; window.__gravados__.push([nome, t]); } }; } }; } }; };
   }, [arquivos, !!opts.semFS]);
   const p = await ctx.newPage();
   p._erros = []; p._rede = [];
@@ -1258,6 +1265,101 @@ teste("L3", "pasta sem File System Access (Firefox): escolhe a pasta pelo seleto
   await p.click("#_lista button"); await p.waitForSelector("#kpis .kpi", { timeout: 30000 });
   ok(await p.evaluate(() => DB.carga.arquivo === "atual.csv" && !window.__gravaAjustesPasta__), "abriu a base sem gravar na pasta");
   await p.context().close();
+});
+
+teste("J1", "justificativas: salvar, juntar com a pasta sem apagar outro analista, remover e exportar", async () => {
+  const ana = { versao: 1, itens: { "2026-08|4101A|4.1.1.04.1.06": { t: "Ana: NF atrasada", por: "Ana", em: "2026-09-10T10:00:00.000Z" } } };
+  const p = await abrePasta([{ nome: "agora.csv", txt: lerCSV("comparacao_agora.csv"), ms: Date.UTC(2026, 8, 15) },
+    { nome: "fpa-notas.json", txt: JSON.stringify(ana), ms: Date.UTC(2026, 8, 15) }]);
+  await p.click("#_escPasta"); await p.click("#_lista button[data-nome='agora.csv']"); await p.waitForSelector("#kpis .kpi");
+  const r1 = await p.evaluate(() => ({ ana: !!notaDe(7, "4101A", "4.1.1.04.1.06"), cont: document.getElementById("bnotas").textContent }));
+  ok(r1.ana && /\(1\)/.test(r1.cont), "nota da pasta não carregada: " + JSON.stringify(r1));
+  // outro analista grava depois que este painel abriu
+  await p.evaluate(() => { const o = JSON.parse(window.__arquivosFake__["fpa-notas.json"]);
+    o.itens["2026-08|4101A|4.1.1.02.1.09"] = { t: "Bia: reclassificação", por: "Bia", em: "2026-09-20T10:00:00.000Z" };
+    window.__arquivosFake__["fpa-notas.json"] = JSON.stringify(o); });
+  await p.evaluate(() => { go({ tipo: "det", unit: "4101A", seg: umap["4101A"].seg }); setF("todos"); toggleExp("4.1.1.08.1.06"); });
+  await p.fill("#ntx", "Lançado em AGO após cobrança"); await p.fill("#ntaut", "Juan");
+  await p.click("#ntsalva");
+  await p.waitForFunction(() => /pasta/.test(document.getElementById("ntmsg").textContent));
+  const r2 = await p.evaluate(() => { const f = JSON.parse(window.__arquivosFake__["fpa-notas.json"]).itens;
+    return { chaves: Object.keys(f).sort(), nossa: f["2026-08|4101A|4.1.1.08.1.06"], icone: !!document.querySelector("tr.lin .ntic"),
+      autor: localStorage.getItem("fpa-autor"), n: itensNotas(7).length }; });
+  igual(["2026-08|4101A|4.1.1.02.1.09", "2026-08|4101A|4.1.1.04.1.06", "2026-08|4101A|4.1.1.08.1.06"], r2.chaves, "junção com a pasta");
+  ok(r2.nossa.t === "Lançado em AGO após cobrança" && r2.nossa.por === "Juan" && r2.icone && r2.autor === "Juan" && r2.n === 3, "nota salva: " + JSON.stringify(r2));
+  // exportação: uma linha por justificativa, com situação e valores do mês
+  await p.evaluate(() => abreNotas());
+  const x = await baixa(p, () => document.getElementById("ntexp").click());
+  const aba = x.abas["Justificativas"], cab = aba[2], lin = aba.slice(3);
+  igual(["Mês", "Segmento", "Unidade", "Nome da unidade", "Conta", "Descrição", "Situação no mês", "Orçado", "Realizado", "Variação", "Justificativa", "Por", "Registrada em"], cab, "cabeçalho");
+  const ln = lin.find(l => l[4] === "4.1.1.08.1.06");
+  ok(lin.length === 3 && ln && ln[0] === "AGO/26" && ln[7] === -100 && ln[8] === -100 && ln[9] === 0 && ln[10] === "Lançado em AGO após cobrança" && ln[11] === "Juan",
+     "linha exportada: " + JSON.stringify(ln));
+  const lnY = lin.find(l => l[4] === "4.1.1.04.1.06");
+  ok(lnY && lnY[6] === "Sem lançamento", "situação no mês: " + JSON.stringify(lnY));
+  // remover grava o item vazio (a remoção também chega à pasta)
+  await p.evaluate(() => { fechaGuia(); toggleExp("4.1.1.08.1.06"); toggleExp("4.1.1.08.1.06"); });
+  await p.evaluate(() => gravaNotaUI("4101A", "4.1.1.08.1.06", true));
+  const r3 = await p.evaluate(() => ({ f: JSON.parse(window.__arquivosFake__["fpa-notas.json"]).itens["2026-08|4101A|4.1.1.08.1.06"], n: itensNotas(7).length }));
+  ok(r3.f && r3.f.t === "" && r3.n === 2, "remoção: " + JSON.stringify(r3));
+  ok(!p._erros.length && !p._rede.length, "erros/rede: " + JSON.stringify([p._erros, p._rede]));
+  await p.context().close();
+  // sem pasta e sem localStorage: salva na memória e não quebra
+  const q = await abre(NOVO, "comparacao_agora.csv");
+  const r4 = await q.evaluate(async () => { const ls = Storage.prototype.setItem; Storage.prototype.setItem = () => { throw new Error("bloqueado"); };
+    const ok = await salvaNota(7, "4101A", "4.1.1.08.1.06", "teste"); Storage.prototype.setItem = ls; return { ok, n: itensNotas(7).length }; });
+  ok(r4.ok === false && r4.n === 1, "sem pasta/localStorage: " + JSON.stringify(r4));
+  await q.context().close();
+});
+
+teste("K1", "comparar com outra base: recebeu, sumiu, mudou, orçamento, vigiada, pendências e exportação", async () => {
+  const p = await abre(NOVO, "comparacao_agora.csv");
+  await p.evaluate(() => abreComparacao());
+  await p.setInputFiles("#cmpcorpo input[type=file]", CSV("comparacao_antes.csv"));
+  await p.waitForSelector(".cmpkpis");
+  const r = await p.evaluate(() => { const c = dadosComparacao();
+    return { kp: [c.pendAntes, c.pendAgora, c.resolvidas, c.novas], l: c.linhas.map(l => [l.cat, l.u, l.a, l.antes, l.agora]).sort((a, b) => a[0].localeCompare(b[0])) }; });
+  igual([1, 1, 1, 1], r.kp, "pendências antes/agora/resolvidas/novas");
+  igual([["mudou", "4101A", "4.1.1.02.1.09", -80, -120], ["orc", "4101A", "4.1.1.07.1.01", -100, -150], ["receb", "4101A", "4.1.1.08.1.06", 0, -100],
+         ["vig", "4801A", "4.1.1.02.1.09", 0, -30], ["zerou", "4101A", "4.1.1.04.1.06", -100, 0]], r.l, "categorias");
+  const x = await baixa(p, () => [...document.querySelectorAll("#cmpres button")].find(b => /exportar/.test(b.textContent)).click());
+  const aba = x.abas["Diferenças"];
+  ok(aba[3][0] === "O que mudou" && aba.length === 9 && aba.slice(4).some(l => l[0] === "Recebeu lançamento" && l[4] === "4.1.1.08.1.06" && l[8] === -100),
+     "exportação: " + JSON.stringify(aba.slice(3)));
+  // clicar numa diferença abre a unidade na conta
+  await p.evaluate(() => document.querySelector(".cmpcat tbody tr.clic").click());
+  ok(await p.evaluate(() => view.tipo === "det" && !document.getElementById("guia").classList.contains("on")), "clique não abriu a unidade");
+  // base de outro ano: avisa e não compara
+  await p.evaluate(() => { BASE_B = null; abreComparacao(); });
+  await p.setInputFiles("#cmpcorpo input[type=file]", CSV("ano_cab.csv"));
+  await p.waitForFunction(() => /não dá para comparar|Não consegui/.test(document.getElementById("cmpres").textContent));
+  ok(!p._erros.length && !p._rede.length, "erros/rede: " + JSON.stringify([p._erros, p._rede]));
+  await p.context().close();
+});
+
+teste("E1", "efeitos: tela nova entra suave, janelas animadas, número que mudou pisca; 'reduzir movimento' desliga", async () => {
+  const p = await abre(NOVO, "plano_sint.csv");
+  const r = await p.evaluate(async () => {
+    go({ tipo: "seg", seg: "CDs" });
+    const trans = document.querySelector(".main").classList.contains("trans");
+    const anim = getComputedStyle(document.getElementById("body")).animationName;
+    const guiaT = getComputedStyle(document.getElementById("guia")).transitionProperty;
+    go({ tipo: "hub" });
+    const sel = document.getElementById("mes"); sel.value = String(+sel.value - 1); sel.dispatchEvent(new Event("change"));
+    const piscou = document.querySelectorAll("#kpis .mudou").length;
+    sel.value = String(+sel.value + 1); sel.dispatchEvent(new Event("change"));
+    return { trans, anim, guiaT, piscou }; });
+  ok(r.trans && r.anim === "entraTela", "entrada da tela: " + JSON.stringify(r));
+  ok(/opacity/.test(r.guiaT) && /display/.test(r.guiaT), "transição das janelas: " + r.guiaT);
+  ok(r.piscou > 0, "nenhum número piscou ao trocar o mês");
+  await p.context().close();
+  const ctx = await browser.newContext({ reducedMotion: "reduce" }); const q = await ctx.newPage();
+  await q.goto("file://" + NOVO); await q.setInputFiles("#_file", CSV("plano_sint.csv")); await q.waitForSelector("#kpis .kpi");
+  const s = await q.evaluate(() => { go({ tipo: "seg", seg: "CDs" });
+    return { trans: document.querySelector(".main").classList.contains("trans"), anim: getComputedStyle(document.getElementById("body")).animationName,
+      guia: getComputedStyle(document.getElementById("guia")).transitionDuration }; });
+  ok(!s.trans && s.anim === "none" && /^0s/.test(s.guia), "reduzir movimento: " + JSON.stringify(s));
+  await ctx.close();
 });
 
 /* ================================================================== */

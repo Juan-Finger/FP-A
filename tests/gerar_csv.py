@@ -187,6 +187,24 @@ def bordas():
                          [(-100.0 if i in meses_r else 0.0) for i in range(12)]))
     per.append(linha("4.1.1.07.1.01", "Desc V", "4101A", "Unidade 4101A", [0.0] * 12, [-100.0] * 8 + [0.0] * 4))
     escreve("periodo.csv", per)
+    # comparação entre duas exportações (AGO = índice 7; JAN–JUL realizado = orçado = −100):
+    #  X 4.1.1.08.1.06: antes sem realizado em AGO, agora −100   → recebeu lançamento (pendência resolvida)
+    #  Y 4.1.1.04.1.06: antes −100, agora sem realizado          → lançamento sumiu (pendência nova)
+    #  Z 4.1.1.02.1.09: antes −80, agora −120                    → realizado mudou
+    #  W 4.1.1.07.1.01: orçado AGO −100 antes, −150 agora (realizado −100 nos dois) → orçamento mudou
+    #  V 4.1.1.02.1.09 na vigiada 4801A: antes 0, agora −30     → movimento novo em vigiada
+    def cmp_(agosto):
+        out = []
+        for conta, unid, p_ago, r_ago in agosto:
+            p_ = [-100.0] * 12
+            p_[7] = p_ago
+            r_ = [-100.0] * 7 + [r_ago] + [0.0] * 4
+            out.append(linha(conta, "Desc " + conta, unid, "Unidade " + unid, p_, r_))
+        return out
+    escreve("comparacao_antes.csv", cmp_([("4.1.1.08.1.06", "4101A", -100.0, 0.0), ("4.1.1.04.1.06", "4101A", -100.0, -100.0),
+        ("4.1.1.02.1.09", "4101A", -100.0, -80.0), ("4.1.1.07.1.01", "4101A", -100.0, -100.0), ("4.1.1.02.1.09", "4801A", 0.0, 0.0)]))
+    escreve("comparacao_agora.csv", cmp_([("4.1.1.08.1.06", "4101A", -100.0, -100.0), ("4.1.1.04.1.06", "4101A", -100.0, 0.0),
+        ("4.1.1.02.1.09", "4101A", -100.0, -120.0), ("4.1.1.07.1.01", "4101A", -150.0, -100.0), ("4.1.1.02.1.09", "4801A", 0.0, -30.0)]))
     # mesma base em UTF-8
     escreve("utf8.csv", [linha("4.1.1.01.1.01", "Manutenção – veículos", "4101A", "São Paulo", v, v)], enc="utf-8")
     escreve("cp1252.csv", [linha("4.1.1.01.1.01", "Manutenção – veículos", "4101A", "São Paulo", v, v)])

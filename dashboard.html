@@ -206,6 +206,28 @@ body.claro .tw.det thead th:first-child{background:#0C2340}
 .tw.det.compacto td.dsc,.tw.det.compacto td.cls{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px}
 .tw.det.compacto td.cls{max-width:190px}
 .xbtn[aria-pressed="true"]{border-color:var(--cy);color:var(--tx)}
+/* justificativas */
+.ntbox{margin-top:12px;padding-top:10px;border-top:1px solid var(--line);display:grid;gap:6px;max-width:900px}
+.ntl{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--mut)}
+.ntl span{text-transform:none;letter-spacing:0;color:var(--dim)}
+#ntx{width:100%;min-height:52px;resize:vertical;background:var(--s1);color:var(--tx);border:1px solid var(--line2);
+  border-radius:8px;padding:8px 10px;font:inherit;font-size:13px}
+#ntx:focus{border-color:var(--cy);outline:none}
+.ntbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.ntbar input{background:var(--s1);color:var(--tx);border:1px solid var(--line2);border-radius:20px;padding:5px 12px;font:inherit;font-size:12px;width:170px}
+.ntmsg{font-size:12px;color:var(--mut)}
+.ntoutras{font-size:12px;color:var(--mut)} .ntoutras b{color:var(--tx);font-weight:500}
+.ntic{color:var(--cy2);margin-left:6px;display:inline-flex;vertical-align:-1px}
+.ntlist td{vertical-align:top}
+.cmpbases{display:flex;flex-wrap:wrap;gap:6px} .cmpbases .sug{border-color:var(--cy);color:var(--tx)}
+.cmpres{margin-top:14px} .cmphead{font-size:12.5px;color:var(--mut);margin-bottom:8px} .cmphead b{color:var(--tx);font-weight:500}
+.cmpkpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:8px}
+.cmpkpis div{background:var(--s2);border-radius:8px;padding:8px 10px;display:flex;flex-direction:column;gap:2px}
+.cmpkpis span{font-size:11px;color:var(--mut)} .cmpkpis b{font-size:18px;font-weight:500}
+.cmpcat{margin-top:14px} .cmpcat table{table-layout:fixed}
+.cmpcat th:nth-child(1){width:26%} .cmpcat th:nth-child(2){width:38%}
+.cmpcat td{overflow:hidden;text-overflow:ellipsis;white-space:nowrap} .cmph{font-size:12.5px;margin-bottom:4px} .cmph .c{background:var(--s3);border-radius:10px;padding:0 7px;font-size:11px;margin:0 4px}
+@media (max-width:760px){ .cmpkpis{grid-template-columns:repeat(2,minmax(0,1fr))} } .ntlist td.ntt{white-space:normal;min-width:260px;max-width:420px;color:var(--tx)}
 tbody td{padding:9px 12px;border-bottom:1px solid var(--line)}
 tbody tr:last-child td{border-bottom:none}
 tbody tr{transition:background .1s}
@@ -294,6 +316,18 @@ table.mini th.r{text-align:right}
 .guia{position:fixed;inset:0;background:rgba(4,10,20,.76);z-index:210;display:none;
   align-items:flex-start;justify-content:center;padding:7vh 16px;overflow-y:auto}
 .guia.on{display:flex}
+/* janelas: entram e saem suaves (@starting-style); "reduzir movimento" desliga (regra global) */
+.guia{opacity:0;transition:opacity .16s ease,display .16s allow-discrete,overlay .16s allow-discrete}
+.guia.on{opacity:1}
+.guia .guiabox{transition:transform .18s cubic-bezier(.2,.8,.3,1)}
+.guia:not(.on) .guiabox{transform:translateY(10px) scale(.985)}
+@starting-style{ .guia.on{opacity:0} .guia.on .guiabox{transform:translateY(10px) scale(.985)} }
+/* tela nova entra com um fade curto ao navegar */
+@keyframes entraTela{from{opacity:.0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.main.trans #kpis,.main.trans #body{animation:entraTela .22s cubic-bezier(.2,.8,.3,1)}
+/* número que mudou ao trocar mês, período, corte ou modo: pisca uma vez */
+@keyframes pisca{0%{background:var(--bg-cy);box-shadow:0 0 0 4px var(--bg-cy)}100%{background:transparent;box-shadow:0 0 0 4px transparent}}
+.mudou{animation:pisca 1.1s ease-out 1;border-radius:4px}
 .guiabox{width:min(680px,100%);background:var(--s1);border:1px solid var(--line2);
   border-radius:12px;box-shadow:0 24px 60px rgba(0,0,0,.55);overflow:hidden}
 .guiah{display:flex;align-items:flex-start;gap:12px;padding:17px 20px 14px;
@@ -702,6 +736,7 @@ table.mini tr.vr td{border-top:1px solid var(--line)}
       <button data-m="rec">Recorrentes</button>
     </div>
     <button class="lnk ajlnk" id="bajrec" title="Escolher quais contas são recorrentes e em que meses cada uma deve ter lançamento">editar recorrentes e periodicidade</button>
+    <button class="lnk ajlnk" id="bnotas" title="Ver e exportar as justificativas registradas nas contas">justificativas</button>
     <div class="navlbl">Navegação</div>
     <nav class="nav" id="nav"></nav>
     </div>
@@ -1152,16 +1187,17 @@ function _decodifica(buf){
   }
   function usaArquivos(arqs){
     listaArq=arqs.filter(function(f){ return /\.csv$/i.test(f.name); }).sort(function(a,b){ return b.lastModified-a.lastModified||(a.name<b.name?-1:1); });
-    var aj=arqs.filter(function(f){ return f.name==="fpa-ajustes.json"; })[0];
-    window.__AJUSTES_PASTA__=null;
+    var aj=arqs.filter(function(f){ return f.name==="fpa-ajustes.json"; })[0], nt=arqs.filter(function(f){ return f.name==="fpa-notas.json"; })[0];
+    window.__AJUSTES_PASTA__=null; window.__NOTAS_PASTA__=null; window.__ARQUIVOS_PASTA__=listaArq.slice();
     var fim=function(){ desenhaPasta("ok"); var b=document.querySelector("#_lista button"); if(b) b.focus(); };
-    if(aj) aj.text().then(function(t){ window.__AJUSTES_PASTA__=t; }).catch(function(){}).then(fim); else fim();
+    Promise.all([aj?aj.text().then(function(t){ window.__AJUSTES_PASTA__=t; }).catch(function(){}):null,
+                 nt?nt.text().then(function(t){ window.__NOTAS_PASTA__=t; }).catch(function(){}):null]).then(fim);
   }
   function listaPasta(){
     var arqs=[], it;
     try{ it=pasta.values(); }catch(e){ desenhaPasta("sem"); return; }
     (async function(){
-      for await (var h of it){ if(h.kind==="file"&&(/\.csv$/i.test(h.name)||h.name==="fpa-ajustes.json")){ try{ arqs.push(await h.getFile()); }catch(e){} } }
+      for await (var h of it){ if(h.kind==="file"&&(/\.csv$/i.test(h.name)||h.name==="fpa-ajustes.json"||h.name==="fpa-notas.json")){ try{ arqs.push(await h.getFile()); }catch(e){} } }
     })().then(function(){ usaArquivos(arqs); }).catch(function(e){ msg("Não consegui ler a pasta: "+e.message); desenhaPasta("sem"); });
   }
   // Firefox/Safari: escolhe a pasta por um <input webkitdirectory> (sem lembrar dela)
@@ -1189,17 +1225,23 @@ function _decodifica(buf){
     window.addEventListener("focus",function(){ if(pasta&&document.getElementById("_ov"))
       pasta.queryPermission({mode:"read"}).then(function(p){ if(p==="granted"&&document.getElementById("_ov")) listaPasta(); }).catch(function(){}); });
   }
-  // ajustes do painel gravados também na pasta (fpa-ajustes.json), para o time compartilhar
-  window.__gravaAjustesPasta__=null;
+  // arquivos do painel na pasta (fpa-ajustes.json, fpa-notas.json), para o time compartilhar
+  window.__gravaAjustesPasta__=null; window.__pasta__=null;
   function habilitaGravacao(){
     if(!pasta||typeof pasta.getFileHandle!=="function") return;
-    window.__gravaAjustesPasta__=function(txt){
-      pasta.requestPermission({mode:"readwrite"}).then(function(p){
-        if(p!=="granted") return;
-        return pasta.getFileHandle("fpa-ajustes.json",{create:true}).then(function(fh){ return fh.createWritable(); })
-          .then(function(w){ return w.write(txt).then(function(){ return w.close(); }); });
-      }).catch(function(){});
+    var grava=function(nome,txt){
+      return pasta.requestPermission({mode:"readwrite"}).then(function(p){
+        if(p!=="granted") return false;
+        return pasta.getFileHandle(nome,{create:true}).then(function(fh){ return fh.createWritable(); })
+          .then(function(w){ return w.write(txt).then(function(){ return w.close(); }); }).then(function(){ return true; });
+      }).catch(function(){ return false; });
     };
+    // lê a versão atual do arquivo (outro analista pode ter gravado depois que o painel abriu)
+    var le=function(nome){
+      return pasta.getFileHandle(nome).then(function(fh){ return fh.getFile(); }).then(function(f){ return f.text(); }).catch(function(){ return null; });
+    };
+    window.__pasta__={nome:pasta.name,grava:grava,le:le};
+    window.__gravaAjustesPasta__=function(txt){ grava("fpa-ajustes.json",txt); };
   }
 
   /* ---- link de exportação do Plano (só abre a página; nenhum dado sai daqui) ---- */
@@ -1251,6 +1293,8 @@ const he=s=>String(s??"").replace(/[&<>"']/g,c=>"&#"+c.charCodeAt(0)+";");
 //   Permission to use, copy, modify, and/or distribute this software for any purpose with or without fee
 //   is hereby granted, provided that the above copyright notice and this permission notice appear in all copies.
 const ICONES={"x": "<path d=\"M18 6 6 18\"/><path d=\"m6 6 12 12\"/>", "alerta": "<path d=\"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3\"/><path d=\"M12 9v4\"/><path d=\"M12 17h.01\"/>", "dir": "<path d=\"m9 18 6-6-6-6\"/>", "baixo": "<path d=\"m6 9 6 6 6-6\"/>", "cima": "<path d=\"m18 15-6-6-6 6\"/>", "seta": "<path d=\"M5 12h14\"/><path d=\"m12 5 7 7-7 7\"/>", "externo": "<path d=\"M15 3h6v6\"/><path d=\"M10 14 21 3\"/><path d=\"M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6\"/>", "pasta": "<path d=\"M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z\"/>", "tema": "<circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 18a6 6 0 0 0 0-12v12z\"/>", "menu": "<path d=\"M4 6h16\"/><path d=\"M4 12h16\"/><path d=\"M4 18h16\"/>", "busca": "<circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/>", "baixar": "<path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><path d=\"M7 10l5 5 5-5\"/><path d=\"M12 15V3\"/>"};
+ICONES.nota='<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>';
+ICONES.compara='<path d="M16 3h5v5"/><path d="M8 21H3v-5"/><path d="M21 3l-7 7"/><path d="M3 21l7-7"/>';
 const ic=n=>`<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICONES[n]}</svg>`;
 // Valor para dentro de um onclick="...": string JS válida e escapada para o atributo.
 const js=s=>he(JSON.stringify(String(s??"")));
@@ -1372,6 +1416,47 @@ function recTexto(a){
   const r=a in AJUSTES.rec?(AJUSTES.rec[a]?"Recorrente":"Não recorrente")+" (ajustado)":((amap[a]||{}).rec||"—");
   return r+(AJUSTES.meses[a]?" · "+perTexto(AJUSTES.meses[a]):"");
 }
+/* ---------- JUSTIFICATIVAS (opcionais) ----------
+   Texto livre do analista por conta × unidade × mês. Nada é obrigatório nem calculado a partir dele:
+   serve para quem exporta depois entender o que aconteceu sem precisar perguntar.
+   Fica no navegador e, com a pasta da base escolhida, em fpa-notas.json. Antes de gravar, o painel
+   relê o arquivo e junta item a item (vale o registro mais recente), para um analista não apagar o
+   que outro gravou. Remover grava o item vazio, para a remoção também chegar aos outros. */
+let NOTAS={};          // "AAAA-MM|unidade|conta" → {t:texto, por:autor, em:ISO}
+const chaveNota=(i,u,a)=>`${DB.ano||""}-${String(i+1).padStart(2,"0")}|${u}|${a}`;
+const notaDe=(i,u,a)=>{ const n=NOTAS[chaveNota(i,u,a)]; return n&&n.t?n:null; };
+function juntaNotas(...fontes){
+  const out={};
+  fontes.forEach(f=>{ if(!f||typeof f!=="object") return;
+    Object.entries(f).forEach(([k,v])=>{
+      if(!/^\d{0,4}-\d{2}\|[^|]+\|[^|]+$/.test(k)||!v||typeof v!=="object"||typeof v.t!=="string"||typeof v.em!=="string") return;
+      if(!out[k]||v.em>out[k].em) out[k]={t:v.t.slice(0,4000),por:String(v.por||"").slice(0,80),em:v.em}; }); });
+  return out;
+}
+const leNotas=t=>{ try{ const o=JSON.parse(t); return o&&o.itens; }catch(e){ return null; } };
+const textoNotas=()=>JSON.stringify({versao:1,salvoEm:new Date().toISOString(),itens:NOTAS},null,1);
+try{ NOTAS=juntaNotas(leNotas(localStorage.getItem("fpa-notas")||"null"),leNotas(window.__NOTAS_PASTA__||"null")); }catch(e){ NOTAS={}; }
+let autorNota=""; try{ autorNota=localStorage.getItem("fpa-autor")||""; }catch(e){}
+// grava uma justificativa; devolve true se também foi para a pasta
+async function salvaNota(i,u,a,texto){
+  NOTAS[chaveNota(i,u,a)]={t:String(texto||"").trim().slice(0,4000),por:autorNota,em:new Date().toISOString()};
+  try{ localStorage.setItem("fpa-notas",textoNotas()); }catch(e){}
+  if(!window.__pasta__) return false;
+  const atual=await window.__pasta__.le("fpa-notas.json");
+  NOTAS=juntaNotas(leNotas(atual||"null"),NOTAS);
+  const ok=await window.__pasta__.grava("fpa-notas.json",textoNotas());
+  try{ localStorage.setItem("fpa-notas",textoNotas()); }catch(e){}
+  return ok;
+}
+// itens com texto, com o mês, a unidade e a conta separados
+function itensNotas(soMes){
+  return Object.entries(NOTAS).filter(([,v])=>v.t).map(([k,v])=>{
+    const [am,u,a]=k.split("|"), i=+am.slice(-2)-1;
+    return {k,i,u,a,...v};
+  }).filter(o=>o.i>=0&&o.i<12&&(soMes==null||o.i===soMes));
+}
+const dataHoraBR=iso=>{ const d=new Date(iso); return isNaN(d)?"":d.toLocaleDateString("pt-BR")+" "+d.toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"}); };
+
 // meses em que a conta costuma ser lançada (maioria das unidades), completando o ciclo
 function sugereMeses(a){
   const fech=[...Array(12).keys()].filter(i=>DB.fechado[i]);
@@ -2649,7 +2734,7 @@ function mesATes(d){
   return `<tr class="exp"><td colspan="11"><div class="expbox">
     <div class="expt">Orçado × realizado mês a mês${modo==="rec"?" · conta recorrente":""}</div>
     ${gr.leg}
-    <table class="mini"><thead><tr><th aria-label="Linha"></th>${ms.map(i=>`<th class="r">${DB.meses[i]}</th>`).join("")}<th class="r">Total</th></tr></thead>
+    <table class="mini"><thead><tr><td></td>${ms.map(i=>`<th class="r">${DB.meses[i]}</th>`).join("")}<th class="r">Total</th></tr></thead>
     <tbody>${gr.linha}
       <tr><td>Orçado</td>${ms.map(i=>`<td class="r num">${fmtC(d.p[i])}</td>`).join("")}
           <td class="r num b">${fmtC(ms.reduce((s,i)=>s+d.p[i],0))}</td></tr>
@@ -2660,8 +2745,91 @@ function mesATes(d){
           <td class="r num b">${fmtC(ms.reduce((s,i)=>s+d.r[i]-d.p[i],0))}</td></tr>
     </tbody></table>
     <div class="expl2">Células destacadas: mês com orçamento e sem nenhum lançamento.</div>
+    ${editorNota(d)}
   </div></td></tr>`;
 }
+// justificativa do mês (opcional), dentro da linha aberta
+function editorNota(d){
+  const n=notaDe(M,d.u,d.a);
+  const outras=itensNotas().filter(o=>o.u===d.u&&o.a===d.a&&o.i!==M).sort((x,y)=>y.i-x.i);
+  return `<div class="ntbox">
+    <label class="ntl" for="ntx">Justificativa de ${rotMes(M)} <span>· opcional · entra na exportação de justificativas</span></label>
+    <textarea id="ntx" maxlength="4000" placeholder="Se houver: o que explica a variação ou a falta de lançamento (ex.: nota fiscal chega em setembro).">${he(n?n.t:"")}</textarea>
+    <div class="ntbar"><input id="ntaut" value="${he(autorNota)}" placeholder="seu nome" aria-label="Seu nome (vai junto com a justificativa)">
+      <button class="xbtn" id="ntsalva" onclick="gravaNotaUI(${js(d.u)},${js(d.a)})">salvar justificativa</button>
+      ${n?`<button class="xbtn" onclick="gravaNotaUI(${js(d.u)},${js(d.a)},true)">remover</button>`:""}
+      <span class="ntmsg" id="ntmsg" role="status" aria-live="polite">${n?`salva por ${he(n.por||"—")} em ${dataHoraBR(n.em)}`:""}</span></div>
+    ${outras.length?`<div class="ntoutras">${outras.map(o=>`<div><b>${rotMes(o.i)}:</b> ${he(o.t)} <span>(${he(o.por||"—")})</span></div>`).join("")}</div>`:""}
+  </div>`;
+}
+async function gravaNotaUI(u,a,remover){
+  const tx=document.getElementById("ntx"), au=document.getElementById("ntaut");
+  if(au){ autorNota=au.value.trim().slice(0,80); try{ localStorage.setItem("fpa-autor",autorNota); }catch(e){} }
+  const naPasta=await salvaNota(M,u,a,remover?"":(tx?tx.value:""));
+  if(view.tipo==="det") renderDet();
+  atualizaContNotas();
+  const m=document.getElementById("ntmsg");
+  if(m) m.textContent=(remover?"Justificativa removida":"Justificativa salva")+(naPasta?" neste navegador e na pasta.":" neste navegador.");
+  const b=document.getElementById("ntsalva"); if(b) b.focus();
+}
+function atualizaContNotas(){
+  const b=document.getElementById("bnotas"); if(!b) return;
+  const n=itensNotas(M).length;
+  b.textContent=`justificativas de ${rotMes(M)}${n?` (${n})`:""}`;
+}
+// janela com as justificativas do mês (ou do ano) e a exportação
+let notasTodas=false;
+function linhasNotas(){
+  const {est}=met();
+  return itensNotas(notasTodas?null:M).map(o=>{
+    const d=dadosDe(o.u).find(x=>x.a===o.a), un=umap[o.u]||{}, p=d?d.p[o.i]:null, r=d?d.r[o.i]:null;
+    const st=d&&DB.fechado[o.i]?statusConta(d,p,r,ehAberto(o.i),est[o.u],[o.i]):null;
+    return {...o,seg:un.seg?(SEGNM[un.seg]||un.seg):"",nome:un.nome||o.u,desc:(amap[o.a]||{}).desc||"",p,r,st};
+  }).sort((x,y)=>y.i-x.i||x.seg.localeCompare(y.seg)||x.u.localeCompare(y.u)||x.a.localeCompare(y.a));
+}
+function abreNotas(){
+  const ls=linhasNotas(), el=document.getElementById("guia");
+  el.innerHTML=`<div class="guiabox largo" role="dialog" aria-modal="true" aria-labelledby="ntt">
+    <div class="guiah"><div><h2 class="gt" id="ntt">Justificativas${notasTodas?" do ano":" de "+rotMes(M)}</h2>
+      <div class="gs">Textos que os analistas registraram nas contas (linha aberta da tabela da unidade). Clique numa linha para abrir a conta.</div></div>
+      <button class="gx" aria-label="Fechar" onclick="fechaGuia()">${ic("x")}</button></div>
+    <div class="guial" tabindex="0">
+      <div class="provbt" style="justify-content:flex-start;margin:0 0 10px">
+        <button class="xbtn" aria-pressed="${!notasTodas}" onclick="notasTodas=false;abreNotas()">só ${rotMes(M)}</button>
+        <button class="xbtn" aria-pressed="${notasTodas}" onclick="notasTodas=true;abreNotas()">todos os meses</button>
+        <span style="flex:1"></span>
+        <button class="xbtn" id="ntexp" onclick="exportNotas()"${ls.length?"":" disabled"}>${ic("baixar")} exportar (.xlsx)</button></div>
+      ${ls.length?`<table class="mini ntlist"><thead><tr><th>Mês</th><th>Unidade</th><th>Conta</th><th>Situação</th><th class="r">Variação</th><th>Justificativa</th><th>Por</th></tr></thead><tbody>
+        ${ls.map(o=>`<tr class="clic" onclick="irNota(${js(o.u)},${js(o.a)},${o.i})">
+          <td>${rotMes(o.i)}</td><td>${he(o.u)} <span style="color:var(--dim)">${he(o.nome)}</span></td>
+          <td class="num">${he(o.a)}<div style="color:var(--dim);font-family:var(--fs)">${he(o.desc)}</div></td>
+          <td>${o.st?`<span class="st ${o.st}">${ST[o.st]}</span>`:'<span style="color:var(--dim)">—</span>'}</td>
+          <td class="r num ${o.p!=null&&o.r-o.p<0?"neg":"pos"}">${o.p==null?"—":fmtC(o.r-o.p)}</td>
+          <td class="ntt">${he(o.t)}</td><td style="color:var(--mut)">${he(o.por||"—")}<div>${dataHoraBR(o.em)}</div></td></tr>`).join("")}
+      </tbody></table>`:`<div class="empty">Nenhuma justificativa registrada${notasTodas?" no ano":" em "+rotMes(M)}. Para registrar, abra uma conta na tabela da unidade.</div>`}
+    </div>
+    <div class="guiaf">Salvas neste navegador${window.__pasta__?` e em fpa-notas.json na pasta ${he(window.__pasta__.nome||"")}`:""}.</div></div>`;
+  if(!el.classList.contains("on")){ el.classList.add("on"); modal(el,true); }
+  el.querySelector(".gx").focus();
+}
+function irNota(u,a,i){
+  fechaGuia();
+  if(i!==M&&DB.fechado[i]){ M=i; const s=document.getElementById("mes"); if(s) s.value=i; }
+  go({tipo:"det",unit:u,seg:(umap[u]||{}).seg});
+  view.filtro="todos"; expandida=a; renderDet();
+  const tx=document.getElementById("ntx"); if(tx) tx.focus();
+}
+function exportNotas(){
+  const ls=linhasNotas(); if(!ls.length) return;
+  const rot=notasTodas?"ano":rotMes(M);
+  baixaXLSX(`justificativas_${limpaNome(rot)}_${hoje()}.xlsx`,[{nome:"Justificativas",hdr:3,titulos:[1],
+    larg:[9,14,9,30,16,40,18,15,15,15,60,18,17],
+    linhas:[[`Justificativas · ${rot} · base ${(DB.carga||{}).arquivo||""}`],[],
+      ["Mês","Segmento","Unidade","Nome da unidade","Conta","Descrição","Situação no mês","Orçado","Realizado","Variação","Justificativa","Por","Registrada em"]]
+      .concat(ls.map(o=>[rotMes(o.i),o.seg,o.u,o.nome,o.a,o.desc,o.st?ST[o.st]:"",o.p==null?"":round2(o.p),o.r==null?"":round2(o.r),
+        o.p==null?"":round2(o.r-o.p),o.t,o.por||"",dataHoraBR(o.em)]))}]);
+}
+
 // linhas da tabela da unidade: filtro do chip, busca e ordenação atuais
 function linhasFiltradas(base){
   let rows=[...base];
@@ -2684,7 +2852,7 @@ function linhasFiltradas(base){
 function corpoDet(rows){
   const mxv=Math.max(...rows.map(r=>Math.abs(r.v)),1);
   return rows.length?rows.map(r=>`<tr class="lin ${expandida===r.a?'aberta':''}" onclick="toggleExp(${js(r.a)})">
-      <td class="num" style="color:var(--dim)"><span class="cx" role="img" aria-label="${expandida===r.a?"linha aberta":"linha fechada"}">${ic(expandida===r.a?"baixo":"dir")}</span>${he(r.a)}</td>
+      <td class="num" style="color:var(--dim)"><span class="cx" role="img" aria-label="${expandida===r.a?"linha aberta":"linha fechada"}">${ic(expandida===r.a?"baixo":"dir")}</span>${he(r.a)}${(n=>n?`<span class="ntic" role="img" aria-label="tem justificativa" title="${he("Justificativa: "+n.t.slice(0,200))}">${ic("nota")}</span>`:"")(notaDe(M,view.unit,r.a))}</td>
       <td class="dsc" title="${he(r.desc)}">${he(r.desc)}${incluiConta(r.a)}</td>
       <td class="r num">${fmtC(r.p)}</td>
       <td class="r num">${fmtC(r.r)}</td>
@@ -3659,10 +3827,21 @@ function go(v){
   render();
   const calmo=window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;
   window.scrollTo({top:0,behavior:calmo?"auto":"smooth"});
+  if(!calmo){ const m=document.querySelector(".main"); if(m){ m.classList.remove("trans"); void m.offsetWidth; m.classList.add("trans"); } }
+}
+// troca de mês, período, corte ou modo: os números que mudaram piscam uma vez (mesma tela, mesmo rótulo)
+function comDestaque(fn){
+  const SEL="#kpis .kpi, #body .fr", chave=e=>(e.querySelector(".lbl,.frl")||{}).textContent||"",
+        valor=e=>(e.querySelector(".v,.frv")||{}).textContent||"";
+  const antes=new Map([...document.querySelectorAll(SEL)].map(e=>[chave(e),valor(e)])), tela=view.tipo+"|"+view.seg+"|"+view.unit;
+  fn();
+  if(tela!==view.tipo+"|"+view.seg+"|"+view.unit) return;
+  document.querySelectorAll(SEL).forEach(e=>{ const k=chave(e), v=e.querySelector(".v,.frv");
+    if(v&&antes.has(k)&&antes.get(k)!==v.textContent){ v.classList.remove("mudou"); void v.offsetWidth; v.classList.add("mudou"); } });
 }
 var render=function(){
   const aberto=met().aberto;
-  renderNav();
+  renderNav(); atualizaContNotas();
   if(!["lastro","lsorc","exc"].includes(view.tipo)) renderKpis();
   gravaURL();
   const cb=document.getElementById("crumb");
@@ -3737,12 +3916,118 @@ function carimbo(){
       +(velho?`<br><b>há ${dias} dias — pode estar desatualizado</b>`:"");
   }
   el.innerHTML=txt+`<br><button class="lnk${av.length?" av":""}" id="bcarga">${av.length?`${ic("alerta")} ${av.length} aviso(s) na carga`:"Resumo da carga"}</button>`
+    +` · <button class="lnk" id="bcompara" title="Mostra o que mudou entre outra exportação do Plano e esta">Comparar com outra base</button>`
     +` · <button class="lnk" id="btroca" title="Volta à tela de carga mantendo a tela atual no endereço">Trocar base</button>`;
   document.getElementById("bcarga").onclick=()=>{ if(window.fechaMenu) fechaMenu(); abreCarga(); };
   const baj=document.getElementById("bajrec"); if(baj) baj.onclick=()=>{ if(window.fechaMenu) fechaMenu(); abreAjustesRec(); };
+  const bcp=document.getElementById("bcompara"); if(bcp) bcp.onclick=()=>{ if(window.fechaMenu) fechaMenu(); abreComparacao(); };
+  const bnt=document.getElementById("bnotas"); if(bnt) bnt.onclick=()=>{ if(window.fechaMenu) fechaMenu(); notasTodas=false; abreNotas(); };
   // nova base: recarrega a página (o endereço guarda a tela atual) e volta à tela de carga
   document.getElementById("btroca").onclick=()=>location.reload();
   }catch(e){}
+}
+
+/* ---------- COMPARAR COM OUTRA BASE ----------
+   Lê outro CSV do Plano (a versão anterior da pasta, ou um arquivo escolhido), monta o mesmo payload e
+   mostra, no mês de análise, o que mudou: contas que receberam lançamento, lançamentos que sumiram,
+   valores alterados, orçamento alterado, pendências resolvidas e novas, e movimento novo em vigiadas.
+   A outra base fica só na memória desta aba. */
+let BASE_B=null;            // {nome, modificado, data: Map("conta|unidade" → {p,r})}
+const CMP_CAT=[["receb","Recebeu lançamento","Não tinha realizado na outra base e agora tem."],
+  ["zerou","Lançamento sumiu","Tinha realizado na outra base e agora está zerado."],
+  ["mudou","Realizado mudou","Tinha e continua tendo realizado, com outro valor."],
+  ["orc","Orçamento mudou","O orçado do mês é diferente."],
+  ["vig","Movimento novo em vigiada","Realizado novo ou alterado em unidade vigiada (exceções)."]];
+function outrasBasesPasta(){
+  const c=DB.carga||{};
+  return (window.__ARQUIVOS_PASTA__||[]).filter(f=>!(f.name===c.arquivo&&f.lastModified===c.modificado));
+}
+function abreComparacao(){
+  const el=document.getElementById("guia"), c=DB.carga||{}, outras=outrasBasesPasta();
+  const ant=outras.filter(f=>f.lastModified<(c.modificado||Infinity))[0];
+  el.innerHTML=`<div class="guiabox largo" role="dialog" aria-modal="true" aria-labelledby="cmpt">
+    <div class="guiah"><div><h2 class="gt" id="cmpt">Comparar com outra base · ${rotMes(M)}</h2>
+      <div class="gs">Mostra o que mudou entre outra exportação do Plano e a base aberta (${he(c.arquivo||"")}${c.modificado?", "+dataHoraBR(new Date(c.modificado).toISOString()):""}).</div></div>
+      <button class="gx" aria-label="Fechar" onclick="fechaGuia()">${ic("x")}</button></div>
+    <div class="guial" tabindex="0" id="cmpcorpo">
+      ${outras.length?`<div class="ntl" style="margin-bottom:6px">Bases da pasta</div><div class="cmpbases">${outras.slice(0,8).map((f,k)=>
+        `<button class="xbtn${f===ant?" sug":""}" onclick="comparaArquivo(outrasBasesPasta()[${k}])">${he(f.name)} · ${dataHoraBR(new Date(f.lastModified).toISOString())}${f===ant?" · anterior":""}</button>`).join("")}</div>`:""}
+      <label class="xbtn" tabindex="0" style="margin-top:8px;display:inline-block" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.querySelector('input').click()}">escolher outro arquivo .csv
+        <input type="file" accept=".csv,text/csv" hidden onchange="comparaArquivo(this.files[0]);this.value=''"></label>
+      <div id="cmpres" role="status" aria-live="polite">${BASE_B?resultadoComparacao():""}</div>
+    </div>
+    <div class="guiaf">A outra base é lida aqui no navegador e não substitui a base aberta. Respeita o modo (${MODOLBL[modo]}).</div></div>`;
+  if(!el.classList.contains("on")){ el.classList.add("on"); modal(el,true); }
+  el.querySelector(".gx").focus();
+}
+async function comparaArquivo(f){
+  const out=document.getElementById("cmpres"); if(!f||!out) return;
+  out.innerHTML=`<div class="ntmsg">Lendo ${he(f.name)}…</div>`;
+  try{
+    const dec=_decodifica(await f.arrayBuffer());
+    const pay=await construirPayloadAsync(dec.txt,{nome:f.name,tamanho:f.size,modificado:f.lastModified||0,encoding:dec.encoding},
+      x=>{ out.innerHTML=`<div class="ntmsg">Processando ${he(f.name)}… ${Math.round(x*100)}%</div>`; });
+    if(pay.ano&&DB.ano&&pay.ano!==DB.ano){ out.innerHTML=`<div class="av">${ic("alerta")} ${he(f.name)} é de ${pay.ano} e a base aberta é de ${DB.ano}: não dá para comparar.</div>`; return; }
+    const data=new Map(); pay.data.forEach(d=>data.set(d.a+"|"+d.u,d));
+    BASE_B={nome:f.name,modificado:f.lastModified||0,data};
+    out.innerHTML=resultadoComparacao();
+  }catch(e){ out.innerHTML=`<div class="av">${ic("alerta")} Não consegui ler ${he(f.name)}: ${he(e.message)}</div>`; }
+}
+// classifica as diferenças no mês M (contas de pendência no modo atual; vigiadas à parte)
+function dadosComparacao(){
+  if(!BASE_B) return null;
+  const {est}=met(), aberto=ehAberto(M), i=M, out=[];
+  const chaves=new Set([...DB.data.map(d=>d.a+"|"+d.u),...BASE_B.data.keys()]);
+  const atual=new Map(DB.data.map(d=>[d.a+"|"+d.u,d]));
+  let pendAntes=0, pendAgora=0, resolvidas=0, novas=0;
+  chaves.forEach(k=>{
+    const d=atual.get(k), b=BASE_B.data.get(k), [a,u]=k.split("|");
+    if(!ehPendencia(a)&&!VIG.has(u)) return;
+    if(modo==="rec"&&!ehRec(a)&&!VIG.has(u)) return;
+    const pA=d?d.p[i]:0, rA=d?d.r[i]:0, pB=b?b.p[i]:0, rB=b?b.r[i]:0;
+    const ref=d||{a,u,p:Array(12).fill(0),r:Array(12).fill(0)};
+    if(!VIG.has(u)){
+      const sA=statusConta(ref,pA,rA,aberto,est[u],[i])==="sem", sB=statusConta(ref,pB,rB,aberto,est[u],[i])==="sem";
+      if(sA) pendAgora++; if(sB) pendAntes++; if(sB&&!sA) resolvidas++; if(sA&&!sB) novas++;
+    }
+    const temA=Math.abs(rA)>EPS, temB=Math.abs(rB)>EPS;
+    const base={a,u,desc:(amap[a]||{}).desc||a,nome:(umap[u]||{}).nome||u,seg:(umap[u]||{}).seg||""};
+    if(VIG.has(u)){ if(Math.abs(rA-rB)>EPS) out.push({...base,cat:"vig",antes:rB,agora:rA}); return; }
+    if(temA&&!temB) out.push({...base,cat:"receb",antes:rB,agora:rA});
+    else if(!temA&&temB) out.push({...base,cat:"zerou",antes:rB,agora:rA});
+    else if(temA&&temB&&Math.abs(rA-rB)>EPS) out.push({...base,cat:"mudou",antes:rB,agora:rA});
+    if(Math.abs(pA-pB)>EPS) out.push({...base,cat:"orc",antes:pB,agora:pA});
+  });
+  out.sort((x,y)=>Math.abs(y.agora-y.antes)-Math.abs(x.agora-x.antes));
+  return {linhas:out,pendAntes,pendAgora,resolvidas,novas};
+}
+function resultadoComparacao(){
+  const r=dadosComparacao(); if(!r) return "";
+  const MAX=60, bloco=([k,t,d])=>{ const ls=r.linhas.filter(l=>l.cat===k); if(!ls.length) return "";
+    return `<div class="cmpcat"><div class="cmph"><b>${t}</b> <span class="c num">${ls.length}</span> <span style="color:var(--dim)">${d}</span></div>
+      <table class="mini"><thead><tr><th>Unidade</th><th>Conta</th><th class="r">${k==="orc"?"Orçado antes":"Realizado antes"}</th><th class="r">Agora</th><th class="r">Diferença</th></tr></thead><tbody>
+      ${ls.slice(0,MAX).map(l=>`<tr class="clic" onclick="fechaGuia();abreConta(${js(l.u)},${js(l.a)})"><td>${he(l.u)} <span style="color:var(--dim)">${he(l.nome)}</span></td>
+        <td class="num">${he(l.a)} <span style="color:var(--dim);font-family:var(--fs)">${he(l.desc)}</span></td>
+        <td class="r num">${fmtC(l.antes)}</td><td class="r num">${fmtC(l.agora)}</td><td class="r num">${fmtC(l.agora-l.antes)}</td></tr>`).join("")}</tbody></table>
+      ${ls.length>MAX?`<div class="ntmsg">Mostrando ${MAX} de ${ls.length}; a exportação traz todas.</div>`:""}</div>`; };
+  return `<div class="cmpres">
+    <div class="cmphead">Comparando com <b>${he(BASE_B.nome)}</b>${BASE_B.modificado?` (${dataHoraBR(new Date(BASE_B.modificado).toISOString())})`:""} · ${rotMes(M)}</div>
+    <div class="cmpkpis">
+      <div><span>Sem lançamento antes</span><b class="num">${r.pendAntes}</b></div>
+      <div><span>Sem lançamento agora</span><b class="num">${r.pendAgora}</b></div>
+      <div><span>Pendências resolvidas</span><b class="num pos">${r.resolvidas}</b></div>
+      <div><span>Pendências novas</span><b class="num ${r.novas?"neg":""}">${r.novas}</b></div></div>
+    <div class="provbt" style="justify-content:flex-start;margin:4px 0 10px"><button class="xbtn" onclick="exportComparacao()"${r.linhas.length?"":" disabled"}>${ic("baixar")} exportar diferenças (.xlsx)</button></div>
+    ${r.linhas.length?CMP_CAT.map(bloco).join(""):`<div class="empty">Nenhuma diferença em ${rotMes(M)} entre as duas bases.</div>`}</div>`;
+}
+function exportComparacao(){
+  const r=dadosComparacao(); if(!r||!r.linhas.length) return;
+  const nome=Object.fromEntries(CMP_CAT.map(([k,t])=>[k,t]));
+  baixaXLSX(`diferencas_${limpaNome(rotMes(M))}_${hoje()}.xlsx`,[{nome:"Diferenças",hdr:4,titulos:[1],larg:[26,14,9,30,16,40,16,16,16],
+    linhas:[[`Diferenças em ${rotMes(M)} · ${(DB.carga||{}).arquivo||""} comparada com ${BASE_B.nome}`],
+      [`Sem lançamento: ${r.pendAntes} antes, ${r.pendAgora} agora · ${r.resolvidas} resolvidas · ${r.novas} novas`],[],
+      ["O que mudou","Segmento","Unidade","Nome da unidade","Conta","Descrição","Antes","Agora","Diferença"]]
+      .concat(r.linhas.map(l=>[nome[l.cat],SEGNM[l.seg]||l.seg,l.u,l.nome,l.a,l.desc,round2(l.antes),round2(l.agora),round2(l.agora-l.antes)]))}]);
 }
 
 /* ---------- editor de recorrentes e periodicidade ---------- */
@@ -3964,7 +4249,7 @@ render=protege(render,"render");
   sel.innerHTML=DB.meses.map((m,i)=>
     `<option value="${i}" ${i===M?"selected":""}>${rotMes(i)}${ehAberto(i)?" · em aberto":DB.fechado[i]?"":" · sem dados"}</option>`).join("");
   // se veio link com estado, aplica antes do primeiro render
-  sel.onchange=()=>{M=+sel.value;render();};
+  sel.onchange=()=>comDestaque(()=>{M=+sel.value;render();});
   const pi=document.getElementById("palin");
   if(pi) pi.oninput=e=>montaPal(e.target.value);
   const pl=document.getElementById("pal");
@@ -4011,12 +4296,12 @@ render=protege(render,"render");
   try{ leURL(); }catch(e){}
   try{ sincronizaBotoes(); }catch(e){}
   try{ carimbo(); }catch(e){}
-  document.querySelectorAll("#modobar button").forEach(b=>b.onclick=()=>{
-    modo=b.dataset.m; sincronizaBotoes(); render();});
-  document.querySelectorAll("#cortebar button").forEach(b=>b.onclick=()=>{
-    corte=+b.dataset.c; sincronizaBotoes(); render();});
-  document.querySelectorAll("#perbar button").forEach(b=>b.onclick=()=>{
-    periodo=b.dataset.p; sincronizaBotoes(); render();});
+  document.querySelectorAll("#modobar button").forEach(b=>b.onclick=()=>comDestaque(()=>{
+    modo=b.dataset.m; sincronizaBotoes(); render();}));
+  document.querySelectorAll("#cortebar button").forEach(b=>b.onclick=()=>comDestaque(()=>{
+    corte=+b.dataset.c; sincronizaBotoes(); render();}));
+  document.querySelectorAll("#perbar button").forEach(b=>b.onclick=()=>comDestaque(()=>{
+    periodo=b.dataset.p; sincronizaBotoes(); render();}));
   render();
   window.__APP_PRONTO__=true;
   if(DB.carga&&(DB.carga.invalidos||DB.carga.curtas)) abreCarga();

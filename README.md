@@ -34,6 +34,16 @@ Painel interno de FP&A, **em um único arquivo**: `dashboard.html`.
   exportados/importados como `fpa-ajustes.json`. Com a pasta da base escolhida (Chrome/Edge), o
   painel também grava `fpa-ajustes.json` na pasta, e quem abrir a mesma pasta sincronizada recebe os
   ajustes. Vale a versão mais recente entre o navegador e a pasta.
+- **Justificativas** (opcionais): na linha aberta de uma conta, o analista pode registrar o que
+  explica a variação ou a falta de lançamento no mês. Nada é obrigatório nem calculado a partir do
+  texto. "justificativas" na barra lateral lista as do mês (ou do ano) e exporta para Excel com
+  situação, orçado, realizado, variação, autor e data, para quem não acompanhou entender o que
+  aconteceu. Ficam no navegador e, com a pasta da base escolhida, em `fpa-notas.json`: antes de
+  gravar, o painel relê o arquivo e junta item a item, para um analista não apagar o de outro.
+- **Comparar com outra base** (ao lado de "Resumo da carga"): lê outra exportação do Plano (as da
+  pasta aparecem com data e hora) e mostra, no mês de análise, o que mudou: contas que receberam
+  lançamento, lançamentos que sumiram, realizado e orçamento alterados, pendências resolvidas e
+  novas, e movimento novo em unidades vigiadas. Exporta as diferenças para Excel.
 - **Trocar base** (barra lateral) volta à tela de carga e mantém a tela atual.
 - Atalhos: `Ctrl+K` busca, `?` lista de atalhos, `G` guia de análise, `P` imprimir/PDF.
 
@@ -76,6 +86,8 @@ O que a suíte garante:
   desfaça uma anterior.
 - **X1**: acessibilidade verificada pelo axe-core nas telas principais e janelas, nos dois temas.
 - **V1**: gráfico IBCS, tabela compacta, coluna fixa e ordenação acessível.
+- **J1** (justificativas, inclusive dois analistas gravando na mesma pasta), **K1** (comparação de
+  bases) e **E1** (efeitos e "reduzir movimento").
 
 Quando uma mudança **intencional** altera números ou telas:
 
@@ -92,6 +104,9 @@ Quando uma mudança **intencional** altera números ou telas:
   (desfavorável), com o valor escrito. Aparecem na linha aberta de cada conta e na aba Resultado.
 - Tabela da unidade: modo compacto (padrão; o botão "compacto" alterna e o navegador lembra), coluna
   da conta fixa ao rolar para o lado e cabeçalhos ordenáveis no padrão do W3C (botão + `aria-sort`).
+- Efeitos discretos: a tela nova entra com um fade curto, as janelas abrem e fecham suaves e, ao
+  trocar mês, período, corte ou modo, os números que mudaram piscam uma vez. Com "reduzir
+  movimento" ligado no sistema, nada anima.
 - Cores definidas como tokens no início do CSS (`--bg-neg`, `--bg-warn`, `--bg-pos`, `--bg-neu`,
   `--bar-pos`…). Fundos de pílulas e alertas usam uma intensidade por papel.
 
