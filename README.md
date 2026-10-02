@@ -75,6 +75,7 @@ O que a suíte garante:
 - Um teste por correção (A1…A15, B1, B3, C0…C12, D2, F1), para que uma mudança posterior não
   desfaça uma anterior.
 - **X1**: acessibilidade verificada pelo axe-core nas telas principais e janelas, nos dois temas.
+- **V1**: gráfico IBCS, tabela compacta, coluna fixa e ordenação acessível.
 
 Quando uma mudança **intencional** altera números ou telas:
 
@@ -86,6 +87,11 @@ Quando uma mudança **intencional** altera números ou telas:
 
 - Ícones em SVG (desenhos do [Lucide](https://lucide.dev), licença ISC) embutidos no arquivo, no
   lugar de caracteres de texto que mudavam de aparência conforme o sistema.
+- Gráficos mês a mês na notação [IBCS](https://ibcs.com/standards/) (ISO 24896): realizado em
+  coluna cheia, orçado em contorno vazado e variação em verde (favorável) ou vermelho
+  (desfavorável), com o valor escrito. Aparecem na linha aberta de cada conta e na aba Resultado.
+- Tabela da unidade: modo compacto (padrão; o botão "compacto" alterna e o navegador lembra), coluna
+  da conta fixa ao rolar para o lado e cabeçalhos ordenáveis no padrão do W3C (botão + `aria-sort`).
 - Cores definidas como tokens no início do CSS (`--bg-neg`, `--bg-warn`, `--bg-pos`, `--bg-neu`,
   `--bar-pos`…). Fundos de pílulas e alertas usam uma intensidade por papel.
 

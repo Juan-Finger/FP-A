@@ -25,6 +25,8 @@
   --bg-neg-sutil:rgba(242,109,109,.09); --bg-warn-sutil:rgba(239,178,92,.10); --bd-neg:rgba(242,109,109,.35);
   /* barras de gráfico (não são texto: ≥ 3:1 sobre o fundo) */
   --bar-pos:#4ADE9B; --bar-neg:#F26D6D; --lil:#A78BFA; --on-red:#2A0E0E;
+  /* notação IBCS (ISO 24896): realizado = cheio, orçado = contorno, no mesmo tom neutro */
+  --ac:#C9D5E2;
   --r:10px;
   --fs:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
   --fm:ui-monospace,'Cascadia Mono','Segoe UI Mono',Consolas,'SF Mono',Menlo,monospace;
@@ -38,7 +40,7 @@ body.claro{
   --alf:#0F678C; --cd:#784F93; --tra:#006C5F; --fro:#AD2F55; --cor:#8A5500; --bko:#4F637A; --ssg:#526274;
   --fg-neg:#B42318; --fg-warn:#8A5A00; --fg-pos:#1A7352; --fg-lil:#6D4FC2; --on-cy:#FFFFFF;
   --exp-bg:#EDF1F6; --hm-fg:#2A1D06;
-  --bar-pos:#22A06B; --bar-neg:#D64545; --lil:#7C5CD6;
+  --bar-pos:#22A06B; --bar-neg:#D64545; --lil:#7C5CD6; --ac:#33465C;
 }
 /* tooltip é escuro também no tema claro: devolve os tons claros dentro dele (C1) */
 body.claro .tip{--tx:#EAF0F7;--mut:#B8C6D6;--dim:#9FB0C3;--amb:#F3C784;--grn:#4ADE9B;--red:#F26D6D;--cy:#22D3EE;--cy2:#67E8F9;
@@ -189,6 +191,21 @@ thead th{background:var(--s2);color:var(--mut);text-align:left;padding:10px 12px
   border-bottom:1px solid var(--line);user-select:none;position:sticky;top:0;z-index:2}
 thead th:hover{color:var(--tx)}
 thead th .ar{color:var(--cy);margin-left:3px;font-size:11px}
+/* cabeçalho ordenável no padrão do W3C: botão dentro do <th> e aria-sort na coluna ativa */
+thead th .thb{background:none;border:0;padding:0;margin:0;font:inherit;letter-spacing:inherit;color:inherit;
+  cursor:pointer;display:inline;white-space:nowrap}
+thead th .thb:focus-visible{outline:2px solid var(--cy);outline-offset:3px;border-radius:3px}
+/* tabela da unidade: coluna da conta fixa ao rolar para o lado e modo compacto (linha ~32px) */
+.tw.det thead th:first-child,.tw.det tbody tr.lin td:first-child{position:sticky;left:0;z-index:1;
+  background:var(--s1);box-shadow:1px 0 0 var(--line)}
+.tw.det thead th:first-child{z-index:3;background:var(--s2)}
+body.claro .tw.det thead th:first-child{background:#0C2340}
+.tw.det tbody tr.lin:hover td:first-child,.tw.det tbody tr.lin.aberta td:first-child{background:var(--s2)}
+.tw.det td.dsc{min-width:200px}
+.tw.det.compacto tbody tr.lin td{padding-top:6px;padding-bottom:6px}
+.tw.det.compacto td.dsc,.tw.det.compacto td.cls{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px}
+.tw.det.compacto td.cls{max-width:190px}
+.xbtn[aria-pressed="true"]{border-color:var(--cy);color:var(--tx)}
 tbody td{padding:9px 12px;border-bottom:1px solid var(--line)}
 tbody tr:last-child td{border-bottom:none}
 tbody tr{transition:background .1s}
@@ -424,17 +441,32 @@ table.mini th.r{text-align:right}
 .rtab .rtot td{border-top:1px solid var(--line2);color:var(--tx);font-weight:500;padding-top:7px}
 .graf{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
 .glbl{font-size:11px;color:var(--mut);margin-bottom:9px}
-.sw{display:inline-block;width:9px;height:9px;border-radius:2px;vertical-align:-1px}
-.sw.rec{background:var(--bar-pos)} .sw.cus{background:var(--bar-neg)}
-.gwrap{display:flex;gap:8px;align-items:flex-end}
-.gcol{flex:1;text-align:center;cursor:help}
-.gpar{display:flex;gap:2px;justify-content:center;align-items:flex-end;height:56px}
-.gb{width:10px;border-radius:2px 2px 0 0}
-.gb.rec{background:var(--bar-pos);opacity:.85} .gb.cus{background:var(--bar-neg);opacity:.85}
-.gm{font-size:11px;color:var(--dim);margin-top:4px}
-.gm.at{color:var(--cy);font-weight:500}
-.gr{font-size:11px;line-height:1}
-.gr.pos{color:var(--grn)} .gr.neg{color:var(--red)}
+/* gráfico mês a mês na notação IBCS: orçado vazado atrás, realizado cheio na frente, variação embaixo */
+.ibcs{display:flex;gap:3px;margin:8px 0 2px}
+.ibc{flex:1;min-width:30px;cursor:help;border-radius:4px}
+.ibc:hover,.ibc:focus-visible{background:var(--s2)}
+.ibp,.ibv{position:relative}
+.ibp i{position:absolute;width:18px;box-sizing:border-box}
+.ibp i.pl{left:calc(50% - 14px);border:1.5px solid var(--ac);background:var(--s1)}
+.ibp i.ac{left:calc(50% - 4px);background:var(--ac)}
+.ibcs .z,.ibr .z{position:absolute;left:4px;right:4px;height:1px;background:var(--line2)}
+.ibv i{position:absolute;left:calc(50% - 9px);width:18px;border-radius:1px}
+.ibv i.pos{background:var(--bar-pos)} .ibv i.neg{background:var(--bar-neg)}
+.ibv .vl{position:absolute;left:-12px;right:-12px;text-align:center;font:9.5px/1 var(--fm);white-space:nowrap;letter-spacing:-.02em}
+.ibv .vl::after,.ibm::after{content:attr(data-v)}
+.ibv .vl.pos{color:var(--fg-pos)} .ibv .vl.neg{color:var(--fg-neg)}
+.ibm{text-align:center;font-size:10.5px;color:var(--dim);margin-top:3px}
+.ibc.at .ibm{color:var(--tx);font-weight:600} .ibc.ab .ibm{color:var(--fg-warn)}
+.ibleg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:11px;color:var(--mut);align-items:center}
+.ibleg i{display:inline-block;width:10px;height:10px;margin-right:5px;vertical-align:-1px;box-sizing:border-box}
+.ibleg i.ac{background:var(--ac)} .ibleg i.pl{border:1.5px solid var(--ac)}
+.ibleg i.dv{width:5px;background:var(--bar-pos);box-shadow:6px 0 0 var(--bar-neg);margin-right:11px}
+/* na tabela de meses da linha aberta: uma célula por mês, alinhada com os valores */
+.ibr td{padding:4px 2px 2px!important;border-bottom:1px solid var(--line)}
+.ibr td.ibc{cursor:help}
+.ibr td.ibc .ibm{display:none}
+@media (max-width:760px){ .ibc:not(.at) .vl{display:none} }
+.tw.det.compacto tbody tr.lin td{white-space:nowrap}
 .exbox{background:var(--s1);border:1px solid var(--line);border-radius:var(--r);
   padding:13px 16px;margin-bottom:11px}
 .exbox.alerta2{border-left:3px solid var(--red)}
@@ -626,8 +658,6 @@ table.mini tr.vr td{border-top:1px solid var(--line)}
   .chip{font-size:11px;padding:5px 10px}
   input#busca,#buscahub{flex:1 1 100%;order:9}
   .flbl{min-width:0;width:100%}
-  .gwrap{overflow-x:auto}
-  .gcol{min-width:26px}
   .wrow{gap:8px;padding:9px 11px;flex-wrap:wrap}
   .wrow .nm{flex:1 1 55%;font-size:12px}
   .wrow .qt{width:auto}
@@ -1534,7 +1564,7 @@ function sparkline(cod,w=72,h=26){
     `${(i/(n-1||1)*w).toFixed(1)},${(h-Math.abs(v)/mx*(h-3)).toFixed(1)}`).join(" ");
   return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">
     <polyline points="${pt(p,upto)}" fill="none" style="stroke:var(--dim)" stroke-width="1.3" stroke-dasharray="2.5 2"/>
-    <polyline points="${pt(r,upto)}" fill="none" style="stroke:var(--cy)" stroke-width="1.6"/></svg>`;
+    <polyline points="${pt(r,upto)}" fill="none" style="stroke:var(--ac)" stroke-width="1.6"/></svg>`;
 }
 
 /* ---------- SIDEBAR ---------- */
@@ -2130,14 +2160,14 @@ function resultado(cod){
 }
 // série mensal de receita e resultado, para o gráfico
 function serieResultado(cod){
-  const rec=Array(12).fill(0), res=Array(12).fill(0), cus=Array(12).fill(0);
+  const rec=Array(12).fill(0), res=Array(12).fill(0), cus=Array(12).fill(0), resP=Array(12).fill(0);
   dadosDe(cod).forEach(d=>{
     const n=natMap[d.a];
     for(let i=0;i<12;i++){
-      res[i]+=d.r[i];
+      res[i]+=d.r[i]; resP[i]+=d.p[i];
       if(n==="rec"||n==="ded") rec[i]+=d.r[i]; else cus[i]+=d.r[i];
     }});
-  return {rec,cus,res};
+  return {rec,cus,res,resP};
 }
 function renderResultado(cod){
   const {g,tp,tr}=resultado(cod);
@@ -2157,19 +2187,6 @@ function renderResultado(cod){
   // gráfico de barras mensal
   const sr=serieResultado(cod);
   const fech=[...Array(12).keys()].filter(i=>DB.fechado[i]);
-  const mx=Math.max(...fech.map(i=>Math.max(Math.abs(sr.rec[i]),Math.abs(sr.cus[i]))),1);
-  const H=54;
-  const barras=fech.map(i=>{
-    const hr=Math.max(1,Math.abs(sr.rec[i])/mx*H), hc=Math.max(1,Math.abs(sr.cus[i])/mx*H);
-    const pos=sr.res[i]>=0;
-    return `<div class="gcol" ${T(`<b>${rotMes(i)}</b>
-        <div class="tr2"><span>Receita líquida</span><b class="num">${fmtC(sr.rec[i])}</b></div>
-        <div class="tr2"><span>Custos e despesas</span><b class="num">${fmtC(sr.cus[i])}</b></div>
-        <div class="tr2"><span>Resultado</span><b class="num ${pos?'pos':'neg'}">${fmtC(sr.res[i])}</b></div>`)}>
-      <div class="gpar"><div class="gb rec" style="height:${hr}px"></div>
-        <div class="gb cus" style="height:${hc}px"></div></div>
-      <div class="gm${i===M?" at":""}">${DB.meses[i]}</div>
-      <div class="gr ${pos?"pos":"neg"}">${pos?"+":"−"}</div></div>`;}).join("");
 
   return `<div class="expl" style="border-left:3px solid var(--grn)">
       <div class="rhead"><span>Resultado em ${faixaLbl()}</span>
@@ -2183,10 +2200,8 @@ function renderResultado(cod){
           <td class="r num ${tr-tp<0?'neg':'pos'}">${fmtC(tr-tp)}</td><td></td>
           <td><span class="fv ${favor(tr-tp)}">${FAVLBL[favor(tr-tp)]}</span></td></tr>
         </tbody></table>
-      <div class="graf"><div class="glbl">Receita líquida <i class="sw rec"></i>
-        &nbsp; Custos e despesas <i class="sw cus"></i> &nbsp;
-        <span style="color:var(--dim)">sinal abaixo = resultado do mês</span></div>
-        <div class="gwrap">${barras}</div></div>
+      <div class="graf"><div class="glbl">Resultado mês a mês</div>
+        ${graficoIBCS(sr.resP,sr.res,fech)}</div>
     </div>`;
 }
 
@@ -2596,16 +2611,46 @@ function linhas(){
       cls:(ac.fv||"—")+" · "+recTexto(d.a)});});
   return out;
 }
+/* Gráfico mês a mês na notação IBCS (padrão de relatório financeiro, ISO 24896):
+   realizado (AC) em coluna cheia, orçado (PL) em contorno vazado logo atrás, e a variação
+   (realizado − orçado) embaixo, verde quando favorável e vermelha quando desfavorável.
+   Os sinais são os do DRE (despesa negativa): as colunas descem quando o valor é negativo. */
+function graficoIBCS(P,R,ms,emCelulas){
+  if(!ms.length) return "";
+  const vals=ms.flatMap(i=>[P[i],R[i]]), hi=Math.max(0,...vals), lo=Math.min(0,...vals), span=(hi-lo)||1;
+  const H=60, base=Math.round(H*hi/span), HV=22, PAD=13;          // PAD: espaço do rótulo da variação
+  const V=ms.map(i=>R[i]-P[i]), mv=Math.max(EPS,...V.map(Math.abs));
+  const col=(v,cls)=>{ const hh=Math.max(Math.abs(v)>EPS?1.5:0,Math.abs(v)/span*H);
+    return `<i class="${cls}" style="top:${(v>=0?base-hh:base).toFixed(1)}px;height:${hh.toFixed(1)}px"></i>`; };
+  const sv=v=>Math.abs(v)<EPS?"":(v>0?"+":"−")+fmtMi(Math.abs(v)).replace(/^−/,"");
+  const z0=PAD+HV;                                                 // linha zero da variação
+  const cel=(i,k,tag)=>{ const v=V[k], hv=Math.abs(v)<EPS?0:Math.max(2,Math.abs(v)/mv*HV), up=v>=0;
+    return `<${tag} class="ibc${i===M?" at":""}${ehAberto(i)?" ab":""}" ${T(`<b>${rotMes(i)}</b>${ehAberto(i)?` <span style="color:var(--fg-warn)">(em aberto)</span>`:""}
+        <div class="tr2"><span>Orçado</span><b class="num">${fmtC(P[i])}</b></div>
+        <div class="tr2"><span>Realizado</span><b class="num">${fmtC(R[i])}</b></div>
+        <div class="tr2"><span>Variação</span><b class="num ${v<0?"neg":"pos"}">${fmtC(v)}${Math.abs(v)<EPS?"":v>0?" · favorável":" · desfavorável"}</b></div>`)}>
+      <div class="ibp" style="height:${H}px">${col(P[i],"pl")}${col(R[i],"ac")}<b class="z" style="top:${base}px"></b></div>
+      <div class="ibv" style="height:${2*(PAD+HV)}px">${hv?`<i class="${up?"pos":"neg"}" style="top:${(up?z0-hv:z0).toFixed(1)}px;height:${hv.toFixed(1)}px"></i>
+        <span class="vl ${up?"pos":"neg"}" data-v="${sv(v)}" style="top:${(up?z0-hv-11:z0+hv+2).toFixed(1)}px"></span>`:""}<b class="z" style="top:${z0}px"></b></div>
+      <div class="ibm" data-v="${DB.meses[i]}"></div></${tag}>`; };
+  const resumo=ms.map((i,k)=>`${DB.meses[i]}: orçado ${fmtMi(P[i])}, realizado ${fmtMi(R[i])}, variação ${fmtMi(V[k])}`).join("; ");
+  const leg=`<div class="ibleg"><span><i class="ac"></i>Realizado</span><span><i class="pl"></i>Orçado</span>
+      <span><i class="dv"></i>Variação (verde favorável, vermelho desfavorável)</span></div>`;
+  if(emCelulas) return {leg,linha:`<tr class="ibr" aria-label="${he(resumo)}"><td></td>${ms.map((i,k)=>cel(i,k,"td")).join("")}<td></td></tr>`};
+  return leg+`<div class="ibcs" role="img" aria-label="${he(resumo)}">${ms.map((i,k)=>cel(i,k,"div")).join("")}</div>`;
+}
 // tabela mês a mês de uma conta (expansão da linha)
 function mesATes(d){
   const ms=[]; for(let i=0;i<12;i++) if(DB.fechado[i]) ms.push(i);
   const cel=i=>{const p=d.p[i],r=d.r[i],v=r-p;
     const falta=Math.abs(p)>EPS&&Math.abs(r)<EPS;
     return `<td class="r num${falta?" falta":""}">${fmtC(r)}</td>`;};
+  const gr=graficoIBCS(d.p,d.r,ms,true);
   return `<tr class="exp"><td colspan="11"><div class="expbox">
     <div class="expt">Orçado × realizado mês a mês${modo==="rec"?" · conta recorrente":""}</div>
+    ${gr.leg}
     <table class="mini"><thead><tr><th aria-label="Linha"></th>${ms.map(i=>`<th class="r">${DB.meses[i]}</th>`).join("")}<th class="r">Total</th></tr></thead>
-    <tbody>
+    <tbody>${gr.linha}
       <tr><td>Orçado</td>${ms.map(i=>`<td class="r num">${fmtC(d.p[i])}</td>`).join("")}
           <td class="r num b">${fmtC(ms.reduce((s,i)=>s+d.p[i],0))}</td></tr>
       <tr><td>Realizado</td>${ms.map(cel).join("")}
@@ -2640,7 +2685,7 @@ function corpoDet(rows){
   const mxv=Math.max(...rows.map(r=>Math.abs(r.v)),1);
   return rows.length?rows.map(r=>`<tr class="lin ${expandida===r.a?'aberta':''}" onclick="toggleExp(${js(r.a)})">
       <td class="num" style="color:var(--dim)"><span class="cx" role="img" aria-label="${expandida===r.a?"linha aberta":"linha fechada"}">${ic(expandida===r.a?"baixo":"dir")}</span>${he(r.a)}</td>
-      <td>${he(r.desc)}${incluiConta(r.a)}</td>
+      <td class="dsc" title="${he(r.desc)}">${he(r.desc)}${incluiConta(r.a)}</td>
       <td class="r num">${fmtC(r.p)}</td>
       <td class="r num">${fmtC(r.r)}</td>
       <td class="r num ${r.v<0?'neg':'pos'}">${fmtC(r.v)}
@@ -2651,7 +2696,7 @@ function corpoDet(rows){
       <td>${r.st==="sem"?'<span style="color:var(--dim)">—</span>':`<span class="fv ${r.fav}">${FAVLBL[r.fav]}</span>`}</td>
       <td><span class="st ${r.st}">${ST[r.st]}</span></td>
       <td>${r.st==="sem"?`<span class="cf ${r.cf}" ${T(tipHist(r.hist,r.cf))}>${CONF[r.cf]}</span>`:'<span style="color:var(--dim)">—</span>'}</td>
-      <td class="cls">${he(r.cls)}</td></tr>`+(expandida===r.a?mesATes(r.d):"")).join("")
+      <td class="cls" title="${he(r.cls)}">${he(r.cls)}</td></tr>`+(expandida===r.a?mesATes(r.d):"")).join("")
     :`<tr><td colspan="11"><div class="empty">Nenhuma conta neste filtro.</div></td></tr>`;
 }
 // busca: atualiza só o corpo da tabela e o contador — o campo não é recriado
@@ -2672,7 +2717,9 @@ function renderDet(){
 
   const rows=linhasFiltradas(base);
   const body=corpoDet(rows);
-  const ar=key=>view.sk===key?`<span class="ar" role="img" aria-label="${view.sd>0?"ordem decrescente":"ordem crescente"}">${ic(view.sd>0?"baixo":"cima")}</span>`:"";
+  const ar=key=>view.sk===key?`<span class="ar">${ic(view.sd>0?"baixo":"cima")}</span>`:"";
+  // th ordenável: botão dentro do cabeçalho; aria-sort só na coluna ordenada (W3C APG)
+  const th=(k,l,cls="")=>`<th data-k="${k}"${cls?` class="${cls}"`:""}${view.sk===k?` aria-sort="${view.sd>0?"descending":"ascending"}"`:""}><button type="button" class="thb">${l}${ar(k)}</button></th>`;
 
   const all=base;
   // BLOCO 0 — histórico de pendências mês a mês
@@ -2792,23 +2839,33 @@ function renderDet(){
       <input id="busca" type="search" aria-label="Buscar conta ou descrição" placeholder="Buscar conta ou descrição…" value="${he(view.busca)}">
       <button class="xbtn" onclick="exportUnidade()">exportar unidade</button>
       <button class="xbtn" onclick="abreProvisao()">exportar provisão</button>
+      <button class="xbtn" id="bdens" aria-pressed="${compacto}" onclick="alternaDensidade()" title="Linhas compactas: descrição numa linha só (o texto completo aparece ao passar o mouse)">compacto</button>
     </div>
-    <div class="tw"><table><thead><tr>
-      <th data-k="a">Conta${ar("a")}</th><th data-k="desc">Descrição${ar("desc")}</th>
-      <th data-k="p" class="r">Planejado${ar("p")}</th><th data-k="r" class="r">Realizado${ar("r")}</th>
-      <th data-k="v" class="r">Variação${ar("v")}</th><th data-k="pct" class="r">%${ar("pct")}</th>
-      <th data-k="nat">Natureza${ar("nat")}</th>
-      <th data-k="fav">Efeito${ar("fav")}</th>
-      <th data-k="st">Status${ar("st")}</th><th data-k="cf">Confiança${ar("cf")}</th>
-      <th data-k="cls">Classificação${ar("cls")}</th>
+    <div class="tw det${compacto?" compacto":""}"><table><thead><tr>
+      ${th("a","Conta")}${th("desc","Descrição")}
+      ${th("p","Planejado","r")}${th("r","Realizado","r")}
+      ${th("v","Variação","r")}${th("pct","%","r")}
+      ${th("nat","Natureza")}
+      ${th("fav","Efeito")}
+      ${th("st","Status")}${th("cf","Confiança")}
+      ${th("cls","Classificação")}
     </tr></thead><tbody>${body}</tbody></table></div>`;
 
   const b=document.getElementById("busca");
   b.oninput=e=>{ view.busca=e.target.value; clearTimeout(tBusca); tBusca=setTimeout(atualizaTabelaDet,150); };
-  document.querySelectorAll(".tw thead th[data-k]").forEach(th=>th.onclick=()=>{
-    const kk=th.dataset.k;
+  document.querySelectorAll(".tw thead th[data-k] .thb").forEach(bt=>bt.onclick=()=>{
+    const kk=bt.closest("th").dataset.k;
     if(view.sk===kk) view.sd*=-1; else {view.sk=kk;view.sd=1;}
     renderDet();});
+}
+// densidade da tabela da unidade (preferência deste navegador)
+let compacto=true;
+try{ const v=localStorage.getItem("fpa-densidade"); if(v) compacto=v!=="confortavel"; }catch(e){}
+function alternaDensidade(){
+  compacto=!compacto;
+  try{ localStorage.setItem("fpa-densidade",compacto?"compacto":"confortavel"); }catch(e){}
+  const t=document.querySelector(".tw.det"); if(t) t.classList.toggle("compacto",compacto);
+  const b=document.getElementById("bdens"); if(b) b.setAttribute("aria-pressed",compacto);
 }
 let aba="pend";
 const ABA_FILTRO={pend:"sem", var:"ana", res:"todos", sin:"todos", hist:"todos"};
@@ -3056,14 +3113,14 @@ document.addEventListener("keydown",e=>{
 /* ================= TECLADO (C3) ================= */
 // Todo elemento clicável recebe foco e responde a Enter/Espaço. Os onclick inline
 // continuam sendo a única fonte da ação — para o mouse nada muda.
-const SEL_CLICAVEL='[onclick]:not(button):not(a[href]):not(input):not(select):not(label):not(.palit),.tw thead th[data-k]';
+const SEL_CLICAVEL='[onclick]:not(button):not(a[href]):not(input):not(select):not(label):not(.palit)';
 function acessivel(){
   document.querySelectorAll(SEL_CLICAVEL).forEach(el=>{
     if(!el.hasAttribute("tabindex")) el.tabIndex=0;
     if(!el.hasAttribute("role")&&!/^(TR|TD|TH)$/.test(el.tagName)) el.setAttribute("role",el.tagName==="A"?"link":"button");
   });
   // elementos com explicação (tooltip) também recebem foco
-  document.querySelectorAll(".kpi[data-tip],.fr[data-tip],.cf[data-tip],.cnt[data-tip],.umais[data-tip],.modotag[data-tip],.hpc[data-tip],.gcol[data-tip]")
+  document.querySelectorAll(".kpi[data-tip],.fr[data-tip],.cf[data-tip],.cnt[data-tip],.umais[data-tip],.modotag[data-tip],.hpc[data-tip],.ibc[data-tip]")
     .forEach(el=>{ if(!el.hasAttribute("tabindex")) el.tabIndex=0; });
 }
 new MutationObserver(acessivel).observe(document.body,{childList:true,subtree:true});   // roda uma vez por lote de mudanças
@@ -3077,9 +3134,10 @@ document.addEventListener("keydown",e=>{
 // controle (aba, chip, linha) ou, se a tela mudou, ao título da nova tela.
 document.addEventListener("click",e=>{
   if(e.detail!==0||!(e.target instanceof Element)) return;          // detail 0 = ativação por teclado
-  const el=e.target.closest("[onclick],button,th[data-k]"); if(!el) return;
+  const el=e.target.closest("[onclick],button"); if(!el) return;
   const onde=()=>JSON.stringify([view.tipo,view.seg,view.unit]), antes=onde();
-  const chave={id:el.id,oc:el.getAttribute("onclick"),k:el.dataset?el.dataset.k:null};
+  const thk=el.closest("th[data-k]");
+  const chave={id:el.id,oc:el.getAttribute("onclick"),k:thk?thk.dataset.k:null};
   setTimeout(()=>{
     const a=document.activeElement;
     if(a&&a!==document.body&&document.contains(a)) return;         // a ação já cuidou do foco
@@ -3087,7 +3145,7 @@ document.addEventListener("click",e=>{
     if(onde()===antes){
       if(chave.id) alvo=document.getElementById(chave.id);
       else if(chave.oc) alvo=[...document.querySelectorAll("[onclick]")].find(x=>x.getAttribute("onclick")===chave.oc);
-      else if(chave.k) alvo=document.querySelector(`.tw thead th[data-k="${chave.k}"]`);
+      else if(chave.k) alvo=document.querySelector(`.tw thead th[data-k="${chave.k}"] .thb`);
     }
     (alvo||document.getElementById("title")).focus({preventScroll:true});
   },0);

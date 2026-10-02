@@ -218,6 +218,14 @@ TEXTO_INTENCIONAL.push(["A4", (o, n, k) => { if (k.startsWith("mp:") || /^det:.*
 TEXTO_INTENCIONAL.push(["I1", (o, n) => { for (const k of ["body", "kpis"]) {
   if (o[k]) o[k] = o[k].replace(/[▸▾]/g, "").replace(/⚠ ?/g, "").replace(/ →/g, " ").replace(/[▲▼]/g, "");
  } }]);
+// R2: aba Resultado troca o gráfico receita × custo pelo resultado realizado × orçado (notação IBCS);
+// os valores do gráfico estão no tooltip e na tabela acima, que continua idêntica
+TEXTO_INTENCIONAL.push(["R2", (o, n, k) => { if (!/:res$/.test(k)) return;
+  const M = "(?:JAN|FEV|MAR|ABR|MAI|JUN|JUL|AGO|SET|OUT|NOV|DEZ)";
+  if (o.body) o.body = o.body.replace(new RegExp("Receita líquida\\s+Custos e despesas\\s+sinal abaixo = resultado do mês(\\n" + M + "\\n[+−])*", "g"), "#GRAF");
+  if (n.body) n.body = n.body.replace(/Resultado mês a mês\nRealizado\nOrçado\nVariação \(verde favorável, vermelho desfavorável\)/g, "#GRAF"); }]);
+// R2: botão "compacto" na barra da tabela da unidade
+TEXTO_INTENCIONAL.push(["R2", (o, n) => { if (n.body) n.body = n.body.replace(/\ncompacto(?=\n)/g, ""); }]);
 teste("T05", "texto visível de todas as telas idêntico ao original (estado padrão)", async () => {
   const [o, n] = await Promise.all([pagina("orig"), pagina("novo")]);
   const a = await o.evaluate(TELAS), b = await n.evaluate(TELAS);
@@ -225,6 +233,9 @@ teste("T05", "texto visível de todas as telas idêntico ao original (estado pad
     const x = JSON.parse(JSON.stringify(a[k])), y = JSON.parse(JSON.stringify(b[k] || {}));
     for (const [, fn] of TEXTO_INTENCIONAL) fn(x, y, k);
 
+    if (process.env.DIFTXT && x.body !== y.body) {   // diagnóstico: DIFTXT=1 mostra a 1ª linha diferente
+      const A = (x.body || "").split("\n"), B = (y.body || "").split("\n");
+      for (let i = 0; i < Math.max(A.length, B.length); i++) if (A[i] !== B[i]) { console.log(k, i, JSON.stringify(A.slice(i, i + 3)), "≠", JSON.stringify(B.slice(i, i + 3))); break; } }
     igual(x, y, "tela " + k);
   }
 });
@@ -685,7 +696,7 @@ teste("C3", "teclado: tudo que é clicável recebe foco e abre com Enter/Espaço
     const u = Object.keys(met().a)[4];
     const telas = [() => go({ tipo: "hub" }), () => setVhub("ct"), () => { toggleContaHub(contasHubFiltradas()[0].a); }, () => setVhub("seg"), () => go({ tipo: "seg", seg: segs[0] }), () => setVseg("ct"), () => setVseg("mp"), () => setVseg("un"),
       () => { go({ tipo: "det", seg: umap[u].seg, unit: u }); setF("todos"); }, () => go({ tipo: "lastro" }), () => go({ tipo: "exc" })];
-    for (const f of telas) { f(); await Promise.resolve(); document.querySelectorAll("[onclick],th[data-k]").forEach(el => { if (el.tabIndex < 0 && !el.closest("[inert]") && el.getBoundingClientRect().width) out.add(el.tagName + "." + el.className.split(" ")[0]); }); }
+    for (const f of telas) { f(); await Promise.resolve(); document.querySelectorAll("[onclick],th[data-k] .thb").forEach(el => { if (el.tabIndex < 0 && !el.closest("[inert]") && el.getBoundingClientRect().width) out.add(el.tagName + "." + el.className.split(" ")[0]); }); }
     go({ tipo: "hub" }); return [...out]; });
   ok(!semFoco.length, "clicáveis sem foco: " + semFoco.join(", "));
   // Tab chega na navegação; Enter abre o segmento; o foco não se perde no <body>
@@ -1108,6 +1119,46 @@ teste("X1", "acessibilidade (axe-core): nenhuma violação nas telas principais 
     await p.context().close();
   }
   ok(!falhas.length, "violações:\n      " + falhas.slice(0, 12).join("\n      "));
+});
+
+teste("V1", "IBCS, tabela compacta, coluna da conta fixa e ordenação no padrão W3C", async () => {
+  const p = await abre(NOVO, "plano_sint.csv");
+  const r = await p.evaluate(async () => {
+    try { localStorage.removeItem("fpa-densidade"); } catch (e) {}
+    go({ tipo: "det", unit: "4001A", seg: umap["4001A"].seg }); setF("todos");
+    // ordenação: botão no cabeçalho, aria-sort só na coluna ordenada
+    const sorts = () => [...document.querySelectorAll(".tw.det thead th[aria-sort]")].map(th => th.dataset.k + ":" + th.getAttribute("aria-sort"));
+    const s0 = sorts();
+    document.querySelector('.tw.det thead th[data-k="p"] .thb').click();
+    const s1 = sorts(), ordP = view.sk;
+    document.querySelector('.tw.det thead th[data-k="p"] .thb').click();
+    const s2 = sorts();
+    // compacto: ligado por padrão, alterna e é lembrado
+    const comp0 = document.querySelector(".tw.det").classList.contains("compacto");
+    document.getElementById("bdens").click();
+    const comp1 = document.querySelector(".tw.det").classList.contains("compacto"), salvo = localStorage.getItem("fpa-densidade");
+    document.getElementById("bdens").click();
+    const fixa = getComputedStyle(document.querySelector(".tw.det tbody tr.lin td")).position;
+    // gráfico IBCS na linha aberta: uma célula por mês fechado, variação = realizado − orçado
+    const lin = linhas().find(l => DB.fechado.some((f, i) => f && Math.abs(l.d.r[i] - l.d.p[i]) > 1000));
+    toggleExp(lin.a);
+    const cels = [...document.querySelectorAll("tr.exp .ibr td.ibc")];
+    const fech = DB.fechado.map((f, i) => f ? i : -1).filter(i => i >= 0);
+    const sinais = cels.map((c, k) => { const v = lin.d.r[fech[k]] - lin.d.p[fech[k]], b = c.querySelector(".ibv i");
+      return Math.abs(v) < EPS ? !b : !!b && b.classList.contains(v > 0 ? "pos" : "neg"); });
+    const plAc = cels.every(c => c.querySelector(".ibp i.pl") && c.querySelector(".ibp i.ac"));
+    setAba("res"); const res = document.querySelectorAll(".graf .ibcs .ibc").length;
+    return { s0, s1, s2, ordP, comp0, comp1, salvo, fixa, nCel: cels.length, nFech: fech.length, sinais, plAc, res }; });
+  igual(["st:descending"], r.s0, "aria-sort inicial");
+  igual(["p:descending"], r.s1, "aria-sort depois de ordenar por Planejado");
+  igual(["p:ascending"], r.s2, "aria-sort ao inverter");
+  ok(r.ordP === "p", "ordenação pelo botão do cabeçalho");
+  ok(r.comp0 && !r.comp1 && r.salvo === "confortavel", "densidade: " + JSON.stringify([r.comp0, r.comp1, r.salvo]));
+  ok(r.fixa === "sticky", "coluna da conta não fica fixa: " + r.fixa);
+  ok(r.nCel === r.nFech && r.sinais.every(Boolean) && r.plAc, "gráfico da linha aberta: " + JSON.stringify(r));
+  ok(r.res === r.nFech, "gráfico do resultado: " + r.res);
+  ok(!p._erros.length, "erros: " + p._erros);
+  await p.context().close();
 });
 
 /* ---------- tela de carga: pasta da base e link do Plano ---------- */
