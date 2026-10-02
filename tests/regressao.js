@@ -202,6 +202,8 @@ TEXTO_INTENCIONAL.push(["A15", o => { if (!o.body) return;
     .replace(new RegExp("\\s*margem " + MG + "( · orçada [^\\n]*)?", "g"), "").replace(new RegExp(" · orçada " + MG, "g"), ""); }]);
 // H1: a Visão Geral ganhou a alternância "Por segmento | Por conta" acima dos cards
 TEXTO_INTENCIONAL.push(["H1", (o, n, k) => { if (k === "hub" && n.body) n.body = n.body.replace("Por segmento\nPor conta\nSEGMENTOS E UNIDADES\n", ""); }]);
+// P1: botão "exportar provisão" ao lado das exportações de segmento e unidade
+TEXTO_INTENCIONAL.push(["P1", (o, n) => { if (n.body) n.body = n.body.replace(/\s*exportar provisão/g, ""); if (o.body) o.body = o.body.replace(/(exportar (segmento|unidade))/g, "$1"); }]);
 // A11: Exceções ganhou a dica de clique nas contas
 TEXTO_INTENCIONAL.push(["A11", (o, n, k) => { if (k === "exc" && n.body) n.body = n.body.replace(/ Clique numa conta para abrir a unidade nela\./g, "").replace(/\nClique numa conta para abrir a unidade nela\./g, ""); }]);
 // F2: conta que recebe fusão mostra "· inclui 4.1.1.01.1.98"
@@ -896,7 +898,7 @@ teste("H2", "Visão Geral · Por conta: tela, filtros, busca, expansão, exporta
   await p.focus("#buscahub"); await p.keyboard.type("4.1.1.02"); await p.waitForTimeout(400);
   const t3 = await p.evaluate(() => ({ mesmo: document.getElementById("buscahub") === window.__c, foco: document.activeElement.id,
     linhas: document.querySelectorAll("#hubct-res tbody tr.lin").length, esp: contasHubFiltradas().length,
-    todas: [...document.querySelectorAll("#hubct-res tbody tr.lin td:first-child")].every(td => td.textContent.includes("4.1.1.02")) }));
+    todas: [...document.querySelectorAll("#hubct-res tbody tr.lin td.num:not(.r)")].every(td => td.textContent.includes("4.1.1.02")) }));
   ok(t3.mesmo && t3.foco === "buscahub" && t3.linhas === t3.esp && t3.todas && t3.linhas > 0, JSON.stringify(t3));
   // expansão: todas as unidades do recorte, com segmento e total
   const t4 = await p.evaluate(() => { hubFiltro("limpar"); const o = contasHubFiltradas()[0]; toggleContaHub(o.a);
@@ -937,6 +939,41 @@ teste("F2", "PPR: provisão (98) soma no PPR (99), que mantém o próprio nome; 
   ok(r.tela && r.busca, "tela/busca: " + JSON.stringify({ t: r.tela, b: r.busca }));
   igual(pyPayload("fusao.csv").data, payloadBasico(await p.evaluate(() => window.__DB__)).data, "valores diferentes do Python");
   await p.context().close();
+});
+
+teste("P1", "provisão: conta, valor e centro de custo (unidade + 4 últimos do CC), com todas as opções", async () => {
+  const p = await abre(NOVO, "provisao.csv");
+  const r = await p.evaluate(() => {
+    const lin = o => dadosProvisao(o).linhas.map(l => [l.conta, l.valor, l.cc]);
+    const base = { escopo: "todos", contas: "todas", valor: "orc", parcial: false, ppr: false };
+    return { mes: DB.meses[M], col: DB.carga.colCC,
+      padrao: lin(base), parcial: lin({ ...base, parcial: true }), ppr: lin({ ...base, ppr: true }), media: lin({ ...base, valor: "media" }),
+      sel: (provSel.clear(), provSel.add("4.1.1.08.1.06"), lin({ ...base, contas: "sel" })),
+      seg: lin({ ...base, parcial: true, escopo: "seg:Transportes" }), un: lin({ ...base, escopo: "un:4101A" }) }; });
+  ok(r.mes === "AGO" && r.col === 5, "mês/coluna: " + r.mes + " " + r.col);
+  igual([["4.1.1.01.1.99", 500, "41021114"], ["4.1.1.08.1.06", 600, "41011101"], ["4.1.1.08.1.06", 400, "41011114"]], r.padrao, "padrão (orçado, sem lançamento)");
+  igual([["4.1.1.01.1.99", 500, "41021114"], ["4.1.1.02.1.09", 300, "41011101"], ["4.1.1.04.1.06", 1569.29, "50021111"],
+         ["4.1.1.08.1.06", 600, "41011101"], ["4.1.1.08.1.06", 400, "41011114"]], r.parcial, "com lançadas abaixo do orçado");
+  igual(["4.1.1.01.1.98", 500, "41021114"], r.ppr[0], "PPR na provisão (98)");
+  igual([["4.1.1.01.1.99", 480, "41021114"], ["4.1.1.08.1.06", 72, "41011101"], ["4.1.1.08.1.06", 48, "41011114"]], r.media, "média do realizado");
+  igual([["4.1.1.08.1.06", 600, "41011101"], ["4.1.1.08.1.06", 400, "41011114"]], r.sel, "só as selecionadas");
+  igual([["4.1.1.04.1.06", 1569.29, "50021111"]], r.seg, "segmento Transportes");
+  igual([["4.1.1.08.1.06", 600, "41011101"], ["4.1.1.08.1.06", 400, "41011114"]], r.un, "unidade 4101A");
+  // pela janela: baixa o XLSX no layout (Conta contábil | Valor | Centro de custo) + conferência
+  await p.evaluate(() => { provSel.clear(); go({ tipo: "hub" }); abreProvisao(); });
+  const dlg = await p.evaluate(() => document.getElementById("guia").innerText);
+  ok(/3 linha/.test(dlg) && /1\.500,00/.test(dlg), "resumo da janela: " + dlg.slice(0, 300));
+  const x = await baixa(p, () => document.getElementById("provBaixar").click());
+  igual([["Conta contábil", "Valor", "Centro de custo"], ["4.1.1.01.1.99", 500, 41021114], ["4.1.1.08.1.06", 600, 41011101], ["4.1.1.08.1.06", 400, 41011114]],
+        x.abas["Provisão"], "planilha de provisão");
+  ok(x.abas["Conferência"].length >= 4 && /provis/i.test(x.nome), "conferência/nome: " + x.nome);
+  await p.context().close();
+  // cabeçalho sem nome reconhecível: escolhe a coluna pelos valores e permite trocar
+  const q = await abre(NOVO, "provisao_cab.csv");
+  const s = await q.evaluate(() => ({ det: DB.carga.colCC, cand: DB.carga.ccCandidatas.map(c => c.col), esc: colunaProvisao(),
+    lin: dadosProvisao({ escopo: "todos", contas: "todas", valor: "orc", parcial: false, ppr: false }).linhas.map(l => l.cc) }));
+  igual({ det: null, cand: [4, 5, 6, 7], esc: 5, lin: ["41021114", "41011101", "41011114"] }, s, "coluna de CC pelos valores");
+  await q.context().close();
 });
 
 /* ================================================================== */

@@ -445,6 +445,17 @@ td.hmu:hover{color:var(--cy2)}
 #buscahub::placeholder{color:var(--dim)}
 .chip .dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:1px}
 td.segs{max-width:220px}
+th.selc,td.selc{width:30px;padding-right:0}
+.selc input{width:15px;height:15px;cursor:pointer;accent-color:var(--cy)}
+.provcnt{font-size:11px;color:var(--cy2);margin-left:4px}
+.provform{display:grid;grid-template-columns:150px 1fr;gap:9px 12px;align-items:center;margin:4px 0 6px}
+.provform label.pl{font-size:12px;color:var(--mut)}
+.provform .fsel{width:100%}
+.provchk{display:flex;gap:8px;align-items:flex-start;font-size:12.5px;color:var(--tx);grid-column:1/-1}
+.provchk input{margin-top:3px;accent-color:var(--cy)}
+.provprev{background:var(--s2);border-radius:8px;padding:10px 12px;font-size:12.5px;color:var(--tx);margin-top:8px}
+.provprev .av{color:var(--fg-warn);display:block;margin-top:4px}
+.provbt{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
 td.segs .sg{display:inline-block;margin:1px 2px 1px 0}
 .vbar2{display:inline-flex;gap:2px;background:var(--s2);border:1px solid var(--line);
   border-radius:7px;padding:2px;margin-right:6px}
@@ -702,6 +713,15 @@ const _PRAZO_FECHAMENTO_DIAS=7;
 const _PLAN=[8,10,12,14,16,18,20,22,24,26,28,30];
 const _REAL=[9,11,13,15,17,19,21,23,25,27,29,31];
 const _CC=0,_CCD=1,_CU=2,_CUD=3,_COLMIN=32;
+// Centro de custo (usado só na exportação de provisão): procurado pelo nome do cabeçalho
+// entre as colunas 5 e 8; se nenhuma tiver nome reconhecível, guarda as quatro e escolhe
+// pelos valores (a de códigos numéricos com 4+ dígitos).
+const _CC_CANDIDATAS=[4,5,6,7];
+function _colunaCC(h){
+  for(const c of _CC_CANDIDATAS){ const t=_norm(_limpa(_cel(h,c))).trim();
+    if(/centro.*cust|c\.?\s*custo|^c\.?\s*c\.?$|ccusto|cod.*\bcc\b/.test(t)) return c; }
+  return null;
+}
 
 function _limpa(v){let t=(v||"").trim();const m=t.match(/^="?([\s\S]*?)"?$/);if(m)t=m[1];return t.replace(/^"+|"+$/g,'').trim();}
 // Número pt-BR ("1.234,56"). A conversão é a mesma do gerador Python (tira os
@@ -792,7 +812,9 @@ function _detectaAno(h,info){
 
 /* Agregação conta × unidade. Regras de negócio idênticas ao gerador Python. */
 function _agregador(info){
-  const comb=new Map(), unit_desc=new Map(), acct_desc=new Map(), descPropria=new Set(), fus={};
+  const comb=new Map(), unit_desc=new Map(), acct_desc=new Map(), descPropria=new Set(), fus={}, ccMap=new Map();
+  let ccCols=[];
+  const P=new Array(12), R=new Array(12);     // valores da linha atual (reaproveitados)
   const carga={arquivo:(info&&info.nome)||"",tamanho:(info&&info.tamanho)||0,modificado:(info&&info.modificado)||0,
     encoding:(info&&info.encoding)||"",linhas:0,usadas:0,vazias:0,naoA:0,dummy:0,semConta:0,curtas:0,
     invalidos:0,amostrasInv:[],cabecalho:{erros:[],nota:""}};
@@ -804,6 +826,8 @@ function _agregador(info){
       if(hdr.length<_COLMIN) throw new Error("O arquivo tem "+hdr.length+" colunas; o esperado são ao menos "+_COLMIN+". Confirme que é o export do Plano com Planejado e Realizado de janeiro a dezembro.");
       carga.cabecalho=_confereCabecalho(hdr);
       const an=_detectaAno(hdr,info); carga.ano=an.ano; carga.anoFonte=an.fonte;
+      carga.colCC=_colunaCC(hdr); ccCols=carga.colCC!=null?[carga.colCC]:_CC_CANDIDATAS.slice();
+      carga.ccCandidatas=ccCols.map(c=>({col:c,nome:_limpa(_cel(hdr,c)),exemplos:[]}));
       if(carga.cabecalho.erros.length) throw new Error("As colunas do arquivo não estão na ordem esperada: "
         +carga.cabecalho.erros.slice(0,3).join("; ")+(carga.cabecalho.erros.length>3?" …":"")
         +". Confirme que é o export padrão do Plano.");
@@ -828,8 +852,19 @@ function _agregador(info){
     let o=comb.get(k); if(!o){o=[new Array(12).fill(0),new Array(12).fill(0)];comb.set(k,o);}
     for(let i=0;i<12;i++){
       const pv=_num(_cel(l,_PLAN[i]),inv,li,_PLAN[i]), rv=_num(_cel(l,_REAL[i]),inv,li,_REAL[i]);
-      o[0][i]+=pv; o[1][i]+=rv;
+      o[0][i]+=pv; o[1][i]+=rv; P[i]=pv; R[i]=rv;
       if(f){ f.p[i]+=pv; f.r[i]+=rv; }
+    }
+    // detalhamento por centro de custo, com a unidade ORIGINAL (o CC contábil usa 5002, não 5001);
+    // fica pendurado na própria combinação conta × unidade (mapa pequeno, chave curta)
+    const sub=o[2]||(o[2]=new Map());
+    for(let j=0;j<ccCols.length;j++){
+      const col=ccCols[j], bruto=_cel(l,col), k3=ccCols.length===1?uo+"|"+bruto:j+"|"+uo+"|"+bruto;
+      let x=sub.get(k3);
+      if(!x){ const cc=_limpa(bruto); x={a:c,uo,u,col,cc,p:new Array(12).fill(0),r:new Array(12).fill(0)}; sub.set(k3,x); ccMap.set(c+"\u0000"+k3,x);
+        const cd=carga.ccCandidatas[j]; if(cd.exemplos.length<5&&!cd.exemplos.includes(cc)) cd.exemplos.push(cc); }
+      const xp=x.p, xr=x.r;
+      for(let i=0;i<12;i++){ xp[i]+=P[i]; xr[i]+=R[i]; }
     }
   }
   function inv(t,linha,col){carga.invalidos++;
@@ -874,7 +909,16 @@ function _agregador(info){
     carga.semClassif=accts.filter(a=>!CLASSIF[a.cod]&&!["rec","ded"].includes(a.nat)).map(a=>a.cod+" "+a.desc);
     const d=new Date(),z=n=>String(n).padStart(2,"0");
     const gerado=d.getFullYear()+"-"+z(d.getMonth()+1)+"-"+z(d.getDate())+"T"+z(d.getHours())+":"+z(d.getMinutes());
-    return {meses:_MESES,fechado,emAberto,units,accts,data,gerado,ano:carga.ano,carga};
+    const cc=[], qual={};
+    for(const x of ccMap.values()){
+      const q=qual[x.col]=qual[x.col]||{n:0,ok:0}; q.n++; if(String(x.cc).replace(/\D/g,"").length>=4) q.ok++;
+      if(x.p.some(v=>Math.abs(v)>0.005)||x.r.some(v=>Math.abs(v)>0.005))
+        cc.push({a:x.a,uo:x.uo,u:x.u,col:x.col,cc:x.cc,p:x.p.map(_compacta),r:x.r.map(_compacta)});
+    }
+    // sem nome reconhecível no cabeçalho: sugere a coluna com mais códigos de 4+ dígitos
+    carga.ccSugerida=carga.colCC!=null?carga.colCC:
+      ccCols.slice().sort((a,b)=>((qual[b]||{}).ok/((qual[b]||{}).n||1))-((qual[a]||{}).ok/((qual[a]||{}).n||1)))[0];
+    return {meses:_MESES,fechado,emAberto,units,accts,data,cc,gerado,ano:carga.ano,carga};
   }
   return {linha,fim};
 }
@@ -1488,7 +1532,8 @@ function renderContasHub(){
           <option value="val"${hubF.ord==="val"?" selected":""}>Maior R$ exposto</option></select>
         <input id="buscahub" type="search" aria-label="Buscar conta ou descrição" placeholder="Buscar conta ou descrição…" value="${he(hubF.busca)}">
         <button class="xbtn" id="hubct-limpa" onclick="hubFiltro('limpar')"${filtrosHubAtivos()?"":" hidden"}>limpar filtros</button>
-        <button class="xbtn" onclick="exportContasHub()">exportar contas</button></div>
+        <button class="xbtn" onclick="exportContasHub()">exportar contas</button>
+        <button class="xbtn" onclick="abreProvisao()">exportar provisão</button><span class="provcnt"></span></div>
     </div>
     <div id="hubct-res">${resultadoContasHub()}</div>`;
 }
@@ -1509,10 +1554,11 @@ function resultadoContasHub(){
      ${sist?`<b style="color:var(--fg-neg)">${sist}</b> falham em metade ou mais das unidades do recorte —
        costuma ser processo ou premissa de orçamento, não esquecimento de unidade.`:"Nenhuma falha atinge metade das unidades do recorte."}</div></div>
    <div class="tw" style="margin-bottom:18px"><table><thead><tr>
-      <th>Conta</th><th>Descrição</th><th>Segmentos</th><th class="r">Unidades c/ falha</th>
+      <th class="selc"><input type="checkbox" aria-label="Selecionar todas as contas listadas para a provisão" onclick="event.stopPropagation();selProvTodas(this)"></th><th>Conta</th><th>Descrição</th><th>Segmentos</th><th class="r">Unidades c/ falha</th>
       <th class="r">R$ exposto</th><th>Alcance</th><th>Quais unidades</th>
     </tr></thead><tbody>${lst.map(o=>`<tr class="lin ${expContaHub===o.a?'aberta':''}" aria-expanded="${expContaHub===o.a}"
         onclick="toggleContaHub(${js(o.a)})">
+      <td class="selc"><input type="checkbox" class="provck" data-a="${he(o.a)}" aria-label="Selecionar ${he(o.a)} para a provisão"${provSel.has(o.a)?" checked":""} onclick="event.stopPropagation();selProv(this.dataset.a,this.checked)"></td>
       <td class="num" style="color:var(--dim)"><span class="cx">${expContaHub===o.a?"▾":"▸"}</span>${he(o.a)}</td>
       <td>${he(o.desc)}${incluiConta(o.a)}${o.rec&&modo!=="rec"?' <span class="cf alta" style="font-size:11px">recorrente</span>':""}</td>
       <td class="segs">${o.segs.map(([s,n])=>`<span class="sg" style="${tint(s)}">${SEGNM[s]} ${n}</span>`).join(" ")}</td>
@@ -1531,7 +1577,7 @@ function detalheContaHub(conta,desc){
   const ls=contaNasUnidades(DB.units.filter(u=>sel.has(u.cod)),conta);
   const tp=ls.reduce((a,o)=>a+o.p,0), tr=ls.reduce((a,o)=>a+o.r,0);
   const mx=Math.max(...ls.map(o=>Math.abs(o.p)||Math.abs(o.r)),1);
-  return `<tr class="exp"><td colspan="7"><div class="expbox">
+  return `<tr class="exp"><td colspan="8"><div class="expbox">
     <div class="expt">${he(desc)} · conta ${he(conta)} · ${hubF.segs.length?hubF.segs.map(s=>SEGNM[s]).join(", "):"todos os segmentos"} em ${faixaLbl()}</div>
     <table class="mini"><thead><tr><th>Unidade</th><th>Segmento</th><th class="r">Orçado</th>
       <th class="r">Realizado</th><th class="r">Variação</th><th></th><th>Status</th></tr></thead>
@@ -1565,6 +1611,116 @@ function exportContasHub(){
     [{nome:"Contas",linhas:l,hdr:4,larg:[15,42,16,11,16,34,12,12,15,11,60],titulos:[1]}]);
 }
 
+/* ---------- PROVISÃO ---------- */
+// Exporta, para o mês analisado, as pendências no layout de lançamento:
+// Conta contábil | Valor | Centro de custo (4 dígitos da unidade ORIGINAL + 4 últimos do CC da base).
+// Decide o que provisionar e quanto por conta × unidade (mesma regra das telas) e reparte o
+// valor entre os centros de custo na proporção do orçado de cada um (soma fecha ao centavo).
+const PROV_CONTA={"4.1.1.01.1.99":"4.1.1.01.1.98"};   // opção: PPR lançado na conta de Provisão PPR
+let provSel=new Set();                                   // contas marcadas nas listas "Por conta"
+let provOpt={escopo:null,contas:"todas",valor:"orc",parcial:false,ppr:false,col:null};
+function selProv(a,on){ on?provSel.add(a):provSel.delete(a);
+  document.querySelectorAll(".provck").forEach(c=>{ if(c.dataset.a===a) c.checked=on; }); atualizaSelProv(); }
+function selProvTodas(el){ el.closest("table").querySelectorAll("tbody input.provck").forEach(c=>selProv(c.dataset.a,el.checked)); }
+function atualizaSelProv(){ document.querySelectorAll(".provcnt").forEach(s=>{ s.textContent=provSel.size?`${provSel.size} conta(s) marcada(s) para provisão`:""; }); }
+function colunaProvisao(){ const c=DB.carga||{}; return provOpt.col!=null?provOpt.col:(c.colCC!=null?c.colCC:c.ccSugerida); }
+let _ccIdx=null;
+function ccDe(a,u,col){
+  if(!_ccIdx){ _ccIdx=new Map(); (DB.cc||[]).forEach(x=>{ const k=x.a+"\u0000"+x.u+"\u0000"+x.col; let l=_ccIdx.get(k); if(!l){ l=[]; _ccIdx.set(k,l); } l.push(x); }); }
+  return _ccIdx.get(a+"\u0000"+u+"\u0000"+col)||[];
+}
+function unidadesEscopo(esc){
+  if(esc&&esc.startsWith("un:")) return [esc.slice(3)];
+  const segs=esc&&esc.startsWith("seg:")?esc.slice(4).split(","):null;
+  return DB.units.filter(u=>!u.vig&&(!segs||segs.includes(u.seg))).map(u=>u.cod);
+}
+// escopos possíveis a partir da tela atual (o mais específico é o padrão)
+function escoposProvisao(){
+  const l=[{v:"todos",t:"Todos os segmentos"}];
+  if(view.tipo==="hub"&&vhub==="ct"&&hubF.segs.length) l.push({v:"seg:"+hubF.segs.join(","),t:"Segmentos filtrados: "+hubF.segs.map(s=>SEGNM[s]).join(", ")});
+  if((view.tipo==="seg"||view.tipo==="det")&&view.seg&&SEGNM[view.seg]&&view.seg!=="Vigiada") l.push({v:"seg:"+view.seg,t:"Segmento "+SEGNM[view.seg]});
+  if(view.tipo==="det"&&umap[view.unit]&&!umap[view.unit].vig) l.push({v:"un:"+view.unit,t:"Unidade "+umap[view.unit].nome+" ("+view.unit+")"});
+  return l;
+}
+function dadosProvisao(o){
+  const out=[]; if(!DB.fechado[M]) return {linhas:out,total:0};
+  const {est}=met(), col=colunaProvisao(), uns=new Set(unidadesEscopo(o.escopo));
+  const ant=[]; for(let i=M-1;i>=0&&ant.length<3;i--) if(DB.fechado[i]) ant.push(i);   // para a média
+  DB.data.forEach(d=>{
+    if(!uns.has(d.u)||!relevante(d)) return;
+    if(o.contas==="sel"&&!provSel.has(d.a)) return;
+    const p=d.p[M], r=d.r[M];
+    const sem=statusOf(p,r,false,est[d.u])==="sem";
+    const parc=!sem&&o.parcial&&Math.abs(p)>EPS&&Math.abs(r)>EPS&&Math.sign(p)===Math.sign(r)&&Math.abs(r)<Math.abs(p)-EPS;
+    if(!sem&&!parc) return;
+    let total=o.valor==="media"&&ant.length?ant.reduce((s,i)=>s+Math.abs(d.r[i]),0)/ant.length:Math.abs(p);
+    if(parc) total=Math.max(0,total-Math.abs(r));
+    total=round2(total); if(total<EPS) return;
+    const ccs=ccDe(d.a,d.u,col).filter(x=>Math.abs(x.p[M])>EPS), base=ccs.reduce((s,x)=>s+Math.abs(x.p[M]),0);
+    const ac=amap[d.a]||{}, un=umap[d.u]||{};
+    const lin=(x,v)=>{ const uni=x?((String(x.uo).match(/\d+/)||[""])[0]).slice(0,4):"", c4=x?String(x.cc).replace(/\D/g,"").slice(-4):"";
+      out.push({conta:(o.ppr&&PROV_CONTA[d.a])||d.a,valor:v,cc:uni+c4,ccOk:uni.length===4&&c4.length===4,
+        contaOrig:d.a,desc:ac.desc||d.a,uo:x?x.uo:d.u,u:d.u,nome:un.nome||d.u,seg:un.seg,ccBase:x?x.cc:"",
+        orc:x?Math.abs(x.p[M]):Math.abs(p),real:x?Math.abs(x.r[M]):Math.abs(r),status:sem?"sem lançamento":"abaixo do orçado"}); };
+    if(!ccs.length){ lin(null,total); return; }
+    let resto=total;
+    ccs.forEach((x,k)=>{ const v=k===ccs.length-1?round2(resto):round2(total*Math.abs(x.p[M])/base); resto=round2(resto-v); if(v>=EPS) lin(x,v); });
+  });
+  out.sort((x,y)=>x.conta.localeCompare(y.conta)||x.cc.localeCompare(y.cc));
+  return {linhas:out,total:round2(out.reduce((s,l)=>s+l.valor,0))};
+}
+function abreProvisao(){
+  const esc=escoposProvisao();
+  if(!provOpt.escopo||!esc.some(e=>e.v===provOpt.escopo)) provOpt.escopo=esc[esc.length-1].v;
+  if(!provSel.size) provOpt.contas="todas";
+  const c=DB.carga||{}, cands=c.ccCandidatas||[], colAtual=colunaProvisao();
+  const sel=(id,k,ops)=>`<select id="${id}" class="fsel" onchange="provAlt('${k}',this.value)">${ops.map(([v,t])=>`<option value="${he(v)}"${String(provOpt[k]==null?colAtual:provOpt[k])===String(v)?" selected":""}>${t}</option>`).join("")}</select>`;
+  const el=document.getElementById("guia");
+  el.innerHTML=`<div class="guiabox" role="dialog" aria-modal="true" aria-labelledby="provt">
+    <div class="guiah"><div><h2 class="gt" id="provt">Exportar provisão · ${rotMes(M)}</h2>
+      <div class="gs">Layout: Conta contábil · Valor · Centro de custo (unidade + 4 últimos dígitos do CC da base).</div></div>
+      <button class="gx" aria-label="Fechar" onclick="fechaGuia()">✕</button></div>
+    <div class="guial">
+      <div class="provform">
+        <label class="pl" for="provEsc">Unidades</label>${sel("provEsc","escopo",esc.map(e=>[e.v,he(e.t)]))}
+        <label class="pl" for="provContas">Contas</label>${sel("provContas","contas",[["todas","Todas as pendentes do escopo"]].concat(provSel.size?[["sel",`Só as ${provSel.size} marcadas na lista`]]:[]))}
+        <label class="pl" for="provValor">Valor</label>${sel("provValor","valor",[["orc","Orçado do mês"],["media","Média do realizado (3 últimos meses)"]])}
+        <label class="pl" for="provCol">Centro de custo</label>${sel("provCol","col",cands.map(x=>[x.col,`Coluna ${x.col+1}${x.nome?" · "+he(x.nome):""} — ex.: ${x.exemplos.slice(0,3).map(he).join(", ")||"vazia"}${x.col===c.colCC?" (pelo cabeçalho)":x.col===c.ccSugerida?" (sugerida pelos valores)":""}`]))}
+        <label class="provchk"><input type="checkbox" id="provParcial"${provOpt.parcial?" checked":""} onchange="provAlt('parcial',this.checked)">
+          Incluir contas lançadas abaixo do orçado (provisiona a diferença)</label>
+        <label class="provchk"><input type="checkbox" id="provPpr"${provOpt.ppr?" checked":""} onchange="provAlt('ppr',this.checked)">
+          PPR: lançar na 4.1.1.01.1.98 (Provisão PPR) em vez da 4.1.1.01.1.99</label>
+      </div>
+      <div class="provprev" id="provPrev" role="status" aria-live="polite"></div>
+      <div class="provbt"><button class="xbtn" onclick="fechaGuia()">cancelar</button>
+        <button class="xbtn" id="provBaixar" onclick="exportProvisao()">baixar provisão (.xlsx)</button></div>
+    </div>
+    <div class="guiaf">Respeita o modo (${MODOLBL[modo]})${corte>0?`, o corte de R$ ${fmtN(corte)}`:""} e o mês ${rotMes(M)}${ehAberto(M)?" (em aberto)":""}.</div></div>`;
+  el.classList.add("on"); modal(el,true); el.querySelector(".gx").focus();
+  atualizaPrevProvisao();
+}
+function provAlt(k,v){ provOpt[k]=k==="col"?+v:v; atualizaPrevProvisao(); }
+function atualizaPrevProvisao(){
+  const el=document.getElementById("provPrev"); if(!el) return;
+  const {linhas,total}=dadosProvisao(provOpt), ruins=linhas.filter(l=>!l.ccOk).length;
+  el.innerHTML=linhas.length?`<b>${linhas.length} linha(s)</b> · R$ <b class="num">${fmtC(total)}</b> · ${new Set(linhas.map(l=>l.contaOrig)).size} conta(s) ·
+    ${new Set(linhas.map(l=>l.u)).size} unidade(s)${ruins?`<span class="av">⚠ ${ruins} linha(s) com centro de custo incompleto — confira a coluna de centro de custo.</span>`:""}`
+    :`Nenhuma pendência para provisionar com estas opções em ${rotMes(M)}.`;
+  const b=document.getElementById("provBaixar"); if(b) b.disabled=!linhas.length;
+}
+function exportProvisao(){
+  const {linhas,total}=dadosProvisao(provOpt); if(!linhas.length) return;
+  const esc=escoposProvisao().find(e=>e.v===provOpt.escopo)||{t:"todos"};
+  const lay=[["Conta contábil","Valor","Centro de custo"]].concat(linhas.map(l=>[l.conta,l.valor,l.ccOk?+l.cc:l.cc]));
+  const conf=[[`Provisão · ${rotMes(M)}${ehAberto(M)?" (em aberto)":""} · ${MODOLBL[modo]} · ${esc.t}`],
+    [`${linhas.length} linha(s) · R$ ${fmtC(total)} · valor: ${provOpt.valor==="media"?"média do realizado dos 3 meses anteriores":"orçado do mês"}${provOpt.parcial?" · inclui lançadas abaixo do orçado":""}${provOpt.ppr?" · PPR na 4.1.1.01.1.98":""}`],[],
+    ["Conta contábil","Conta no painel","Descrição","Unidade","Unidade no painel","Nome da unidade","Segmento","CC na base","Centro de custo","Orçado do mês (CC)","Realizado do mês (CC)","Valor provisionado","Situação"]]
+    .concat(linhas.map(l=>[l.conta,l.contaOrig,l.desc,l.uo,l.u,l.nome,SEGNM[l.seg]||l.seg,l.ccBase,l.ccOk?+l.cc:l.cc,round2(l.orc),round2(l.real),l.valor,l.status+(l.ccOk?"":" · CC incompleto")]));
+  baixaXLSX(`provisao_${limpaNome(esc.t)}_${limpaNome(rotMes(M))}_${hoje()}.xlsx`,
+    [{nome:"Provisão",linhas:lay,hdr:1,larg:[18,15,16],int:[2]},
+     {nome:"Conferência",linhas:conf,hdr:4,larg:[16,16,40,10,10,30,14,14,14,16,16,16,22],titulos:[1],int:[8]}]);
+}
+
 /* ---------- SEGMENTO ---------- */
 function renderSeg(){
   const s=view.seg;
@@ -1580,7 +1736,8 @@ function renderSeg(){
         <button class="${vseg==="mp"?"on":""}" onclick="setVseg('mp')">Mapa do ano</button>
       </span>
       <span style="margin-left:4px">${vseg==="un"?arr.length+" unidades · por valor exposto":vseg==="ct"?"contas com falha · sistêmico primeiro":"pendências por unidade e mês"}</span>
-      <button class="xbtn" onclick="exportSeg()">exportar segmento</button></div>
+      <button class="xbtn" onclick="exportSeg()">exportar segmento</button>
+      <button class="xbtn" onclick="abreProvisao()">exportar provisão</button><span class="provcnt"></span></div>
     ${vseg==="ct"?renderContasSeg(s):vseg==="mp"?renderMapa(s):""}
     <div class="grid g3">`+(vseg!=="un"?[]:arr).map(o=>{const v=o.real-o.plan,calm=o.sem===0;
       return `<div class="card fade ${calm?'calm':''}" onclick="go({tipo:'det',seg:${js(s)},unit:${js(o.cod)}})">
@@ -2058,7 +2215,7 @@ function detalheContaSeg(sg,conta,desc){
   const ls=contaNoSegmento(sg,conta);
   const tp=ls.reduce((a,o)=>a+o.p,0), tr=ls.reduce((a,o)=>a+o.r,0);
   const mx=Math.max(...ls.map(o=>Math.abs(o.p)||Math.abs(o.r)),1);
-  return `<tr class="exp"><td colspan="6"><div class="expbox">
+  return `<tr class="exp"><td colspan="7"><div class="expbox">
     <div class="expt">${he(desc)} · conta ${he(conta)} · todas as unidades de ${SEGNM[sg]} em ${faixaLbl()}</div>
     <table class="mini"><thead><tr><th>Unidade</th><th class="r">Orçado</th>
       <th class="r">Realizado</th><th class="r">Variação</th><th></th><th>Status</th></tr></thead>
@@ -2089,10 +2246,11 @@ function renderContasSeg(sg){
        esse padrão costuma ser processo ou premissa de orçamento, não esquecimento de unidade.`
       :"Nenhuma falha atinge metade das unidades: o padrão é pontual, unidade a unidade."}</div></div>`;
   return resumo+`<div class="tw" style="margin-bottom:18px"><table><thead><tr>
-      <th>Conta</th><th>Descrição</th><th class="r">Unidades c/ falha</th>
+      <th class="selc"><input type="checkbox" aria-label="Selecionar todas as contas listadas para a provisão" onclick="event.stopPropagation();selProvTodas(this)"></th><th>Conta</th><th>Descrição</th><th class="r">Unidades c/ falha</th>
       <th class="r">R$ exposto</th><th>Alcance</th><th>Quais unidades</th>
     </tr></thead><tbody>${lst.map(o=>`<tr class="lin ${expConta===o.a?'aberta':''}"
         onclick="toggleConta(${js(o.a)})">
+      <td class="selc"><input type="checkbox" class="provck" data-a="${he(o.a)}" aria-label="Selecionar ${he(o.a)} para a provisão"${provSel.has(o.a)?" checked":""} onclick="event.stopPropagation();selProv(this.dataset.a,this.checked)"></td>
       <td class="num" style="color:var(--dim)"><span class="cx">${expConta===o.a?"▾":"▸"}</span>${he(o.a)}</td>
       <td>${he(o.desc)}${incluiConta(o.a)}${o.rec&&modo!=="rec"?' <span class="cf alta" style="font-size:11px">recorrente</span>':""}</td>
       <td class="r"><span class="frac"><b>${o.sem}</b>/${o.tot}</span>
@@ -2318,6 +2476,7 @@ function renderDet(){
     <div class="toolbar">${chips}
       <input id="busca" type="search" aria-label="Buscar conta ou descrição" placeholder="Buscar conta ou descrição…" value="${he(view.busca)}">
       <button class="xbtn" onclick="exportUnidade()">exportar unidade</button>
+      <button class="xbtn" onclick="abreProvisao()">exportar provisão</button>
     </div>
     <div class="tw"><table><thead><tr>
       <th data-k="a">Conta${ar("a")}</th><th data-k="desc">Descrição${ar("desc")}</th>
@@ -2772,7 +2931,7 @@ function zipar(files){
 const esc=s=>String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 function colL(n){let s="";while(n>0){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=(n-m-1)/26;}return s;}
 function abaXML(a){
-  const linhas=a.linhas, hdr=a.hdr||0, pct=new Set(a.pct||[]), link=a.link||false;
+  const linhas=a.linhas, hdr=a.hdr||0, pct=new Set(a.pct||[]), int=new Set(a.int||[]), link=a.link||false;
   const rows=linhas.map((row,i)=>{
     const nr=i+1;
     const cs=row.map((v,j)=>{
@@ -2780,7 +2939,7 @@ function abaXML(a){
       let st=0;
       if(nr===hdr) st=1;
       else if(a.titulos&&a.titulos.includes(nr)) st=4;
-      else if(typeof v==="number") st=pct.has(j)?3:2;
+      else if(typeof v==="number") st=pct.has(j)?3:(int.has(j)?0:2);
       else if(link&&hdr&&nr>hdr&&j===0) st=5;
       if(typeof v==="number" && isFinite(v)) return `<c r="${ref}" s="${st}"><v>${v}</v></c>`;
       if(v===null||v===undefined||v==="") return "";

@@ -25,8 +25,10 @@ def fmt(v):
     return ("-" if v < 0 else "") + s
 
 
-def linha(conta, desc, unid, udesc, p, r):
-    cel = [f'="{conta}"', desc, f'="{unid}"', udesc, '="001"', '="CC01"', "Fulano", "X"]
+def linha(conta, desc, unid, udesc, p, r, cc=None):
+    # centro de custo no formato do Plano: 4 dígitos da unidade + 4 do centro (ex.: 41011101)
+    cc = cc if cc is not None else unid[:4] + "1101"
+    cel = [f'="{conta}"', desc, f'="{unid}"', udesc, '="001"', f'="{cc}"', "Fulano", "X"]
     for i in range(12):
         cel += [fmt(p[i]) if p[i] else "0", fmt(r[i]) if r[i] else "0"]
     return ";".join(cel + ["0", "0"])
@@ -77,10 +79,11 @@ def principal():
                         if parada and i >= 5: r[i] = 0.0
                         if u in novas and i < 5: r[i] = 0.0
                         if rnd.random() < .004: r[i] = round(r[i] * 9, 2)  # anomalia
-                out.append(linha(c, desc[c], u, f"Unidade {u} – Filial", p, r))
+                cc = u[:4] + ["1101", "1111", "1114", "1123"][(rep + sum(map(ord, c))) % 4]
+                out.append(linha(c, desc[c], u, f"Unidade {u} – Filial", p, r, cc))
                 d = NOVAS.get(u, u)   # mesma linha já com a unidade de destino (para o painel original)
                 # conta fundida leva a descrição do destino (no painel atual a do destino prevalece)
-                out_orig.append(linha(c, desc[FUNDIR.get(c, c)], d, f"Unidade {d} – Filial", p, r))
+                out_orig.append(linha(c, desc[FUNDIR.get(c, c)], d, f"Unidade {d} – Filial", p, r, cc))
     escreve("plano_sint.csv", out)
     # O painel original não conhece as unificações novas: recebe a base com elas já aplicadas
     # no próprio CSV (mesmo efeito da regra), para a comparação continuar valendo.
@@ -153,6 +156,29 @@ def bordas():
                           linha("4.1.1.01.1.99", "PPR Colaboradores", "4101A", "U", p99, [-600.0] * 8 + [0.0] * 4)])
     t_out = __import__("datetime").datetime(2026, 10, 1, 9, 0).timestamp()   # setembro em aberto, com dados
     os.utime(os.path.join(TMP, "fusao.csv"), (t_out, t_out))
+    # provisão (mês AGO = índice 7; JAN–JUL com realizado para a média):
+    #  X 4.1.1.08.1.06 em 4101A: orçado AGO 600 no CC 1101 + 400 no CC 1114, sem realizado em AGO
+    #  Y 4.1.1.04.1.06 em 5002A (unificada em 5001A): orçado AGO 1.619,29 no CC 1111, sem realizado
+    #  Z 4.1.1.02.1.09 em 4101A: orçado AGO 1000, realizado 700 (abaixo do orçado)
+    #  PPR 4.1.1.01.1.99 em 4102A: orçado AGO 500, sem realizado
+    def serie(ago_p, ago_r, hist):
+        return ([-ago_p] * 12, [-hist] * 7 + [-ago_r] + [0.0] * 4)
+    pv = []
+    for conta, unid, cc, ago_p, ago_r, hist in [
+            ("4.1.1.08.1.06", "4101A", "41011101", 600.0, 0.0, 90.0),
+            ("4.1.1.08.1.06", "4101A", "41011114", 400.0, 0.0, 30.0),
+            ("4.1.1.04.1.06", "5002A", "50021111", 1619.29, 0.0, 1500.0),
+            ("4.1.1.04.1.06", "5001A", "50011111", 0.0, 50.0, 50.0),
+            ("4.1.1.02.1.09", "4101A", "41011101", 1000.0, 700.0, 900.0),
+            ("4.1.1.01.1.99", "4102A", "41021114", 500.0, 0.0, 480.0)]:
+        p_, r_ = serie(ago_p, ago_r, hist)
+        pv.append(linha(conta, "Desc " + conta, unid, "Unidade " + unid, p_, r_, cc))
+    escreve("provisao.csv", pv)
+    # cabeçalho sem nome reconhecível para o centro de custo
+    h0 = HDR[:]
+    HDR[5] = "Campo 6"
+    escreve("provisao_cab.csv", pv)
+    HDR = h0
     # mesma base em UTF-8
     escreve("utf8.csv", [linha("4.1.1.01.1.01", "Manutenção – veículos", "4101A", "São Paulo", v, v)], enc="utf-8")
     escreve("cp1252.csv", [linha("4.1.1.01.1.01", "Manutenção – veículos", "4101A", "São Paulo", v, v)])
