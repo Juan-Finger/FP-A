@@ -1312,6 +1312,48 @@ teste("J1", "justificativas: salvar, juntar com a pasta sem apagar outro analist
   await q.context().close();
 });
 
+teste("J2", "justificativas: planilha para preencher, importar do Excel e do .json", async () => {
+  const p = await abre(NOVO, "comparacao_agora.csv");
+  await p.evaluate(() => { notasTodas = false; abreNotas(); });
+  const x = await baixa(p, () => document.getElementById("ntprep").click());
+  const aba = x.abas["Justificativas"], cab = aba[2], lin = aba.slice(3);
+  const sit = Object.fromEntries(lin.map(l => [l[2] + "|" + l[4], l[6]]));
+  ok(cab[10] === "Justificativa" && sit["4101A|4.1.1.04.1.06"] === "Sem lançamento" && sit["4801A|4.1.1.02.1.09"] === "Movimento em vigiada", "planilha para preencher: " + JSON.stringify(sit));
+  // analista preenche no Excel e salva
+  const orig = path.join(TMP, x.nome), ed = path.join(TMP, "preenchida.xlsx");
+  cp.execFileSync("python3", [path.join(__dirname, "preenche_xlsx.py"), orig, ed,
+    JSON.stringify({ "4101A|4.1.1.04.1.06": ["NF de aluguel chega dia 10", "Ana"], "4801A|4.1.1.02.1.09": ["Lançamento indevido, estornar", null] })]);
+  await p.evaluate(() => { autorNota = "Juan"; });
+  await p.setInputFiles("#ntimp", ed);
+  await p.waitForFunction(() => document.getElementById("ntimpmsg"));
+  const r1 = await p.evaluate(() => ({ msg: document.getElementById("ntimpmsg").textContent,
+    y: notaDe(7, "4101A", "4.1.1.04.1.06"), v: notaDe(7, "4801A", "4.1.1.02.1.09"), n: itensNotas(7).length,
+    ls: JSON.parse(localStorage.getItem("fpa-notas")).itens }));
+  ok(r1.y && r1.y.t === "NF de aluguel chega dia 10" && r1.y.por === "Ana" && r1.v && r1.v.por === "Juan" && r1.n === 2, "importação: " + JSON.stringify(r1));
+  ok(/2 justificativa\(s\) importada/.test(r1.msg) && /1 linha\(s\) sem mês/.test(r1.msg) && /sem justificativa/.test(r1.msg), "mensagem: " + r1.msg);
+  ok(Object.keys(r1.ls).length === 2, "não gravou no navegador");
+  // importar de novo não duplica nem altera
+  await p.setInputFiles("#ntimp", ed);
+  await p.waitForFunction(() => /já estavam iguais/.test((document.getElementById("ntimpmsg") || {}).textContent || ""));
+  ok(await p.evaluate(() => itensNotas(7).length === 2 && /0 justificativa/.test(document.getElementById("ntimpmsg").textContent)), "reimportação alterou");
+  // .json de outro computador: o mais recente vence, item novo entra
+  const js = path.join(TMP, "outras-notas.json");
+  fs.writeFileSync(js, JSON.stringify({ versao: 1, itens: {
+    "2026-08|4101A|4.1.1.04.1.06": { t: "versão antiga", por: "Bia", em: "2020-01-01T00:00:00.000Z" },
+    "2026-08|4101A|4.1.1.02.1.09": { t: "Reclassificar para 4.1.1.02.1.10", por: "Bia", em: "2099-01-01T00:00:00.000Z" } } }));
+  await p.setInputFiles("#ntimp", js);
+  await p.waitForFunction(() => /outras-notas\.json/.test((document.getElementById("ntimpmsg") || {}).textContent || ""));
+  const r2 = await p.evaluate(() => ({ y: notaDe(7, "4101A", "4.1.1.04.1.06").t, z: (notaDe(7, "4101A", "4.1.1.02.1.09") || {}).t, n: itensNotas(7).length }));
+  ok(r2.y === "NF de aluguel chega dia 10" && r2.z === "Reclassificar para 4.1.1.02.1.10" && r2.n === 3, "importação .json: " + JSON.stringify(r2));
+  // arquivo qualquer: mensagem clara, nada muda
+  fs.writeFileSync(path.join(TMP, "lixo.json"), '{"x":1}');
+  await p.setInputFiles("#ntimp", path.join(TMP, "lixo.json"));
+  await p.waitForFunction(() => /Não importei/.test((document.getElementById("ntimpmsg") || {}).textContent || ""));
+  ok(await p.evaluate(() => itensNotas(7).length === 3), "arquivo inválido alterou as justificativas");
+  ok(!p._erros.length && !p._rede.length, "erros/rede: " + JSON.stringify([p._erros, p._rede]));
+  await p.context().close();
+});
+
 teste("K1", "comparar com outra base: recebeu, sumiu, mudou, orçamento, vigiada, pendências e exportação", async () => {
   const p = await abre(NOVO, "comparacao_agora.csv");
   await p.evaluate(() => abreComparacao());

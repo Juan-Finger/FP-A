@@ -1440,6 +1440,10 @@ let autorNota=""; try{ autorNota=localStorage.getItem("fpa-autor")||""; }catch(e
 // grava uma justificativa; devolve true se também foi para a pasta
 async function salvaNota(i,u,a,texto){
   NOTAS[chaveNota(i,u,a)]={t:String(texto||"").trim().slice(0,4000),por:autorNota,em:new Date().toISOString()};
+  return persisteNotas();
+}
+// navegador + pasta (relê o arquivo da pasta e junta antes de gravar)
+async function persisteNotas(){
   try{ localStorage.setItem("fpa-notas",textoNotas()); }catch(e){}
   if(!window.__pasta__) return false;
   const atual=await window.__pasta__.le("fpa-notas.json");
@@ -1448,6 +1452,123 @@ async function salvaNota(i,u,a,texto){
   try{ localStorage.setItem("fpa-notas",textoNotas()); }catch(e){}
   return ok;
 }
+/* Importação. Do .json (de outro computador ou de quem não usa a pasta): junta item a item, vale o
+   mais recente. Da planilha preenchida no Excel: cada linha é reconhecida por mês, unidade e conta;
+   célula de justificativa vazia é ignorada (a planilha nunca apaga o que já existe). */
+function importaNotasJSON(txt){
+  const itens=leNotas(txt);
+  if(!itens||typeof itens!=="object") throw new Error("Arquivo inválido: esperado o fpa-notas.json exportado pelo painel.");
+  const antes=JSON.stringify(NOTAS), n0=Object.keys(NOTAS).length;
+  const novo=juntaNotas(NOTAS,itens);
+  const mud=Object.keys(novo).filter(k=>!NOTAS[k]||NOTAS[k].em!==novo[k].em).length;
+  NOTAS=novo;
+  return {importadas:mud,iguais:Object.keys(juntaNotas(itens)).length-mud,mudou:antes!==JSON.stringify(NOTAS),novas:Object.keys(NOTAS).length-n0};
+}
+function importaNotasPlanilha(abas){
+  const nomes=Object.keys(abas), cab=["Mês","Unidade","Conta","Justificativa"];
+  let ls=null, hi=-1, col=null;
+  for(const nm of ["Justificativas",...nomes]){ const a=abas[nm]; if(!a) continue;
+    for(let r=0;r<Math.min(a.length,15);r++){ const row=(a[r]||[]).map(v=>String(v==null?"":v).trim());
+      if(cab.every(c=>row.includes(c))){ ls=a; hi=r; col=Object.fromEntries(row.map((c,j)=>[c,j])); break; } }
+    if(ls) break; }
+  if(!ls) throw new Error("Planilha sem as colunas Mês, Unidade, Conta e Justificativa. Use a planilha baixada do painel.");
+  const aa=String(DB.ano||"").slice(-2), out={importadas:0,iguais:0,vazias:0,invalidas:0};
+  const agora=new Date().toISOString();
+  for(let r=hi+1;r<ls.length;r++){
+    const row=ls[r]||[], txt=v=>String(v==null?"":v).trim();
+    const mes=txt(row[col["Mês"]]), u=txt(row[col["Unidade"]]), a=txt(row[col["Conta"]]), t=txt(row[col["Justificativa"]]);
+    if(!mes&&!u&&!a&&!t) continue;
+    const m=mes.toUpperCase().match(/^([A-ZÇ]{3})\/(\d{2})$/), i=m?DB.meses.indexOf(m[1]):-1;
+    if(i<0||(aa&&m[2]!==aa)||!u||!a){ out.invalidas++; continue; }
+    if(!t){ out.vazias++; continue; }
+    const k=chaveNota(i,u,a), atual=NOTAS[k];
+    if(atual&&atual.t===t.slice(0,4000)){ out.iguais++; continue; }
+    const por=col["Por"]!=null?txt(row[col["Por"]]).slice(0,80):"";
+    NOTAS[k]={t:t.slice(0,4000),por:por||autorNota,em:agora}; out.importadas++;
+  }
+  return out;
+}
+// Leitor mínimo de .xlsx (zip + XML), sem biblioteca: devolve {aba: [[valor]]}.
+// Lê o que o Excel grava (textos compartilhados, compressão deflate) e o que o painel exporta.
+const colIdx=ref=>{ const m=(ref.match(/^[A-Z]+/)||["A"])[0]; let n=0; for(const ch of m) n=n*26+ch.charCodeAt(0)-64; return n-1; };
+async function lerXLSX(buf){
+  const u8=new Uint8Array(buf), dv=new DataView(buf), td=new TextDecoder();
+  let fim=-1; for(let i=u8.length-22;i>=Math.max(0,u8.length-65557);i--) if(dv.getUint32(i,true)===0x06054b50){ fim=i; break; }
+  if(fim<0) throw new Error("O arquivo não é uma planilha .xlsx.");
+  const n=dv.getUint16(fim+10,true), arqs={}; let p=dv.getUint32(fim+16,true);
+  for(let k=0;k<n;k++){
+    if(dv.getUint32(p,true)!==0x02014b50) throw new Error("Planilha corrompida.");
+    const met=dv.getUint16(p+10,true), tam=dv.getUint32(p+20,true), nl=dv.getUint16(p+28,true), el=dv.getUint16(p+30,true), cl=dv.getUint16(p+32,true), off=dv.getUint32(p+42,true);
+    const nome=td.decode(u8.subarray(p+46,p+46+nl)), ini=off+30+dv.getUint16(off+26,true)+dv.getUint16(off+28,true);
+    arqs[nome]={met,dados:u8.subarray(ini,ini+tam)}; p+=46+nl+el+cl;
+  }
+  const texto=async nome=>{ const a=arqs[nome]; if(!a) return null;
+    if(a.met===0) return td.decode(a.dados);
+    if(a.met!==8) throw new Error("Compressão da planilha não suportada.");
+    const s=new Blob([a.dados]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
+    return td.decode(await new Response(s).arrayBuffer()); };
+  const xml=t=>new DOMParser().parseFromString(t||"<x/>","application/xml");
+  const ss=[]; xml(await texto("xl/sharedStrings.xml")).querySelectorAll("si").forEach(si=>
+    ss.push([...si.getElementsByTagName("t")].filter(t=>!t.closest("rPh")).map(t=>t.textContent).join("")));
+  const wb=xml(await texto("xl/workbook.xml")), rels=xml(await texto("xl/_rels/workbook.xml.rels")), alvo={};
+  [...rels.getElementsByTagName("Relationship")].forEach(r=>alvo[r.getAttribute("Id")]=r.getAttribute("Target"));
+  const abas={};
+  for(const [k,s] of [...wb.getElementsByTagName("sheet")].entries()){
+    const rid=s.getAttribute("r:id")||s.getAttributeNS("http://schemas.openxmlformats.org/officeDocument/2006/relationships","id");
+    const t=(alvo[rid]||`worksheets/sheet${k+1}.xml`).replace(/^\/?(xl\/)?/,"xl/");
+    const linhas=[];
+    [...xml(await texto(t)).getElementsByTagName("row")].forEach(row=>{
+      const r=+row.getAttribute("r")||linhas.length+1, l=[];
+      [...row.getElementsByTagName("c")].forEach((c,j)=>{
+        const ref=c.getAttribute("r"), ty=c.getAttribute("t"), v=c.getElementsByTagName("v")[0];
+        l[ref?colIdx(ref):j]=ty==="s"?(v?ss[+v.textContent]:null)
+          :ty==="inlineStr"?[...c.getElementsByTagName("t")].map(x=>x.textContent).join("")
+          :ty==="str"||ty==="e"?(v?v.textContent:null):ty==="b"?(v?v.textContent==="1":null):(v?+v.textContent:null); });
+      linhas[r-1]=l; });
+    abas[s.getAttribute("name")]=Array.from(linhas,x=>x||[]);
+  }
+  return abas;
+}
+// importa o arquivo escolhido (.json ou .xlsx) e grava como de costume
+let msgImportNotas="";
+async function importaNotasArq(inp){
+  const f=inp.files&&inp.files[0]; inp.value=""; if(!f) return;
+  try{
+    let r;
+    if(/\.json$/i.test(f.name)){ r=importaNotasJSON(await f.text());
+      msgImportNotas=`${f.name}: ${r.importadas} justificativa(s) nova(s) ou mais recente(s)${r.iguais>0?`, ${r.iguais} já estavam iguais`:""}.`; }
+    else { r=importaNotasPlanilha(await lerXLSX(await f.arrayBuffer()));
+      msgImportNotas=`${f.name}: ${r.importadas} justificativa(s) importada(s)${r.iguais?`, ${r.iguais} já estavam iguais`:""}${r.vazias?`, ${r.vazias} linha(s) sem justificativa`:""}${r.invalidas?`, ${r.invalidas} linha(s) sem mês/unidade/conta válidos (ignoradas)`:""}.`; }
+    const naPasta=await persisteNotas();
+    msgImportNotas+=naPasta?" Salvas neste navegador e na pasta.":" Salvas neste navegador.";
+  }catch(e){ msgImportNotas="Não importei: "+e.message; }
+  atualizaContNotas(); if(view.tipo==="det") renderDet();
+  abreNotas();
+}
+// planilha para os analistas preencherem: contas do mês sem lançamento, sem orçamento ou para analisar,
+// e movimento em vigiadas; já traz as justificativas existentes
+function exportPreencher(){
+  const {est}=met(), aberto=ehAberto(M), ls=[];
+  DB.data.forEach(d=>{
+    const p=d.p[M], r=d.r[M], vig=VIG.has(d.u);
+    if(vig){ if(Math.abs(r)<EPS) return; }
+    else { if(!relevante(d)) return;
+      const st=statusConta(d,p,r,aberto,est[d.u],[M]); if(!["sem","sorc","ana"].includes(st)) return; d=Object.assign({},d,{_st:st}); }
+    const un=umap[d.u]||{}, n=notaDe(M,d.u,d.a);
+    ls.push([rotMes(M),SEGNM[un.seg]||un.seg||"",d.u,un.nome||d.u,d.a,(amap[d.a]||{}).desc||"",vig?"Movimento em vigiada":ST[d._st],
+      round2(p),round2(r),round2(r-p),n?n.t:"",n?n.por:"",n?dataHoraBR(n.em):""]);
+  });
+  ls.sort((x,y)=>String(x[1]).localeCompare(y[1])||x[2].localeCompare(y[2])||Math.abs(y[9])-Math.abs(x[9]));
+  baixaXLSX(`justificativas_para_preencher_${limpaNome(rotMes(M))}_${hoje()}.xlsx`,[{nome:"Justificativas",hdr:3,titulos:[1],
+    larg:[9,14,9,30,16,40,18,15,15,15,60,18,17],
+    linhas:[[`Preencha a coluna Justificativa (e Por) e importe no painel em "justificativas" · ${rotMes(M)} · base ${(DB.carga||{}).arquivo||""}`],[],
+      ["Mês","Segmento","Unidade","Nome da unidade","Conta","Descrição","Situação no mês","Orçado","Realizado","Variação","Justificativa","Por","Registrada em"]].concat(ls)}]);
+}
+function exportNotasJSON(){
+  const el=document.createElement("a"); el.href=URL.createObjectURL(new Blob([textoNotas()],{type:"application/json"}));
+  el.download="fpa-notas.json"; document.body.appendChild(el); el.click(); document.body.removeChild(el); URL.revokeObjectURL(el.href);
+}
+
 // itens com texto, com o mês, a unidade e a conta separados
 function itensNotas(soMes){
   return Object.entries(NOTAS).filter(([,v])=>v.t).map(([k,v])=>{
@@ -2789,6 +2910,7 @@ function linhasNotas(){
 }
 function abreNotas(){
   const ls=linhasNotas(), el=document.getElementById("guia");
+  setTimeout(()=>{ msgImportNotas=""; },0);
   el.innerHTML=`<div class="guiabox largo" role="dialog" aria-modal="true" aria-labelledby="ntt">
     <div class="guiah"><div><h2 class="gt" id="ntt">Justificativas${notasTodas?" do ano":" de "+rotMes(M)}</h2>
       <div class="gs">Textos que os analistas registraram nas contas (linha aberta da tabela da unidade). Clique numa linha para abrir a conta.</div></div>
@@ -2799,6 +2921,12 @@ function abreNotas(){
         <button class="xbtn" aria-pressed="${notasTodas}" onclick="notasTodas=true;abreNotas()">todos os meses</button>
         <span style="flex:1"></span>
         <button class="xbtn" id="ntexp" onclick="exportNotas()"${ls.length?"":" disabled"}>${ic("baixar")} exportar (.xlsx)</button></div>
+      <div class="provbt" style="justify-content:flex-start;margin:0 0 10px">
+        <button class="xbtn" id="ntprep" onclick="exportPreencher()" title="Contas de ${rotMes(M)} sem lançamento, sem orçamento ou para analisar, e movimento em vigiadas">${ic("baixar")} planilha para preencher (.xlsx)</button>
+        <label class="xbtn" tabindex="0" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.querySelector('input').click()}">importar (.xlsx ou .json)
+          <input type="file" id="ntimp" accept=".xlsx,.json,application/json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden onchange="importaNotasArq(this)"></label>
+        <button class="xbtn" onclick="exportNotasJSON()" title="Todas as justificativas, para levar a outro computador">${ic("baixar")} fpa-notas.json</button></div>
+      ${msgImportNotas?`<div class="ntmsg" id="ntimpmsg" role="status" style="margin:-2px 0 10px">${he(msgImportNotas)}</div>`:""}
       ${ls.length?`<table class="mini ntlist"><thead><tr><th>Mês</th><th>Unidade</th><th>Conta</th><th>Situação</th><th class="r">Variação</th><th>Justificativa</th><th>Por</th></tr></thead><tbody>
         ${ls.map(o=>`<tr class="clic" onclick="irNota(${js(o.u)},${js(o.a)},${o.i})">
           <td>${rotMes(o.i)}</td><td>${he(o.u)} <span style="color:var(--dim)">${he(o.nome)}</span></td>
@@ -2808,7 +2936,8 @@ function abreNotas(){
           <td class="ntt">${he(o.t)}</td><td style="color:var(--mut)">${he(o.por||"—")}<div>${dataHoraBR(o.em)}</div></td></tr>`).join("")}
       </tbody></table>`:`<div class="empty">Nenhuma justificativa registrada${notasTodas?" no ano":" em "+rotMes(M)}. Para registrar, abra uma conta na tabela da unidade.</div>`}
     </div>
-    <div class="guiaf">Salvas neste navegador${window.__pasta__?` e em fpa-notas.json na pasta ${he(window.__pasta__.nome||"")}`:""}.</div></div>`;
+    <div class="guiaf">Salvas neste navegador${window.__pasta__?` e em fpa-notas.json na pasta ${he(window.__pasta__.nome||"")}`:""}.
+      Para preencher no Excel: baixe a planilha, escreva na coluna Justificativa e importe aqui. Células vazias não apagam nada.</div></div>`;
   if(!el.classList.contains("on")){ el.classList.add("on"); modal(el,true); }
   el.querySelector(".gx").focus();
 }

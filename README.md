@@ -40,6 +40,11 @@ Painel interno de FP&A, **em um único arquivo**: `dashboard.html`.
   situação, orçado, realizado, variação, autor e data, para quem não acompanhou entender o que
   aconteceu. Ficam no navegador e, com a pasta da base escolhida, em `fpa-notas.json`: antes de
   gravar, o painel relê o arquivo e junta item a item, para um analista não apagar o de outro.
+  Na mesma janela: **planilha para preencher** (contas do mês sem lançamento, sem orçamento ou para
+  analisar, e movimento em vigiadas, com as justificativas que já existem) e **importar** (.xlsx
+  preenchido no Excel ou `fpa-notas.json` de outro computador). Na planilha, cada linha é
+  reconhecida por mês, unidade e conta; célula de justificativa vazia é ignorada, então importar
+  nunca apaga nada. Do .json, vale a versão mais recente de cada item.
 - **Comparar com outra base** (ao lado de "Resumo da carga"): lê outra exportação do Plano (as da
   pasta aparecem com data e hora) e mostra, no mês de análise, o que mudou: contas que receberam
   lançamento, lançamentos que sumiram, realizado e orçamento alterados, pendências resolvidas e
@@ -63,9 +68,10 @@ e ao centavo.
 
 ## Testes
 
-Requisitos: Python 3, Node 18+, Playwright com Chromium e axe-core
-(`npm i -D playwright axe-core && npx playwright install chromium`). O axe-core só roda nos testes;
-não entra no `dashboard.html`.
+Requisitos: Python 3 com openpyxl, Node 18+, Playwright com Chromium e axe-core
+(`pip install openpyxl && npm i -D playwright axe-core && npx playwright install chromium`).
+openpyxl e axe-core só rodam nos testes (simulam o Excel e verificam acessibilidade); não entram no
+`dashboard.html`.
 
 ```
 node tests/regressao.js            # todos os testes
@@ -86,7 +92,8 @@ O que a suíte garante:
   desfaça uma anterior.
 - **X1**: acessibilidade verificada pelo axe-core nas telas principais e janelas, nos dois temas.
 - **V1**: gráfico IBCS, tabela compacta, coluna fixa e ordenação acessível.
-- **J1** (justificativas, inclusive dois analistas gravando na mesma pasta), **K1** (comparação de
+- **J1** (justificativas, inclusive dois analistas gravando na mesma pasta), **J2** (planilha para
+  preencher e importação do Excel e do .json), **K1** (comparação de
   bases) e **E1** (efeitos e "reduzir movimento").
 
 Quando uma mudança **intencional** altera números ou telas:
