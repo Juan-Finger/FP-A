@@ -19,6 +19,12 @@
   /* texto de destaque sobre fundo tingido (pílulas, alertas) e cores "sobre ciano" */
   --fg-neg:#F79A9A; --fg-warn:#F3C784; --fg-pos:#7BE8BB; --fg-lil:#C4B5FD; --on-cy:#06202B;
   --exp-bg:#0A1420; --hm-fg:var(--tx);
+  /* fundos tingidos (pílulas, etiquetas, alertas): uma intensidade por papel, nos dois temas */
+  --bg-neg:rgba(242,109,109,.14); --bg-warn:rgba(239,178,92,.14); --bg-pos:rgba(74,222,155,.14);
+  --bg-neu:rgba(143,163,184,.11); --bg-lil:rgba(167,139,250,.15); --bg-cy:rgba(34,211,238,.13);
+  --bg-neg-sutil:rgba(242,109,109,.09); --bg-warn-sutil:rgba(239,178,92,.10); --bd-neg:rgba(242,109,109,.35);
+  /* barras de gráfico (não são texto: ≥ 3:1 sobre o fundo) */
+  --bar-pos:#4ADE9B; --bar-neg:#F26D6D; --lil:#A78BFA; --on-red:#2A0E0E;
   --r:10px;
   --fs:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
   --fm:ui-monospace,'Cascadia Mono','Segoe UI Mono',Consolas,'SF Mono',Menlo,monospace;
@@ -32,6 +38,7 @@ body.claro{
   --alf:#0F678C; --cd:#784F93; --tra:#006C5F; --fro:#AD2F55; --cor:#8A5500; --bko:#4F637A; --ssg:#526274;
   --fg-neg:#B42318; --fg-warn:#8A5A00; --fg-pos:#1A7352; --fg-lil:#6D4FC2; --on-cy:#FFFFFF;
   --exp-bg:#EDF1F6; --hm-fg:#2A1D06;
+  --bar-pos:#22A06B; --bar-neg:#D64545; --lil:#7C5CD6;
 }
 /* tooltip é escuro também no tema claro: devolve os tons claros dentro dele (C1) */
 body.claro .tip{--tx:#EAF0F7;--mut:#B8C6D6;--dim:#9FB0C3;--amb:#F3C784;--grn:#4ADE9B;--red:#F26D6D;--cy:#22D3EE;--cy2:#67E8F9;
@@ -45,6 +52,7 @@ body.claro .segbar button.on,body.claro .chip.on,body.claro .vbar2 button.on{
   background:#0C2340;color:#fff}
 body.claro .tip{background:#132030;color:#EAF0F7}
 body.claro .brand .bar{background:#0E7C94}
+body.claro select#mes{color:var(--cy2)}
 *{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
 body{font-family:var(--fs);background:var(--bg);color:var(--tx);
@@ -52,6 +60,13 @@ body{font-family:var(--fs);background:var(--bg);color:var(--tx);
 .num{font-family:var(--fm);font-variant-numeric:tabular-nums;
      letter-spacing:-.02em}
 .hidden{display:none!important}
+/* ícones: desenhos do Lucide (licença ISC) embutidos no arquivo; herdam a cor do texto */
+.ic{width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;
+    vertical-align:-.14em;flex-shrink:0}
+.cx .ic{width:10px;height:10px;vertical-align:0;stroke-width:2.5}
+.lin td:has(> .cx){white-space:nowrap}
+.ar .ic{width:11px;height:11px;vertical-align:-1px}
+.gx .ic,.ham .ic{width:18px;height:18px;vertical-align:middle}
 :focus-visible{outline:2px solid var(--cy);outline-offset:2px}
 h1:focus{outline:none}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
@@ -181,12 +196,12 @@ tbody tr:hover{background:var(--s2)}
 td.r{text-align:right}
 .st{font-size:11px;font-weight:500;padding:3px 9px;border-radius:20px;white-space:nowrap;
     display:inline-block}
-.st.sem{background:rgba(242,109,109,.13);color:var(--fg-neg)}
-.st.ana{background:rgba(239,178,92,.13);color:var(--fg-warn)}
-.st.sorc{background:rgba(167,139,250,.15);color:var(--fg-lil)}
-.st.ok{background:rgba(74,222,155,.13);color:var(--fg-pos)}
-.st.zer,.st.cic{background:rgba(143,163,184,.10);color:var(--mut)}
-.st.abr{background:rgba(34,211,238,.11);color:var(--cy2)}
+.st.sem{background:var(--bg-neg);color:var(--fg-neg)}
+.st.ana{background:var(--bg-warn);color:var(--fg-warn)}
+.st.sorc{background:var(--bg-lil);color:var(--fg-lil)}
+.st.ok{background:var(--bg-pos);color:var(--fg-pos)}
+.st.zer,.st.cic{background:var(--bg-neu);color:var(--mut)}
+.st.abr{background:var(--bg-cy);color:var(--cy2)}
 .cls{color:var(--dim);font-size:11px}
 .empty{padding:44px;text-align:center;color:var(--dim);font-size:13px}
 .vbar{display:inline-block;height:4px;border-radius:2px;vertical-align:middle;margin-left:7px}
@@ -207,16 +222,16 @@ td.r{text-align:right}
   cursor:pointer;transition:all .13s;text-transform:none}
 .xbtn:hover{background:var(--cy);border-color:var(--cy);color:var(--on-cy)}
 .fv{font-size:11px;padding:2px 7px;border-radius:5px;white-space:nowrap}
-.fv.fav{background:rgba(74,222,155,.13);color:var(--fg-pos)}
-.fv.desf{background:rgba(242,109,109,.13);color:var(--fg-neg)}
-.fv.neutro{background:rgba(143,163,184,.10);color:var(--dim)}
+.fv.fav{background:var(--bg-pos);color:var(--fg-pos)}
+.fv.desf{background:var(--bg-neg);color:var(--fg-neg)}
+.fv.neutro{background:var(--bg-neu);color:var(--dim)}
 .nat{font-size:11px;color:var(--dim)}
 .legenda{font-size:11px;color:var(--dim);margin:-6px 0 14px;display:flex;gap:16px;flex-wrap:wrap}
 .legenda b{font-weight:400;color:var(--mut)}
 .cf{font-size:11px;padding:2px 7px;border-radius:5px;white-space:nowrap}
-.cf.alta{background:rgba(242,109,109,.14);color:var(--fg-neg)}
-.cf.media{background:rgba(239,178,92,.13);color:var(--fg-warn)}
-.cf.baixa,.cf.nd{background:rgba(143,163,184,.10);color:var(--dim)}
+.cf.alta{background:var(--bg-neg);color:var(--fg-neg)}
+.cf.media{background:var(--bg-warn);color:var(--fg-warn)}
+.cf.baixa,.cf.nd{background:var(--bg-neu);color:var(--dim)}
 .expl{background:var(--s1);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;margin-bottom:18px}
 .erow{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:12px}
 .erow .bn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -253,7 +268,7 @@ table.mini th.r{text-align:right}
 .segbar button.on{background:var(--cy);color:var(--on-cy);font-weight:500}
 .segbar.sm{margin:0}
 .segbar.sm button{font-size:11px;padding:4px 3px}
-.modotag{font-size:11px;padding:2px 8px;border-radius:5px;background:rgba(34,211,238,.13);
+.modotag{font-size:11px;padding:2px 8px;border-radius:5px;background:var(--bg-cy);
   color:var(--cy2);margin-left:8px;vertical-align:2px}
 .acoes{display:flex;gap:6px;margin-top:10px}
 .bt2{flex:1;background:var(--s2);border:1px solid var(--line2);color:var(--mut);
@@ -352,26 +367,26 @@ table.mini th.r{text-align:right}
 .tip .tr2 .tv{color:var(--amb);width:74px;text-align:right}
 .kpi[data-tip],.cf[data-tip],.cnt[data-tip]{cursor:help}
 .cnt[data-tip]{border-bottom:1px dotted var(--dim)}
-.alerta{background:rgba(242,109,109,.09);border:1px solid rgba(242,109,109,.3);
+.alerta{background:var(--bg-neg-sutil);border:1px solid var(--bd-neg);
   border-left:3px solid var(--red);border-radius:var(--r);padding:13px 16px;margin-bottom:18px}
 .alerta .at{font-size:13px;font-weight:500;color:var(--fg-neg)}
 .alerta .ad{font-size:11.5px;color:var(--mut);margin-top:4px}
 .alerta .alist{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
 .alerta .ac{font-size:11px;background:var(--s2);border:1px solid var(--line2);border-radius:14px;
   padding:3px 10px;cursor:pointer;color:var(--tx);transition:all .12s}
-.alerta .ac:hover{background:var(--red);color:#2A0E0E;border-color:var(--red)}
-.alerta .ac b{color:var(--red);margin-left:3px} .alerta .ac:hover b{color:#2A0E0E}
-.mudo{font-size:11px;background:rgba(242,109,109,.16);color:var(--fg-neg);padding:2px 7px;
+.alerta .ac:hover{background:var(--red);color:var(--on-red);border-color:var(--red)}
+.alerta .ac b{color:var(--red);margin-left:3px} .alerta .ac:hover b{color:var(--on-red)}
+.mudo{font-size:11px;background:var(--bg-neg);color:var(--fg-neg);padding:2px 7px;
   border-radius:5px;vertical-align:2px;font-weight:400}
 .mudo.big{font-size:11px;vertical-align:5px}
 .hpbox{border-left:3px solid var(--s3)}
 .hph{display:flex;align-items:center;gap:10px;font-size:11px;color:var(--dim);
   letter-spacing:.1em;text-transform:uppercase;margin-bottom:10px}
 .pad{font-size:11px;padding:2px 8px;border-radius:5px;letter-spacing:0;text-transform:none}
-.pad.piorando{background:rgba(242,109,109,.16);color:var(--fg-neg)}
-.pad.estavel{background:rgba(143,163,184,.12);color:var(--mut)}
-.pad.melhorando{background:rgba(74,222,155,.13);color:var(--fg-pos)}
-.pad.limpa{background:rgba(74,222,155,.13);color:var(--fg-pos)}
+.pad.piorando{background:var(--bg-neg);color:var(--fg-neg)}
+.pad.estavel{background:var(--bg-neu);color:var(--mut)}
+.pad.melhorando{background:var(--bg-pos);color:var(--fg-pos)}
+.pad.limpa{background:var(--bg-pos);color:var(--fg-pos)}
 .pad.mini{font-size:11px;padding:1px 6px}
 .hpg{display:flex;gap:5px;align-items:flex-end}
 .hpc{flex:1;text-align:center;cursor:help}
@@ -383,12 +398,12 @@ table.mini th.r{text-align:right}
 .hpb.parc{background:var(--amb);opacity:.45;
   background-image:repeating-linear-gradient(45deg,transparent,transparent 3px,rgba(0,0,0,.35) 3px,rgba(0,0,0,.35) 6px)}
 .hpc.parc .hpm{color:var(--amb)}
-.modotag.parc{background:rgba(239,178,92,.16);color:var(--fg-warn);cursor:help}
+.modotag.parc{background:var(--bg-warn);color:var(--fg-warn);cursor:help}
 .hpc.off .hpb{background:var(--s3)}
 .hpm{font-size:11px;color:var(--dim);margin-top:4px}
 .hpc.atual .hpm{color:var(--cy);font-weight:500}
 .hpc.atual .hpb{outline:1px solid var(--cy2);outline-offset:1px}
-.avisop{font-size:11px;color:var(--fg-warn);background:rgba(239,178,92,.10);
+.avisop{font-size:11px;color:var(--fg-warn);background:var(--bg-warn-sutil);
   border-radius:6px;padding:6px 10px;margin-bottom:7px}
 .faixar{display:flex;gap:10px;flex-wrap:wrap;background:var(--s1);border:1px solid var(--line);
   border-radius:var(--r);padding:11px 14px;margin-bottom:18px}
@@ -410,12 +425,12 @@ table.mini th.r{text-align:right}
 .graf{margin-top:14px;padding-top:12px;border-top:1px solid var(--line)}
 .glbl{font-size:11px;color:var(--mut);margin-bottom:9px}
 .sw{display:inline-block;width:9px;height:9px;border-radius:2px;vertical-align:-1px}
-.sw.rec{background:#4ADE9B} .sw.cus{background:#F26D6D}
+.sw.rec{background:var(--bar-pos)} .sw.cus{background:var(--bar-neg)}
 .gwrap{display:flex;gap:8px;align-items:flex-end}
 .gcol{flex:1;text-align:center;cursor:help}
 .gpar{display:flex;gap:2px;justify-content:center;align-items:flex-end;height:56px}
 .gb{width:10px;border-radius:2px 2px 0 0}
-.gb.rec{background:#4ADE9B;opacity:.85} .gb.cus{background:#F26D6D;opacity:.85}
+.gb.rec{background:var(--bar-pos);opacity:.85} .gb.cus{background:var(--bar-neg);opacity:.85}
 .gm{font-size:11px;color:var(--dim);margin-top:4px}
 .gm.at{color:var(--cy);font-weight:500}
 .gr{font-size:11px;line-height:1}
@@ -489,14 +504,14 @@ td.segs .sg{display:inline-block;margin:1px 2px 1px 0}
   margin-left:7px;vertical-align:middle;overflow:hidden}
 .bar2 i{display:block;height:100%;background:var(--amb);border-radius:2px}
 .tp{font-size:11px;padding:2px 8px;border-radius:5px;white-space:nowrap}
-.tp.sistemico{background:rgba(242,109,109,.16);color:var(--fg-neg)}
-.tp.varios{background:rgba(239,178,92,.14);color:var(--fg-warn)}
-.tp.isolado{background:rgba(143,163,184,.12);color:var(--mut)}
+.tp.sistemico{background:var(--bg-neg);color:var(--fg-neg)}
+.tp.varios{background:var(--bg-warn);color:var(--fg-warn)}
+.tp.isolado{background:var(--bg-neu);color:var(--mut)}
 td.uns{max-width:330px}
 .uc{display:inline-block;font-size:11px;background:var(--s2);border:1px solid var(--line);
   border-radius:11px;padding:1.5px 8px;margin:1.5px 3px 1.5px 0;cursor:pointer;color:var(--mut)}
 .uc:hover{border-color:var(--cy);color:var(--tx)}
-.uc.m{border-color:rgba(242,109,109,.4);color:var(--fg-neg)}
+.uc.m{border-color:var(--bd-neg);color:var(--fg-neg)}
 .umais{font-size:11px;color:var(--cy2);cursor:help;padding:0 4px}
 .sinal{margin-bottom:11px}
 .sinal:last-child{margin-bottom:0}
@@ -504,8 +519,8 @@ td.uns{max-width:330px}
 .par{background:var(--s2);border-radius:7px;padding:7px 11px;margin-bottom:6px}
 .par .pl{font-size:11.5px;color:var(--tx);display:flex;align-items:center;gap:8px;padding:1.5px 0}
 .par .pl b{margin-left:auto;color:var(--mut);font-weight:400}
-.pn{font-size:11px;background:rgba(242,109,109,.16);color:var(--fg-neg);padding:1px 6px;border-radius:4px;flex:none}
-.pn.pk{background:rgba(239,178,92,.16);color:var(--fg-warn)}
+.pn{font-size:11px;background:var(--bg-neg);color:var(--fg-neg);padding:1px 6px;border-radius:4px;flex:none}
+.pn.pk{background:var(--bg-warn);color:var(--fg-warn)}
 .tabh{font-size:11px;color:var(--dim);letter-spacing:.1em;text-transform:uppercase;
   margin:4px 0 9px;display:flex;align-items:center;gap:8px}
 .tabh b{color:var(--cy2);font-weight:400}
@@ -518,14 +533,14 @@ td.uns{max-width:330px}
 .abas button:hover{color:var(--tx)}
 .abas button.on{color:var(--cy2);border-bottom-color:var(--cy)}
 .abas .ab{font-size:11px;background:var(--s2);border-radius:9px;padding:1px 7px;color:var(--dim)}
-.abas button.on .ab{background:rgba(34,211,238,.15);color:var(--cy2)}
+.abas button.on .ab{background:var(--bg-cy);color:var(--cy2)}
 .mini tr.clic{cursor:pointer}
 .mini tr.clic:hover td{background:var(--s2)}
 .erow.clicavel{cursor:pointer;border-radius:6px;padding:3px 6px;margin:0 -6px;
   transition:background .12s}
 .erow.clicavel:hover{background:var(--s2)}
 .lin{cursor:pointer}
-.lin .cx{color:var(--dim);margin-right:5px;font-size:11px}
+.lin .cx{color:var(--dim);margin-right:4px;font-size:11px}
 .lin.aberta{background:var(--s2)} .lin.aberta .cx{color:var(--cy2)}
 tr.exp td{padding:0;background:var(--exp-bg)}
 .expbox{padding:13px 16px 15px;border-left:2px solid var(--cy)}
@@ -537,7 +552,7 @@ table.mini td{padding:4px 7px;border-bottom:none;color:var(--mut)}
 table.mini td:first-child{color:var(--tx);font-size:11px}
 table.mini tr:hover td{background:transparent}
 table.mini .b{color:var(--tx);font-weight:500;border-left:1px solid var(--line)}
-table.mini td.falta{background:rgba(242,109,109,.16);color:var(--fg-neg);border-radius:3px}
+table.mini td.falta{background:var(--bg-neg);color:var(--fg-neg);border-radius:3px}
 table.mini tr.vr td{border-top:1px solid var(--line)}
 .expl2{font-size:11px;color:var(--dim);margin-top:9px}
 .fade{animation:f .22s ease}
@@ -634,10 +649,10 @@ table.mini tr.vr td{border-top:1px solid var(--line)}
 </head>
 <body>
 <div class="topbar">
-  <button class="ham" id="ham" aria-label="Menu">☰</button>
+  <button class="ham" id="ham" aria-label="Menu"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h16"/><path d="M4 12h16"/><path d="M4 18h16"/></svg></button>
   <div class="tbt"><span id="tbtitulo">Visão geral</span>
     <small id="tbsub"></small></div>
-  <button class="ham" id="tbbusca" aria-label="Buscar">⌕</button>
+  <button class="ham" id="tbbusca" aria-label="Buscar"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg></button>
 </div>
 <div class="drawerbg" id="drawerbg"></div>
 <div class="app">
@@ -651,7 +666,7 @@ table.mini tr.vr td{border-top:1px solid var(--line)}
     </div>
     <div class="sidescroll">
     <div class="navlbl">Visualização
-      <button class="tema" id="btema" title="Alternar tema claro/escuro">◐</button></div>
+      <button class="tema" id="btema" title="Alternar tema claro/escuro" aria-label="Alternar tema claro/escuro"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="10"/><path d="M12 18a6 6 0 0 0 0-12v12z"/></svg></button></div>
     <div class="segbar" id="modobar" role="group" aria-label="Visualização">
       <button data-m="geral" class="on">Plano geral</button>
       <button data-m="rec">Recorrentes</button>
@@ -991,7 +1006,7 @@ function _decodifica(buf){
    +'para montar o painel com os números atuais.</p>'
    +'<div id="_pasta" class="_cx"></div>'
    +'<div class="_cx" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
-   +'<button type="button" id="_plano" class="_bt">↗ Exportar nova base do Plano</button>'
+   +'<button type="button" id="_plano" class="_bt"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg> Exportar nova base do Plano</button>'
    +'<button type="button" id="_planoEd" class="_lk">editar link</button>'
    +'<div id="_planoForm" hidden style="display:flex;gap:6px;width:100%">'
    +'<input id="_planoUrl" type="url" aria-label="Link de exportação do Plano" style="flex:1;min-width:0;background:#0A1220;color:#E8EEF5;border:1px solid rgba(255,255,255,.22);border-radius:7px;padding:6px 8px;font:inherit;font-size:12px">'
@@ -1011,6 +1026,7 @@ function _decodifica(buf){
    +'#_ov ._bt:hover{border-color:#22D3EE}'
    +'#_ov ._lk{background:none;border:none;padding:0;color:#67E8F9;text-decoration:underline;font:inherit;font-size:12.5px;cursor:pointer}'
    +'#_ov button:focus-visible{outline:2px solid #22D3EE;outline-offset:2px}'
+   +'#_ov .ic{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:-3px}'
    +'#_ov ._ls{list-style:none;margin:8px 0 0;padding:0;max-height:210px;overflow-y:auto;border:1px solid rgba(255,255,255,.13);border-radius:9px}'
    +'#_ov ._ls li+li{border-top:1px solid rgba(255,255,255,.08)}'
    +'#_ov ._ls button{display:grid;grid-template-columns:1fr auto;gap:2px 12px;width:100%;text-align:left;background:none;border:none;color:#E8EEF5;padding:8px 11px;font:inherit;font-size:13px;cursor:pointer}'
@@ -1066,6 +1082,7 @@ function _decodifica(buf){
           var q=op==="get"?s.get(k):s.put(v,k); q.onsuccess=function(){ ok(q.result); }; q.onerror=function(){ ok(null); };
         }catch(e){ ok(null); } };
     }catch(e){ ok(null); } }); }
+  var IC_PASTA="<svg class=\"ic\" viewBox=\"0 0 24 24\" aria-hidden=\"true\" focusable=\"false\"><path d=\"M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z\"/></svg>";
   function z2(n){ return String(n).padStart(2,"0"); }
   function dataHora(ms){ var d=new Date(ms); return z2(d.getDate())+"/"+z2(d.getMonth()+1)+"/"+d.getFullYear()+" "+z2(d.getHours())+":"+z2(d.getMinutes()); }
   function tam(b){ return b>=1048576?(b/1048576).toFixed(1).replace(".",",")+" MB":Math.max(1,Math.round(b/1024))+" KB"; }
@@ -1074,13 +1091,13 @@ function _decodifica(buf){
     var box=document.getElementById("_pasta"); if(!box) return; box.textContent="";
     var cab=el("div",{"class":"_ph"});
     if(estado==="sem"){
-      var b=el("button",{type:"button","class":"_bt",id:"_escPasta"},"📁 Escolher a pasta da base");
+      var b=el("button",{type:"button","class":"_bt",id:"_escPasta"},null); b.innerHTML=IC_PASTA+" Escolher a pasta da base";
       b.onclick=escolhePasta; cab.appendChild(b);
       cab.appendChild(el("span",{},FS?"Lista os CSV da pasta com data e hora e lembra dela nas próximas vezes.":"Lista os CSV da pasta com data e hora (neste navegador a pasta é escolhida a cada vez)."));
       box.appendChild(cab); return;
     }
     if(estado==="permissao"){
-      var b2=el("button",{type:"button","class":"_bt",id:"_reabre"},"📁 Abrir a pasta "+pasta.name);
+      var b2=el("button",{type:"button","class":"_bt",id:"_reabre"},null); b2.innerHTML=IC_PASTA+" Abrir a pasta "; b2.appendChild(document.createTextNode(pasta.name));
       b2.onclick=function(){ pasta.requestPermission({mode:"read"}).then(function(p){ if(p==="granted") listaPasta(); }).catch(function(){}); };
       cab.appendChild(b2); var t=el("button",{type:"button","class":"_lk"},"outra pasta"); t.onclick=escolhePasta; cab.appendChild(t);
       box.appendChild(cab); return;
@@ -1198,6 +1215,13 @@ if(!DB) throw new Error("painel iniciado sem base carregada");
 
 // Escapa texto vindo do CSV antes de pôr em HTML (nomes e descrições são dados, não markup).
 const he=s=>String(s??"").replace(/[&<>"']/g,c=>"&#"+c.charCodeAt(0)+";");
+// Ícones embutidos (nada é baixado): desenhos do Lucide (lucide.dev), licença ISC.
+//   Copyright (c) for portions of Lucide are held by Cole Bemis 2013-2022 as part of Feather (MIT).
+//   All other copyright (c) for Lucide are held by Lucide Contributors 2022.
+//   Permission to use, copy, modify, and/or distribute this software for any purpose with or without fee
+//   is hereby granted, provided that the above copyright notice and this permission notice appear in all copies.
+const ICONES={"x": "<path d=\"M18 6 6 18\"/><path d=\"m6 6 12 12\"/>", "alerta": "<path d=\"m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3\"/><path d=\"M12 9v4\"/><path d=\"M12 17h.01\"/>", "dir": "<path d=\"m9 18 6-6-6-6\"/>", "baixo": "<path d=\"m6 9 6 6 6-6\"/>", "cima": "<path d=\"m18 15-6-6-6 6\"/>", "seta": "<path d=\"M5 12h14\"/><path d=\"m12 5 7 7-7 7\"/>", "externo": "<path d=\"M15 3h6v6\"/><path d=\"M10 14 21 3\"/><path d=\"M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6\"/>", "pasta": "<path d=\"M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z\"/>", "tema": "<circle cx=\"12\" cy=\"12\" r=\"10\"/><path d=\"M12 18a6 6 0 0 0 0-12v12z\"/>", "menu": "<path d=\"M4 6h16\"/><path d=\"M4 12h16\"/><path d=\"M4 18h16\"/>", "busca": "<circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/>", "baixar": "<path d=\"M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4\"/><path d=\"M7 10l5 5 5-5\"/><path d=\"M12 15V3\"/>"};
+const ic=n=>`<svg class="ic" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICONES[n]}</svg>`;
 // Valor para dentro de um onclick="...": string JS válida e escapada para o atributo.
 const js=s=>he(JSON.stringify(String(s??"")));
 
@@ -1529,7 +1553,7 @@ function renderNav(){
        <span class="n">${totalExcecoes()||""}</span></a>`:"")
     + `<div class="navlbl" style="padding:14px 8px 7px">Diagnóstico do ano</div>
        <a class="${view.tipo==='lastro'?'on':''}" onclick="go({tipo:'lastro'})">
-       <span class="dot" style="background:#A78BFA"></span>Orçamento sem lastro
+       <span class="dot" style="background:var(--lil)"></span>Orçamento sem lastro
        <span class="n">${semLastro(CFG.mesesDiagnostico).length}</span></a>
        <a class="${view.tipo==='lsorc'?'on':''}" onclick="go({tipo:'lsorc'})">
        <span class="dot" style="background:#67E8F9"></span>Lastro sem orçamento
@@ -1657,7 +1681,7 @@ function renderHub(){
   const mudas=Object.values(a).filter(o=>o.est==="muda"&&o.orc>0)
       .sort((x,y)=>y.expo-x.expo);
   const alerta=(!aberto&&mudas.length)?`<div class="alerta">
-     <div class="at">⚠ ${mudas.length} unidade(s) não lançaram NADA em ${faixaLbl()}</div>
+     <div class="at">${ic("alerta")} ${mudas.length} unidade(s) não lançaram NADA em ${faixaLbl()}</div>
      <div class="ad">Vinham lançando nos meses anteriores e ficaram sem nenhum lançamento agora.
        Somam <b>R$ ${fmtMi(mudas.reduce((s,o)=>s+o.expo,0))}</b> de orçamento sem realizado.</div>
      <div class="alist">${mudas.slice(0,12).map(o=>`<span class="ac" onclick="go({tipo:'det',seg:${js(o.seg)},unit:${js(o.cod)}})">
@@ -1805,10 +1829,10 @@ function resultadoContasHub(){
    <div class="tw" style="margin-bottom:18px"><table><thead><tr>
       <th class="selc"><input type="checkbox" aria-label="Selecionar todas as contas listadas para a provisão" onclick="event.stopPropagation();selProvTodas(this)"></th><th>Conta</th><th>Descrição</th><th>Segmentos</th><th class="r">Unidades c/ falha</th>
       <th class="r">R$ exposto</th><th>Alcance</th><th>Quais unidades</th>
-    </tr></thead><tbody>${lst.map(o=>`<tr class="lin ${expContaHub===o.a?'aberta':''}" aria-expanded="${expContaHub===o.a}"
+    </tr></thead><tbody>${lst.map(o=>`<tr class="lin ${expContaHub===o.a?'aberta':''}"
         onclick="toggleContaHub(${js(o.a)})">
       <td class="selc"><input type="checkbox" class="provck" data-a="${he(o.a)}" aria-label="Selecionar ${he(o.a)} para a provisão"${provSel.has(o.a)?" checked":""} onclick="event.stopPropagation();selProv(this.dataset.a,this.checked)"></td>
-      <td class="num" style="color:var(--dim)"><span class="cx">${expContaHub===o.a?"▾":"▸"}</span>${he(o.a)}</td>
+      <td class="num" style="color:var(--dim)"><span class="cx" role="img" aria-label="${expContaHub===o.a?"linha aberta":"linha fechada"}">${ic(expContaHub===o.a?"baixo":"dir")}</span>${he(o.a)}</td>
       <td>${he(o.desc)}${incluiConta(o.a)}${o.rec&&modo!=="rec"?' <span class="cf alta" style="font-size:11px">recorrente</span>':""}</td>
       <td class="segs">${o.segs.map(([s,n])=>`<span class="sg" style="${tint(s)}">${SEGNM[s]} ${n}</span>`).join(" ")}</td>
       <td class="r"><span class="frac"><b>${o.sem}</b>/${o.tot}</span>
@@ -1829,7 +1853,7 @@ function detalheContaHub(conta,desc){
   return `<tr class="exp"><td colspan="8"><div class="expbox">
     <div class="expt">${he(desc)} · conta ${he(conta)} · ${hubF.segs.length?hubF.segs.map(s=>SEGNM[s]).join(", "):"todos os segmentos"} em ${faixaLbl()}</div>
     <table class="mini"><thead><tr><th>Unidade</th><th>Segmento</th><th class="r">Orçado</th>
-      <th class="r">Realizado</th><th class="r">Variação</th><th></th><th>Status</th></tr></thead>
+      <th class="r">Realizado</th><th class="r">Variação</th><th aria-label="Barra da variação"></th><th>Status</th></tr></thead>
     <tbody>${ls.map(o=>`<tr class="clic" onclick="event.stopPropagation();abreConta(${js(o.cod)},${js(conta)})">
       <td>${he(o.nome)}</td><td><span class="sg" style="${tint(o.seg)}">${SEGNM[o.seg]}</span></td>
       <td class="r num">${Math.abs(o.p)<EPS?"—":fmtC(o.p)}</td>
@@ -1938,8 +1962,8 @@ function abreProvisao(){
   el.innerHTML=`<div class="guiabox" role="dialog" aria-modal="true" aria-labelledby="provt">
     <div class="guiah"><div><h2 class="gt" id="provt">Exportar provisão · ${rotMes(M)}</h2>
       <div class="gs">Layout: Conta contábil · Valor · Centro de custo (unidade + 4 últimos dígitos do CC da base).</div></div>
-      <button class="gx" aria-label="Fechar" onclick="fechaGuia()">✕</button></div>
-    <div class="guial">
+      <button class="gx" aria-label="Fechar" onclick="fechaGuia()">${ic("x")}</button></div>
+    <div class="guial" tabindex="0">
       <div class="provform">
         <label class="pl" for="provEsc">Unidades</label>${sel("provEsc","escopo",esc.map(e=>[e.v,he(e.t)]))}
         <label class="pl" for="provContas">Contas</label>${sel("provContas","contas",[["todas","Todas as pendentes do escopo"]].concat(provSel.size?[["sel",`Só as ${provSel.size} marcadas na lista`]]:[]))}
@@ -1966,7 +1990,7 @@ function atualizaPrevProvisao(){
   const el=document.getElementById("provPrev"); if(!el) return;
   const {linhas,total,ant}=dadosProvisao(provOpt), ruins=linhas.filter(l=>!l.ccOk).length;
   el.innerHTML=(linhas.length?`<b>${linhas.length} linha(s)</b> · R$ <b class="num">${fmtC(total)}</b> · ${new Set(linhas.map(l=>l.contaOrig)).size} conta(s) ·
-    ${new Set(linhas.map(l=>l.u)).size} unidade(s)${ruins?`<span class="av">⚠ ${ruins} linha(s) com centro de custo incompleto — confira a coluna de centro de custo.</span>`:""}`
+    ${new Set(linhas.map(l=>l.u)).size} unidade(s)${ruins?`<span class="av">${ic("alerta")} ${ruins} linha(s) com centro de custo incompleto — confira a coluna de centro de custo.</span>`:""}`
     :`Nenhuma pendência para provisionar com estas opções em ${rotMes(M)}.`)+detalheRealizado(linhas,ant);
   const b=document.getElementById("provBaixar"); if(b) b.disabled=!linhas.length;
 }
@@ -1978,11 +2002,11 @@ function detalheRealizado(linhas,ant){
   const nPico=g.filter(l=>l.pico!=null).length, MAX=60;
   const ms=[...ant].reverse(), idx=ms.map(i=>ant.indexOf(i));
   return `<div class="provdet">
-    ${nPico?`<span class="av">⚠ ${nPico} conta(s) com um mês acima de ${CFG.provPico}× a mediana dos outros${provOpt.valor==="media"?" — a média fica inflada; confira ou use a mediana":""}.</span>`:""}
+    ${nPico?`<span class="av">${ic("alerta")} ${nPico} conta(s) com um mês acima de ${CFG.provPico}× a mediana dos outros${provOpt.valor==="media"?" — a média fica inflada; confira ou use a mediana":""}.</span>`:""}
     <div class="provtab"><table><caption>Realizado dos meses usados no cálculo, por conta e unidade</caption>
       <thead><tr><th>Conta</th><th>Unidade</th>${ms.map(i=>`<th class="num">${rotMes(i)}</th>`).join("")}<th class="num">Orçado</th><th class="num">Provisão</th></tr></thead>
       <tbody>${g.slice(0,MAX).map(l=>`<tr${l.pico!=null?' class="pico"':""}><td title="${he(l.desc)}">${he(l.contaOrig)}</td><td>${he(l.u)}</td>
-        ${idx.map((k,j)=>`<td class="num${ms[j]===l.pico?" alto":""}"${ms[j]===l.pico?' title="Fora da curva"':""}>${fmtC(l.hist[k])}${ms[j]===l.pico?" ⚠":""}</td>`).join("")}
+        ${idx.map((k,j)=>`<td class="num${ms[j]===l.pico?" alto":""}"${ms[j]===l.pico?' title="Fora da curva"':""}>${fmtC(l.hist[k])}${ms[j]===l.pico?" "+ic("alerta"):""}</td>`).join("")}
         <td class="num">${fmtC(l.orcUn)}</td><td class="num"><b>${fmtC(l.valor)}</b></td></tr>`).join("")}</tbody></table></div>
     ${g.length>MAX?`<div class="gs">Mostrando ${MAX} de ${g.length}; a planilha (aba Conferência) traz todas.</div>`:""}</div>`;
 }
@@ -2214,7 +2238,7 @@ function renderExcecoes(){
      foi para o lugar errado ou a unidade ainda está ativa sem que o cadastro reflita isso.</div></div>
    ${lst.map(o=>`<div class="exbox ${o.linhas.length?"alerta2":"limpa2"}">
       <div class="exh"><span class="exn lnkun" onclick="go({tipo:'det',seg:${js(o.u.seg)},unit:${js(o.u.cod)}})">${he(o.u.nome)}</span>
-        <span class="tag" style="background:rgba(143,163,184,.12);color:var(--mut)">${he(o.u.cod)}</span>
+        <span class="tag" style="background:var(--bg-neu);color:var(--mut)">${he(o.u.cod)}</span>
         ${o.linhas.length
           ? `<span class="exq">${o.linhas.length} conta(s) · R$ ${fmtMi(o.val)} em ${faixaLbl()}</span>`
           : `<span class="exok">sem movimento no período</span>`}
@@ -2453,7 +2477,7 @@ function renderMapa(sg){
     if(m.inativa) return `<td class="hm off" ${T(`<b>${rotMes(m.i)}</b><div class="tl">A unidade ainda não tinha lançado nada no ano até este mês: sem pendência a cobrar.</div>`)}></td>`;
     const t=m.n/mx;
     const bg = m.muda ? "rgba(242,109,109,.85)"
-             : m.n===0 ? "rgba(74,222,155,.16)"
+             : m.n===0 ? "var(--bg-pos)"
              : `rgba(239,178,92,${(0.12+t*0.38).toFixed(2)})`;
     const cs=m.n?contasDoMes(cod,i):[];
     const lista=cs.slice(0,8).map(c=>`<div class="tr2"><span>${he(c.desc)}</span>
@@ -2509,7 +2533,7 @@ function detalheContaSeg(sg,conta,desc){
   return `<tr class="exp"><td colspan="7"><div class="expbox">
     <div class="expt">${he(desc)} · conta ${he(conta)} · todas as unidades de ${SEGNM[sg]} em ${faixaLbl()}</div>
     <table class="mini"><thead><tr><th>Unidade</th><th class="r">Orçado</th>
-      <th class="r">Realizado</th><th class="r">Variação</th><th></th><th>Status</th></tr></thead>
+      <th class="r">Realizado</th><th class="r">Variação</th><th aria-label="Barra da variação"></th><th>Status</th></tr></thead>
     <tbody>${ls.map(o=>`<tr class="clic" onclick="event.stopPropagation();abreConta(${js(o.cod)},${js(conta)})">
       <td>${he(o.nome)}</td>
       <td class="r num">${Math.abs(o.p)<EPS?"—":fmtC(o.p)}</td>
@@ -2542,7 +2566,7 @@ function renderContasSeg(sg){
     </tr></thead><tbody>${lst.map(o=>`<tr class="lin ${expConta===o.a?'aberta':''}"
         onclick="toggleConta(${js(o.a)})">
       <td class="selc"><input type="checkbox" class="provck" data-a="${he(o.a)}" aria-label="Selecionar ${he(o.a)} para a provisão"${provSel.has(o.a)?" checked":""} onclick="event.stopPropagation();selProv(this.dataset.a,this.checked)"></td>
-      <td class="num" style="color:var(--dim)"><span class="cx">${expConta===o.a?"▾":"▸"}</span>${he(o.a)}</td>
+      <td class="num" style="color:var(--dim)"><span class="cx" role="img" aria-label="${expConta===o.a?"linha aberta":"linha fechada"}">${ic(expConta===o.a?"baixo":"dir")}</span>${he(o.a)}</td>
       <td>${he(o.desc)}${incluiConta(o.a)}${o.rec&&modo!=="rec"?' <span class="cf alta" style="font-size:11px">recorrente</span>':""}</td>
       <td class="r"><span class="frac"><b>${o.sem}</b>/${o.tot}</span>
         <span class="bar2"><i style="width:${(o.taxa*100).toFixed(0)}%"></i></span></td>
@@ -2580,7 +2604,7 @@ function mesATes(d){
     return `<td class="r num${falta?" falta":""}">${fmtC(r)}</td>`;};
   return `<tr class="exp"><td colspan="11"><div class="expbox">
     <div class="expt">Orçado × realizado mês a mês${modo==="rec"?" · conta recorrente":""}</div>
-    <table class="mini"><thead><tr><th></th>${ms.map(i=>`<th class="r">${DB.meses[i]}</th>`).join("")}<th class="r">Total</th></tr></thead>
+    <table class="mini"><thead><tr><th aria-label="Linha"></th>${ms.map(i=>`<th class="r">${DB.meses[i]}</th>`).join("")}<th class="r">Total</th></tr></thead>
     <tbody>
       <tr><td>Orçado</td>${ms.map(i=>`<td class="r num">${fmtC(d.p[i])}</td>`).join("")}
           <td class="r num b">${fmtC(ms.reduce((s,i)=>s+d.p[i],0))}</td></tr>
@@ -2615,7 +2639,7 @@ function linhasFiltradas(base){
 function corpoDet(rows){
   const mxv=Math.max(...rows.map(r=>Math.abs(r.v)),1);
   return rows.length?rows.map(r=>`<tr class="lin ${expandida===r.a?'aberta':''}" onclick="toggleExp(${js(r.a)})">
-      <td class="num" style="color:var(--dim)"><span class="cx">${expandida===r.a?"▾":"▸"}</span>${he(r.a)}</td>
+      <td class="num" style="color:var(--dim)"><span class="cx" role="img" aria-label="${expandida===r.a?"linha aberta":"linha fechada"}">${ic(expandida===r.a?"baixo":"dir")}</span>${he(r.a)}</td>
       <td>${he(r.desc)}${incluiConta(r.a)}</td>
       <td class="r num">${fmtC(r.p)}</td>
       <td class="r num">${fmtC(r.r)}</td>
@@ -2648,7 +2672,7 @@ function renderDet(){
 
   const rows=linhasFiltradas(base);
   const body=corpoDet(rows);
-  const ar=key=>view.sk===key?`<span class="ar">${view.sd>0?"▼":"▲"}</span>`:"";
+  const ar=key=>view.sk===key?`<span class="ar" role="img" aria-label="${view.sd>0?"ordem decrescente":"ordem crescente"}">${ic(view.sd>0?"baixo":"cima")}</span>`:"";
 
   const all=base;
   // BLOCO 0 — histórico de pendências mês a mês
@@ -2682,7 +2706,7 @@ function renderDet(){
         <span class="num" style="width:92px;text-align:right;color:var(--amb)">${fmtC(Math.abs(r.p))}</span>
         <span class="cf ${r.cf}" style="width:104px;text-align:center" ${T(tipHist(r.hist,r.cf))}>${CONF[r.cf]}</span></div>`).join("")}
      ${semL.length>5?`<div style="font-size:11px;color:var(--dim);margin-top:7px;cursor:pointer"
-        onclick="setF('sem')">ver as ${semL.length} contas →</div>`:""}
+        onclick="setF('sem')">ver as ${semL.length} contas ${ic("seta")}</div>`:""}
      </div>`:"";
 
   // BLOCO 2 — variação de quem teve orçado E realizado
@@ -2705,15 +2729,15 @@ function renderDet(){
   // BLOCO 2b — lançou sem ter orçamento
   const tSorc=sorc.reduce((a,r)=>a+Math.abs(r.r),0);
   const mxS=Math.max(...sorc.map(r=>Math.abs(r.r)),1);
-  const b2b=sorc.length?`<div class="expl" style="border-left:3px solid #A78BFA">
+  const b2b=sorc.length?`<div class="expl" style="border-left:3px solid var(--lil)">
      <div style="font-size:11px;color:var(--dim);letter-spacing:.1em;text-transform:uppercase;margin-bottom:9px">
        Lançou sem ter orçamento &nbsp;·&nbsp; <b style="color:var(--fg-lil)">${sorc.length} contas · R$ ${fmtMi(tSorc)}</b></div>
      ${sorc.slice(0,5).map(r=>`<div class="erow">
         <span class="bn">${he(r.desc)}<span class="nat"> · ${r.nat}</span></span>
-        <span class="bb" style="width:${(Math.abs(r.r)/mxS*80).toFixed(0)}px;background:#A78BFA"></span>
+        <span class="bb" style="width:${(Math.abs(r.r)/mxS*80).toFixed(0)}px;background:var(--lil)"></span>
         <span class="num" style="width:92px;text-align:right;color:var(--fg-lil)">${fmtC(r.r)}</span></div>`).join("")}
      ${sorc.length>5?`<div style="font-size:11px;color:var(--dim);margin-top:7px;cursor:pointer"
-        onclick="setF('sorc')">ver as ${sorc.length} contas →</div>`:""}
+        onclick="setF('sorc')">ver as ${sorc.length} contas ${ic("seta")}</div>`:""}
      <div class="expl2">Gasto que não estava previsto no orçamento do período.</div>
      </div>`:"";
 
@@ -2851,11 +2875,11 @@ function abreGuia(){
     <div class="guiah"><div>
         <h2 class="gt" id="guiat">Como analisar seu segmento</h2>
         <div class="gs">Roteiro sugerido. Cada passo abre onde ele é feito.</div></div>
-      <button class="gx" aria-label="Fechar" onclick="fechaGuia()">✕</button></div>
-    <div class="guial">${ROTEIRO.map((o,i)=>`<div class="gp">
+      <button class="gx" aria-label="Fechar" onclick="fechaGuia()">${ic("x")}</button></div>
+    <div class="guial" tabindex="0">${ROTEIRO.map((o,i)=>`<div class="gp">
         <div class="gpt">${o.t}</div>
         <div class="gpd">${o.d}</div>
-        ${o.go?`<button class="gpb" onclick="guiaIr(${i})">${o.b} →</button>`:""}
+        ${o.go?`<button class="gpb" onclick="guiaIr(${i})">${o.b} ${ic("seta")}</button>`:""}
       </div>`).join("")}</div>
     <div class="guiaf">Atalhos: <kbd>Ctrl</kbd>+<kbd>K</kbd> buscar ·
       <kbd>1</kbd>–<kbd>9</kbd> segmentos · <kbd>R</kbd> recorrentes ·
@@ -3442,7 +3466,7 @@ function renderLastroSemOrc(){
      <div class="sub">realizado no ano</div></div>`;
   const mx=Math.max(...lst.map(o=>o.val),1);
   document.getElementById("body").innerHTML=`
-    <div class="expl" style="border-left:3px solid #A78BFA;margin-bottom:18px">
+    <div class="expl" style="border-left:3px solid var(--lil);margin-bottom:18px">
       <div class="expl2" style="margin:0;font-size:12px;color:var(--mut)">
       Estas linhas tiveram lançamento mês após mês e <b>nunca</b> foram orçadas em ${ANO}.
       É gasto recorrente que ficou de fora do orçamento — o oposto do orçamento sem lastro.
@@ -3461,7 +3485,7 @@ function renderLastroSemOrc(){
         <div class="worst" style="padding:14px 16px">
           ${lst.slice(0,6).map(o=>`<div class="erow clicavel" onclick="abreConta(${js(o.u)},${js(o.a)})">
             <span class="bn">${he(o.desc)}<span class="nat"> · ${he(o.nome)} · ${he(o.a)}</span></span>
-            <span class="bb" style="width:${(o.val/mx*70).toFixed(0)}px;background:#A78BFA"></span>
+            <span class="bb" style="width:${(o.val/mx*70).toFixed(0)}px;background:var(--lil)"></span>
             <span class="num" style="width:104px;text-align:right;color:var(--fg-lil)">${fmtC(o.val)}</span></div>`).join("")}
         </div></div>
     </div>
@@ -3512,7 +3536,7 @@ function renderLastro(){
      <div class="sub">orçado no ano</div></div>`;
   const mx=Math.max(...lst.map(o=>o.val),1);
   document.getElementById("body").innerHTML=`
-    <div class="expl" style="border-left:3px solid #A78BFA;margin-bottom:18px">
+    <div class="expl" style="border-left:3px solid var(--lil);margin-bottom:18px">
       <div class="expl2" style="margin:0;font-size:12px;color:var(--mut)">
       Estas linhas foram orçadas mês após mês e <b>nunca</b> tiveram lançamento em ${ANO}.
       Não é falha de lançamento — é orçamento sem contrapartida real. Serve de insumo para o
@@ -3535,7 +3559,7 @@ function renderLastro(){
                  <div class="tl">Orçada em ${o.meses} meses, sem nenhum lançamento.</div>
                  <div class="tl" style="color:var(--cy2)">Clique para abrir a unidade nesta conta.</div>`)}>
             <span class="bn">${he(o.desc)}<span class="nat"> · ${he(o.nome)} · ${he(o.a)}</span></span>
-            <span class="bb" style="width:${(o.val/mx*70).toFixed(0)}px;background:#A78BFA"></span>
+            <span class="bb" style="width:${(o.val/mx*70).toFixed(0)}px;background:var(--lil)"></span>
             <span class="num" style="width:104px;text-align:right;color:var(--fg-lil)">${fmtC(o.val)}</span></div>`).join("")}
         </div></div>
     </div>
@@ -3611,7 +3635,7 @@ var render=function(){
   document.getElementById("subtitle").innerHTML=
     `${faixaLbl()} · ${aberto?statusMesCarga(M).replace(" · sem realizado"," · sem realizado importado"):PERLBL[periodo]}`
     +(modo==="rec"?` <span class="modotag">${N_REC} contas recorrentes</span>`:"")
-    +(corte>0?` <span class="modotag" style="background:rgba(143,163,184,.14);color:var(--mut)">ignorando abaixo de R$ ${fmtN(corte)}</span>`:"")
+    +(corte>0?` <span class="modotag" style="background:var(--bg-neu);color:var(--mut)">ignorando abaixo de R$ ${fmtN(corte)}</span>`:"")
     +(mesesAtivos().some(ehAberto)?(()=>{ const ab=mesesAtivos().filter(ehAberto);
       return ` <span class="modotag parc" ${T(`<b>Mês em aberto</b>
         <div class="tl">${ab.map(rotMes).join(", ")} ainda está na semana de ajustes do fechamento (até ${prazoMes(ab[ab.length-1])}).
@@ -3654,7 +3678,7 @@ function carimbo(){
       +`${c.modificado?"Arquivo de":"Dados gerados em"} <b>${dt}</b>`
       +(velho?`<br><b>há ${dias} dias — pode estar desatualizado</b>`:"");
   }
-  el.innerHTML=txt+`<br><button class="lnk${av.length?" av":""}" id="bcarga">${av.length?`⚠ ${av.length} aviso(s) na carga`:"Resumo da carga"}</button>`
+  el.innerHTML=txt+`<br><button class="lnk${av.length?" av":""}" id="bcarga">${av.length?`${ic("alerta")} ${av.length} aviso(s) na carga`:"Resumo da carga"}</button>`
     +` · <button class="lnk" id="btroca" title="Volta à tela de carga mantendo a tela atual no endereço">Trocar base</button>`;
   document.getElementById("bcarga").onclick=()=>{ if(window.fechaMenu) fechaMenu(); abreCarga(); };
   const baj=document.getElementById("bajrec"); if(baj) baj.onclick=()=>{ if(window.fechaMenu) fechaMenu(); abreAjustesRec(); };
@@ -3718,8 +3742,8 @@ function abreAjustesRec(){
       <div class="gs">Desmarque contas que não devem ser cobradas como recorrentes. Em contas lançadas só em alguns meses
       (bimestral, trimestral…), escolha os meses: fora deles, ou se já houve lançamento no ciclo, a conta aparece como
       "Fora do ciclo" em vez de "Sem lançamento".</div></div>
-      <button class="gx" aria-label="Fechar" onclick="fechaGuia()">✕</button></div>
-    <div class="guial">
+      <button class="gx" aria-label="Fechar" onclick="fechaGuia()">${ic("x")}</button></div>
+    <div class="guial" tabindex="0">
       <div class="ajtop"><input type="search" class="fsel" placeholder="buscar conta" aria-label="Buscar conta"
           value="${he(ajFiltro.q)}" oninput="ajFiltro.q=this.value;desenhaAjustes()">
         <select class="fsel" aria-label="Mostrar" onchange="ajFiltro.ver=this.value;desenhaAjustes()">
@@ -3788,9 +3812,9 @@ function abreCarga(){
     <div class="guiah"><div>
         <h2 class="gt" id="cargat">Resumo da carga</h2>
         <div class="gs">Confira os totais com o Plano antes de analisar.</div></div>
-      <button class="gx" aria-label="Fechar" onclick="fechaGuia()">✕</button></div>
-    <div class="guial">
-      ${av.length?`<div class="gp"><div class="gpt" style="color:var(--amb)">⚠ Avisos</div><div class="gpd">${av.map(he).join("<br>")}</div>
+      <button class="gx" aria-label="Fechar" onclick="fechaGuia()">${ic("x")}</button></div>
+    <div class="guial" tabindex="0">
+      ${av.length?`<div class="gp"><div class="gpt" style="color:var(--amb)">${ic("alerta")} Avisos</div><div class="gpd">${av.map(he).join("<br>")}</div>
         ${(c.amostrasInv||[]).length?`<table class="mini" style="margin-top:8px"><thead><tr><th>Linha</th><th>Coluna</th><th>Valor no arquivo</th></tr></thead>
           <tbody>${c.amostrasInv.map(x=>`<tr><td class="num">${x.linha}</td><td class="num">${x.coluna}</td><td class="num">${he(x.valor)}</td></tr>`).join("")}</tbody></table>`:""}
         ${(c.semSegmento||[]).length?`<div class="expl2">Unidades sem segmento:</div>${lista(c.semSegmento)}`:""}</div>`:""}
@@ -3807,13 +3831,13 @@ function abreCarga(){
         ${lin("Unidades",n(DB.units.length)+" ("+DB.units.filter(u=>u.vig).length+" vigiadas)")}${lin("Contas",n(DB.accts.length))}
         ${Object.keys(ALIAS).length?lin("Unidades unificadas",Object.entries(ALIAS).map(([d,o])=>he(o.join(" + ")+" → "+d)).join(" · ")):""}</div></div>
       <div class="gp"><div class="gpt">Totais por mês — todas as unidades A (inclusive vigiadas)</div>
-        <table class="mini" style="margin-top:6px"><thead><tr><th>Mês</th><th class="r">Planejado</th><th class="r">Realizado</th><th class="r">Variação</th><th></th></tr></thead>
+        <table class="mini" style="margin-top:6px"><thead><tr><th>Mês</th><th class="r">Planejado</th><th class="r">Realizado</th><th class="r">Variação</th><td></td></tr></thead>
         <tbody>${tot}</tbody></table></div>
       ${(c.fusoes||[]).map(f=>`<div class="gp"><div class="gpt">Conta fundida: ${he(f.origem)} → ${he(f.destino)}</div>
         <div class="gpd">${f.linhas?`${n(f.linhas)} linha(s) de ${n(f.unidades)} unidade(s) da ${he(f.origem)} somadas em <b>${he((amap[f.destino]||{}).desc||f.destino)}</b>.
           Se a conta de destino aparece sem lançamento, confira abaixo se a ${he(f.origem)} tinha realizado no mês.`
           :`Nenhuma linha da ${he(f.origem)} nesta base.`}</div>
-        ${f.linhas?`<table class="mini" style="margin-top:6px"><thead><tr><th>Mês</th><th class="r">Orçado (${he(f.origem)})</th><th class="r">Realizado (${he(f.origem)})</th><th></th></tr></thead>
+        ${f.linhas?`<table class="mini" style="margin-top:6px"><thead><tr><th>Mês</th><th class="r">Orçado (${he(f.origem)})</th><th class="r">Realizado (${he(f.origem)})</th><td></td></tr></thead>
           <tbody>${DB.meses.map((m,i)=>DB.fechado[i]?`<tr><td>${rotMes(i)}</td><td class="r num">${fmtC(f.p[i])}</td><td class="r num">${fmtC(f.r[i])}</td>
             <td class="nat">${ehAberto(i)?"em aberto":""}</td></tr>`:"").join("")}</tbody></table>`:""}</div>`).join("")}
       ${(c.semClassif||[]).length?`<div class="gp"><div class="gpt">Contas fora da tabela de classificação (${c.semClassif.length})</div>

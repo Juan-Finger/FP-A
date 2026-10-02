@@ -214,12 +214,17 @@ TEXTO_INTENCIONAL.push(["U1", (o, n) => { if (n.kpis) n.kpis = n.kpis.replace(/ 
 TEXTO_INTENCIONAL.push(["A3", (o, n, k) => { if (k.startsWith("ct:")) { delete o.body; delete n.body; } }]);
 // A4: mapa e histórico mudam para unidades que ainda não tinham começado a lançar (conferido no T02 e no A4)
 TEXTO_INTENCIONAL.push(["A4", (o, n, k) => { if (k.startsWith("mp:") || /^det:.*:hist$/.test(k)) { delete o.body; delete n.body; } }]);
+// I1: símbolos de texto usados como ícone (▸ ▾ ⚠ →, ▲ ▼ de ordenação) viraram SVG; o estado vai para aria-label (não entra no texto copiado)
+TEXTO_INTENCIONAL.push(["I1", (o, n) => { for (const k of ["body", "kpis"]) {
+  if (o[k]) o[k] = o[k].replace(/[▸▾]/g, "").replace(/⚠ ?/g, "").replace(/ →/g, " ").replace(/[▲▼]/g, "");
+ } }]);
 teste("T05", "texto visível de todas as telas idêntico ao original (estado padrão)", async () => {
   const [o, n] = await Promise.all([pagina("orig"), pagina("novo")]);
   const a = await o.evaluate(TELAS), b = await n.evaluate(TELAS);
   for (const k of Object.keys(a)) {
     const x = JSON.parse(JSON.stringify(a[k])), y = JSON.parse(JSON.stringify(b[k] || {}));
     for (const [, fn] of TEXTO_INTENCIONAL) fn(x, y, k);
+
     igual(x, y, "tela " + k);
   }
 });
@@ -1057,6 +1062,7 @@ teste("P2", "provisão: abre em 'contas marcadas' e, pelo realizado, mostra o m�
     const orcTxt = document.getElementById("provPrev").innerText;
     provAlt("valor", "media");
     const tab = [...document.querySelectorAll("#provPrev .provtab tbody tr")].map(tr => ({ pico: tr.classList.contains("pico"),
+      alto: !!tr.querySelector("td.alto svg.ic"),
       c: [...tr.cells].map(td => td.textContent.trim()) }));
     const cab = [...document.querySelectorAll("#provPrev .provtab thead th")].map(th => th.textContent);
     const aviso = (document.querySelector("#provPrev .av") || {}).textContent || "";
@@ -1066,7 +1072,7 @@ teste("P2", "provisão: abre em 'contas marcadas' e, pelo realizado, mostra o m�
   ok(r.semSel === "todas" && r.comSel === "sel" && r.contasOpt === "sel", "seleção: " + JSON.stringify([r.semSel, r.comSel, r.contasOpt]));
   ok(!/JUL/.test(r.orcTxt), "pelo orçado não deveria mostrar o detalhe: " + r.orcTxt);
   igual(["Conta", "Unidade", "MAI/26", "JUN/26", "JUL/26", "Orçado", "Provisão"], r.cab, "cabeçalho do detalhe");
-  ok(r.tab.length === 1 && r.tab[0].pico && r.tab[0].c[4].includes("4.800,00") && r.tab[0].c[4].includes("⚠") && r.tab[0].c[6] === "1.920,00",
+  ok(r.tab.length === 1 && r.tab[0].pico && r.tab[0].c[4].includes("4.800,00") && r.tab[0].alto && r.tab[0].c[6] === "1.920,00",
      "detalhe: " + JSON.stringify(r.tab));
   ok(/1 conta\(s\) com um mês acima/.test(r.aviso) && /mediana/.test(r.aviso), "aviso: " + r.aviso);
   // planilha: meses e mês fora da curva na Conferência
@@ -1076,6 +1082,32 @@ teste("P2", "provisão: abre em 'contas marcadas' e, pelo realizado, mostra o m�
          "Base do cálculo (conta × unidade)", "Mês fora da curva"], h.slice(13), "colunas novas");
   igual([480, 480, 4800, 1920, "JUL/26"], l.slice(13), "valores na conferência");
   await p.context().close();
+});
+
+teste("X1", "acessibilidade (axe-core): nenhuma violação nas telas principais e janelas, nos dois temas", async () => {
+  let src;
+  try { src = fs.readFileSync(require.resolve("axe-core/axe.min.js"), "utf8"); }
+  catch (e) { src = fs.readFileSync(path.join(cp.execSync("npm root -g").toString().trim(), "axe-core", "axe.min.js"), "utf8"); }
+  const telas = {
+    hub: () => go({ tipo: "hub" }), "por conta": () => { go({ tipo: "hub" }); vhub = "ct"; render(); },
+    segmento: () => { vhub = "seg"; go({ tipo: "seg", seg: "CDs" }); },
+    unidade: () => { const u = DB.units.find(u => u.seg === "CDs"); go({ tipo: "unit", unit: u.cod, seg: u.seg }); },
+    exceções: () => go({ tipo: "exc" }), provisão: () => { go({ tipo: "hub" }); abreProvisao(); },
+    recorrentes: () => { fechaGuia(); abreAjustesRec(); }, "resumo da carga": () => { fechaGuia(); abreCarga(); } };
+  const falhas = [];
+  for (const cs of ["dark", "light"]) {
+    const p = await abre(NOVO, "plano_sint.csv", { colorScheme: cs });
+    await p.addScriptTag({ content: src });
+    for (const [nome, f] of Object.entries(telas)) {
+      await p.evaluate(`(${f.toString()})()`); await p.waitForTimeout(50);
+      await p.evaluate(() => Promise.all(document.getAnimations().map(a => a.finished.catch(() => {}))));   // cartões entram com fade
+      const v = await p.evaluate(async () => (await axe.run(document, { resultTypes: ["violations"] })).violations
+        .map(x => `${x.id} (${x.impact}): ${x.nodes.slice(0, 2).map(n => n.target.join(" ")).join(" | ")}`));
+      v.forEach(x => falhas.push(`${cs}/${nome}: ${x}`));
+    }
+    await p.context().close();
+  }
+  ok(!falhas.length, "violações:\n      " + falhas.slice(0, 12).join("\n      "));
 });
 
 /* ---------- tela de carga: pasta da base e link do Plano ---------- */

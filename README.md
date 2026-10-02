@@ -53,8 +53,9 @@ e ao centavo.
 
 ## Testes
 
-Requisitos: Python 3, Node 18+ e Playwright com Chromium
-(`npm i -D playwright && npx playwright install chromium`).
+Requisitos: Python 3, Node 18+, Playwright com Chromium e axe-core
+(`npm i -D playwright axe-core && npx playwright install chromium`). O axe-core só roda nos testes;
+não entra no `dashboard.html`.
 
 ```
 node tests/regressao.js            # todos os testes
@@ -73,12 +74,20 @@ O que a suíte garante:
   refatoração tem de reproduzir o mesmo resultado.
 - Um teste por correção (A1…A15, B1, B3, C0…C12, D2, F1), para que uma mudança posterior não
   desfaça uma anterior.
+- **X1**: acessibilidade verificada pelo axe-core nas telas principais e janelas, nos dois temas.
 
 Quando uma mudança **intencional** altera números ou telas:
 
 1. rode `node tests/regressao.js T06 --diff` e confira que só mudou o esperado;
 2. rode `node tests/regressao.js T06 --aprovar`;
 3. faça o commit do `tests/referencia/snapshot_aprovado.json` junto com a mudança, explicando o porquê.
+
+## Visual
+
+- Ícones em SVG (desenhos do [Lucide](https://lucide.dev), licença ISC) embutidos no arquivo, no
+  lugar de caracteres de texto que mudavam de aparência conforme o sistema.
+- Cores definidas como tokens no início do CSS (`--bg-neg`, `--bg-warn`, `--bg-pos`, `--bg-neu`,
+  `--bar-pos`…). Fundos de pílulas e alertas usam uma intensidade por papel.
 
 ## Parâmetros de análise
 
