@@ -284,7 +284,11 @@ teste("C0", "offline: nenhuma requisição de rede e CSP bloqueia exfiltração"
   const p = await pagina("novo");
   ok(!p._rede.length, "requisições externas: " + p._rede.join(", "));
   const html = fs.readFileSync(NOVO, "utf8");
-  ok(!/https?:\/\/(?!www\.w3\.org|schemas\.openxmlformats\.org)/.test(html.replace(/xmlns(:\w+)?="[^"]+"/g, "")), "há URL externa no HTML");
+  // única URL externa permitida: o link de exportação do Plano, aberto numa nova aba pelo usuário (navegação, não conexão)
+  const PLANO = /var PLANO_PADRAO="https:\/\/plano\.allstrategy\.com\.br\/[^"]*";/;
+  ok(PLANO.test(html) && (html.match(/PLANO_PADRAO/g) || []).length === 3 && /window\.open\(planoUrl\(\),"_blank","noopener,noreferrer"\)/.test(html),
+     "link do Plano fora do lugar esperado");
+  ok(!/https?:\/\/(?!www\.w3\.org|schemas\.openxmlformats\.org)/.test(html.replace(/xmlns(:\w+)?="[^"]+"/g, "").replace(PLANO, "")), "há URL externa no HTML");
   ok(/Content-Security-Policy[^>]+connect-src 'none'/.test(html), "CSP ausente");
   const r = await p.evaluate(async () => { const r = {};
     try { await fetch("https://example.com/?d=1"); r.fetch = "passou"; } catch (e) { r.fetch = "bloqueado"; }
@@ -352,8 +356,9 @@ teste("A14", "carga robusta: drop fora da área, erro de inicialização e tecla
   // 3) teclado: o foco fica no seletor de arquivo; o painel por trás não recebe foco
   p = await abre(NOVO);
   const focos = [];
-  for (let i = 0; i < 3; i++) { await p.keyboard.press("Tab"); focos.push(await p.evaluate(() => document.activeElement.id || document.activeElement.tagName)); }
-  ok(focos.every(f => f === "_file" || f === "BODY"), "Tab saiu da tela de carga: " + focos);
+  for (let i = 0; i < 6; i++) { await p.keyboard.press("Tab");
+    focos.push(await p.evaluate(() => { const a = document.activeElement; return a === document.body || !!a.closest("#_ov") ? "ov" : (a.id || a.tagName); })); }
+  ok(focos.every(f => f === "ov"), "Tab saiu da tela de carga: " + focos);
   await p.context().close();
 });
 
@@ -1026,6 +1031,105 @@ teste("R4", "editar recorrentes: marca/desmarca, salva no navegador, exporta e i
   ok(/ajustad/.test(r.cls), "classificação não indica ajuste: " + r.cls);
   igual(r.antes, r.limpo, "restaurar padrão"); igual(r.depois, r.reimportado, "reimportar");
   ok(/ajustes/i.test(r.erro || ""), "arquivo inválido aceito: " + r.erro);
+  await p.context().close();
+});
+
+/* ---------- tela de carga: pasta da base e link do Plano ---------- */
+// pasta simulada (File System Access): nada sai da máquina, os arquivos são montados na página
+async function abrePasta(arquivos, opts = {}) {
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 860 }, acceptDownloads: true, colorScheme: "dark" });
+  // nenhuma conexão real: a aba do Plano recebe uma página vazia local
+  await ctx.route(/^https?:/, r => r.fulfill({ status: 200, contentType: "text/html", body: "<title>plano</title>" }));
+  await ctx.addInitScript(([arqs, semFS]) => {
+    if (semFS) { delete window.showDirectoryPicker; return; }
+    window.__gravados__ = []; window.__picker__ = 0;
+    const itens = arqs.map(a => ({ kind: "file", name: a.nome,
+      getFile: async () => new File([a.txt], a.nome, { lastModified: a.ms }) }));
+    window.showDirectoryPicker = async () => { window.__picker__++; return {
+      kind: "directory", name: "Base FP&A",
+      values: async function* () { for (const i of itens) yield i; },
+      queryPermission: async () => "granted", requestPermission: async () => "granted",
+      getFileHandle: async nome => ({ createWritable: async () => { let t = "";
+        return { write: async x => { t += x; }, close: async () => { window.__gravados__.push([nome, t]); } }; } }) }; };
+  }, [arquivos, !!opts.semFS]);
+  const p = await ctx.newPage();
+  p._erros = []; p._rede = [];
+  p.on("pageerror", e => p._erros.push(e.message));
+  p.on("request", r => { const u = r.url(); if (!/^(file|data|blob):/.test(u)) p._rede.push(u); });
+  await p.goto("file://" + NOVO);
+  return p;
+}
+const lerCSV = n => new TextDecoder("windows-1252").decode(fs.readFileSync(CSV(n)));
+teste("L1", "pasta da base: lista os CSV com data e hora, abre o escolhido e grava os ajustes na pasta", async () => {
+  const set = Date.UTC(2026, 9, 1, 14, 30), ago = Date.UTC(2026, 8, 10, 12, 0);
+  const aj = JSON.stringify({ versao: 1, rec: { "4.1.1.02.1.09": false }, meses: { "4.1.1.08.1.06": [2, 5, 8, 11] }, salvoEm: "2099-01-01T00:00:00Z" });
+  const p = await abrePasta([
+    { nome: "base_agosto.csv", txt: lerCSV("so_orcado.csv"), ms: ago },
+    { nome: "base_setembro.csv", txt: lerCSV("periodo.csv"), ms: set },
+    { nome: "leia-me.txt", txt: "x", ms: set + 1 },
+    { nome: "fpa-ajustes.json", txt: aj, ms: set } ]);
+  await p.click("#_escPasta"); await p.waitForSelector("#_lista button");
+  const itens = await p.$$eval("#_lista button", bs => bs.map(b => b.textContent));
+  ok(itens.length === 2 && /^base_setembro\.csv/.test(itens[0]) && /mais recente/.test(itens[0]) && /^base_agosto/.test(itens[1]),
+     "lista: " + JSON.stringify(itens));
+  const fmt = ms => { const d = new Date(ms), z = n => String(n).padStart(2, "0");
+    return `${z(d.getDate())}/${z(d.getMonth() + 1)}/${d.getFullYear()} ${z(d.getHours())}:${z(d.getMinutes())}`; };
+  ok(itens[0].includes(fmt(set)) && itens[1].includes(fmt(ago)), "data e hora: " + JSON.stringify(itens));
+  ok(await p.evaluate(() => document.activeElement.dataset.nome === "base_setembro.csv"), "foco não foi para o mais recente");
+  await p.click("#_lista button[data-nome='base_setembro.csv']");
+  await p.waitForSelector("#kpis .kpi", { timeout: 30000 });
+  const r = await p.evaluate(() => ({ arq: DB.carga.arquivo, mod: DB.carga.modificado, rec: ehRec("4.1.1.02.1.09"),
+    meses: AJUSTES.meses["4.1.1.08.1.06"], origem: ORIGEM_AJ }));
+  ok(r.arq === "base_setembro.csv" && r.mod === set, "base aberta: " + JSON.stringify(r));
+  ok(r.rec === false && String(r.meses) === "2,5,8,11" && r.origem === "pasta", "ajustes da pasta: " + JSON.stringify(r));
+  // salvar no editor grava fpa-ajustes.json na pasta
+  await p.evaluate(() => { abreAjustesRec(); document.getElementById("ajSalvar").click(); });
+  await p.waitForFunction(() => window.__gravados__.length > 0);
+  const g = await p.evaluate(() => window.__gravados__);
+  ok(g[0][0] === "fpa-ajustes.json" && JSON.parse(g[0][1]).meses["4.1.1.08.1.06"].join() === "2,5,8,11", "gravação: " + JSON.stringify(g).slice(0, 200));
+  ok(!p._erros.length && !p._rede.length, "erros/rede: " + JSON.stringify([p._erros, p._rede]));
+  await p.context().close();
+  // ajuste do navegador mais novo que o da pasta prevalece
+  const q = await abrePasta([{ nome: "b.csv", txt: lerCSV("periodo.csv"), ms: set },
+    { nome: "fpa-ajustes.json", txt: aj.replace("2099", "2001"), ms: set }]);
+  await q.evaluate(() => localStorage.setItem("fpa-ajustes", JSON.stringify({ versao: 1, rec: {}, meses: {}, salvoEm: "2026-01-01T00:00:00Z" })));
+  await q.click("#_escPasta"); await q.click("#_lista button"); await q.waitForSelector("#kpis .kpi");
+  ok(await q.evaluate(() => ORIGEM_AJ === "navegador" && ehRec("4.1.1.02.1.09")), "o mais recente não prevaleceu");
+  await q.context().close();
+});
+
+teste("L2", "link do Plano: abre em nova aba (sem carimbo anti-cache) e pode ser editado", async () => {
+  const p = await abrePasta([]);
+  const abre1 = p.context().waitForEvent("page"); await p.click("#_plano"); const n1 = await abre1;
+  const PAD = "https://plano.allstrategy.com.br/performance/dre-exportar-valores?NOME=plano&PLANEJAMENTO=31&idpro=330-1790938214";
+  await n1.waitForLoadState().catch(() => {});
+  ok(n1.url() === PAD, "url: " + n1.url());
+  await n1.close();
+  await p.click("#_planoEd"); await p.fill("#_planoUrl", "http://inseguro.example/x"); await p.click("#_planoOk");
+  ok(/começar com https/.test(await p.textContent("#_msg")), "aceitou link sem https");
+  await p.fill("#_planoUrl", "https://plano.allstrategy.com.br/performance/dre-exportar-valores?NOME=plano&PLANEJAMENTO=32&_=1790938213782");
+  await p.click("#_planoOk");
+  const salvo = await p.evaluate(() => localStorage.getItem("fpa-plano-url"));
+  ok(salvo === "https://plano.allstrategy.com.br/performance/dre-exportar-valores?NOME=plano&PLANEJAMENTO=32", "salvo: " + salvo);
+  const abre2 = p.context().waitForEvent("page"); await p.click("#_plano"); const n2 = await abre2;
+  await n2.waitForLoadState().catch(() => {});
+  ok(n2.url().includes("PLANEJAMENTO=32"), "link editado não usado: " + n2.url());
+  ok(!p._rede.length, "a página do painel fez conexão: " + p._rede);
+  await p.context().close();
+});
+
+teste("L3", "pasta sem File System Access (Firefox): escolhe a pasta pelo seletor e lista só os CSV dela", async () => {
+  const p = await abrePasta([], { semFS: true });
+  await p.click("#_escPasta");
+  const dir = path.join(TMP, "pasta_l3"); fs.rmSync(dir, { recursive: true, force: true }); fs.mkdirSync(path.join(dir, "sub"), { recursive: true });
+  fs.copyFileSync(CSV("periodo.csv"), path.join(dir, "atual.csv")); fs.writeFileSync(path.join(dir, "sub", "velho.csv"), "x");
+  fs.writeFileSync(path.join(dir, "nota.txt"), "x");
+  await p.setInputFiles("#_dir", dir);
+  await p.waitForSelector("#_lista button");
+  const itens = await p.$$eval("#_lista button", bs => bs.map(b => b.dataset.nome));
+  igual(["atual.csv"], itens, "lista sem File System Access");
+  await p.click("#_lista button"); await p.waitForSelector("#kpis .kpi", { timeout: 30000 });
+  ok(await p.evaluate(() => DB.carga.arquivo === "atual.csv" && !window.__gravaAjustesPasta__), "abriu a base sem gravar na pasta");
   await p.context().close();
 });
 

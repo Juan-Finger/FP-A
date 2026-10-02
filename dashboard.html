@@ -980,15 +980,37 @@ function _decodifica(buf){
    +'<p style="color:#8FA3B8;font-size:13.5px;line-height:1.6;margin:14px 0 16px">'
    +'Carregue a base exportada do <b style="color:#E8EEF5">Plano</b> (o arquivo <b style="color:#E8EEF5">.csv</b>) '
    +'para montar o painel com os números atuais.</p>'
+   +'<div id="_pasta" class="_cx"></div>'
+   +'<div class="_cx" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
+   +'<button type="button" id="_plano" class="_bt">↗ Exportar nova base do Plano</button>'
+   +'<button type="button" id="_planoEd" class="_lk">editar link</button>'
+   +'<div id="_planoForm" hidden style="display:flex;gap:6px;width:100%">'
+   +'<input id="_planoUrl" type="url" aria-label="Link de exportação do Plano" style="flex:1;min-width:0;background:#0A1220;color:#E8EEF5;border:1px solid rgba(255,255,255,.22);border-radius:7px;padding:6px 8px;font:inherit;font-size:12px">'
+   +'<button type="button" id="_planoOk" class="_bt">salvar</button><button type="button" id="_planoPad" class="_lk">padrão</button></div>'
+   +'<div style="font-size:12px;color:#8FA3B8;width:100%">Abre o Plano numa nova aba (com o seu login). Salve o CSV na pasta da base e ele aparece na lista.</div></div>'
    +'<label id="_zone" style="display:block;cursor:pointer;text-align:center;'
-   +'border:1.6px dashed rgba(255,255,255,.22);border-radius:11px;padding:26px 18px;transition:border-color .15s,background .15s">'
+   +'border:1.6px dashed rgba(255,255,255,.22);border-radius:11px;padding:20px 18px;transition:border-color .15s,background .15s">'
    +'<input id="_file" type="file" accept=".csv,text/csv" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden">'
    +'<div style="font-size:14.5px;color:#E8EEF5;font-weight:500">Arraste o CSV aqui ou clique para escolher</div>'
    +'<div style="font-size:12px;color:#8FA3B8;margin-top:8px">O arquivo é lido aqui no seu navegador — nada é enviado para fora.</div>'
    +'</label>'
    +'<div id="_msg" role="status" aria-live="polite" style="min-height:20px;margin-top:14px;font-size:13px"></div>'
    +'</div></div>'
-   +'<style>#_zone:focus-within{border-color:#22D3EE!important;outline:2px solid #22D3EE;outline-offset:2px}</style>';
+   +'<style>#_zone:focus-within{border-color:#22D3EE!important;outline:2px solid #22D3EE;outline-offset:2px}'
+   +'#_ov ._cx{margin:0 0 14px}'
+   +'#_ov ._bt{background:#15233A;border:1px solid rgba(255,255,255,.22);color:#E8EEF5;border-radius:8px;padding:7px 12px;font:inherit;font-size:13px;cursor:pointer}'
+   +'#_ov ._bt:hover{border-color:#22D3EE}'
+   +'#_ov ._lk{background:none;border:none;padding:0;color:#67E8F9;text-decoration:underline;font:inherit;font-size:12.5px;cursor:pointer}'
+   +'#_ov button:focus-visible{outline:2px solid #22D3EE;outline-offset:2px}'
+   +'#_ov ._ls{list-style:none;margin:8px 0 0;padding:0;max-height:210px;overflow-y:auto;border:1px solid rgba(255,255,255,.13);border-radius:9px}'
+   +'#_ov ._ls li+li{border-top:1px solid rgba(255,255,255,.08)}'
+   +'#_ov ._ls button{display:grid;grid-template-columns:1fr auto;gap:2px 12px;width:100%;text-align:left;background:none;border:none;color:#E8EEF5;padding:8px 11px;font:inherit;font-size:13px;cursor:pointer}'
+   +'#_ov ._ls button:hover{background:rgba(34,211,238,.07)}'
+   +'#_ov ._ls ._d{color:#8FA3B8;font-size:12px;font-variant-numeric:tabular-nums}'
+   +'#_ov ._ls ._n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+   +'#_ov ._tag{color:#0A1220;background:#22D3EE;border-radius:4px;font-size:10.5px;font-weight:600;padding:1px 6px;margin-left:6px}'
+   +'#_ov ._ph{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:13px;color:#8FA3B8}'
+   +'#_ov ._ph b{color:#E8EEF5;font-weight:500}</style>';
 
   var ocupado=false;
   function msg(t,cor){var m=document.getElementById("_msg");if(!m)return;m.textContent="";
@@ -1005,6 +1027,7 @@ function _decodifica(buf){
     if(!window.__APP_OK__){ msg("O painel não conseguiu iniciar com esta base: "+(erro||"erro desconhecido")+". Recarregue a página (F5) e tente de novo."); return; }
     var ov=document.getElementById("_ov");if(ov)ov.remove();
     inerte(false);
+    habilitaGravacao();
     if(window.__aoCarregar__) window.__aoCarregar__();
   }
   function processar(file){
@@ -1024,7 +1047,124 @@ function _decodifica(buf){
     rd.onerror=function(){msg("Não consegui ler o arquivo.");ocupado=false;};
     rd.readAsArrayBuffer(file);
   }
+  /* ---- pasta da base: lista os CSV com data e hora (Chrome/Edge lembram a pasta) ---- */
+  var FS=typeof window.showDirectoryPicker==="function", pasta=null, listaArq=[];
+  function idb(op,k,v){ return new Promise(function(ok){ try{
+      var r=indexedDB.open("fpa",1);
+      r.onupgradeneeded=function(){ r.result.createObjectStore("h"); };
+      r.onerror=function(){ ok(null); };
+      r.onsuccess=function(){ try{ var t=r.result.transaction("h",op==="get"?"readonly":"readwrite"), s=t.objectStore("h");
+          var q=op==="get"?s.get(k):s.put(v,k); q.onsuccess=function(){ ok(q.result); }; q.onerror=function(){ ok(null); };
+        }catch(e){ ok(null); } };
+    }catch(e){ ok(null); } }); }
+  function z2(n){ return String(n).padStart(2,"0"); }
+  function dataHora(ms){ var d=new Date(ms); return z2(d.getDate())+"/"+z2(d.getMonth()+1)+"/"+d.getFullYear()+" "+z2(d.getHours())+":"+z2(d.getMinutes()); }
+  function tam(b){ return b>=1048576?(b/1048576).toFixed(1).replace(".",",")+" MB":Math.max(1,Math.round(b/1024))+" KB"; }
+  function el(tag,attrs,txt){ var e=document.createElement(tag); for(var k in attrs) e.setAttribute(k,attrs[k]); if(txt!=null) e.textContent=txt; return e; }
+  function desenhaPasta(estado){
+    var box=document.getElementById("_pasta"); if(!box) return; box.textContent="";
+    var cab=el("div",{"class":"_ph"});
+    if(estado==="sem"){
+      var b=el("button",{type:"button","class":"_bt",id:"_escPasta"},"📁 Escolher a pasta da base");
+      b.onclick=escolhePasta; cab.appendChild(b);
+      cab.appendChild(el("span",{},FS?"Lista os CSV da pasta com data e hora e lembra dela nas próximas vezes.":"Lista os CSV da pasta com data e hora (neste navegador a pasta é escolhida a cada vez)."));
+      box.appendChild(cab); return;
+    }
+    if(estado==="permissao"){
+      var b2=el("button",{type:"button","class":"_bt",id:"_reabre"},"📁 Abrir a pasta "+pasta.name);
+      b2.onclick=function(){ pasta.requestPermission({mode:"read"}).then(function(p){ if(p==="granted") listaPasta(); }).catch(function(){}); };
+      cab.appendChild(b2); var t=el("button",{type:"button","class":"_lk"},"outra pasta"); t.onclick=escolhePasta; cab.appendChild(t);
+      box.appendChild(cab); return;
+    }
+    cab.appendChild(el("span",{},"Pasta "));
+    cab.appendChild(el("b",{},(pasta&&pasta.name)||"escolhida"));
+    var at=el("button",{type:"button","class":"_lk",id:"_atualiza"},"atualizar"); at.onclick=function(){ pasta?listaPasta():escolhePasta(); };
+    var tr=el("button",{type:"button","class":"_lk"},"trocar pasta"); tr.onclick=escolhePasta;
+    cab.appendChild(at); cab.appendChild(tr); box.appendChild(cab);
+    if(!listaArq.length){ box.appendChild(el("div",{style:"font-size:12.5px;color:#E7B549;margin-top:8px"},"Nenhum .csv nesta pasta. Exporte do Plano e salve aqui.")); return; }
+    var ul=el("ul",{"class":"_ls",id:"_lista","aria-label":"Bases na pasta, mais recente primeiro"});
+    listaArq.forEach(function(f,i){
+      var li=el("li"), b=el("button",{type:"button","data-nome":f.name}), n=el("span",{"class":"_n"},f.name);
+      if(i===0) n.appendChild(el("span",{"class":"_tag"},"mais recente"));
+      b.appendChild(n); b.appendChild(el("span",{"class":"_d"},dataHora(f.lastModified)));
+      b.appendChild(el("span",{"class":"_d",style:"grid-column:1/-1"},tam(f.size)));
+      b.setAttribute("aria-label",f.name+", arquivo de "+dataHora(f.lastModified)+(i===0?", mais recente":""));
+      b.onclick=function(){ processar(f); };
+      li.appendChild(b); ul.appendChild(li);
+    });
+    box.appendChild(ul);
+  }
+  function usaArquivos(arqs){
+    listaArq=arqs.filter(function(f){ return /\.csv$/i.test(f.name); }).sort(function(a,b){ return b.lastModified-a.lastModified||(a.name<b.name?-1:1); });
+    var aj=arqs.filter(function(f){ return f.name==="fpa-ajustes.json"; })[0];
+    window.__AJUSTES_PASTA__=null;
+    var fim=function(){ desenhaPasta("ok"); var b=document.querySelector("#_lista button"); if(b) b.focus(); };
+    if(aj) aj.text().then(function(t){ window.__AJUSTES_PASTA__=t; }).catch(function(){}).then(fim); else fim();
+  }
+  function listaPasta(){
+    var arqs=[], it;
+    try{ it=pasta.values(); }catch(e){ desenhaPasta("sem"); return; }
+    (async function(){
+      for await (var h of it){ if(h.kind==="file"&&(/\.csv$/i.test(h.name)||h.name==="fpa-ajustes.json")){ try{ arqs.push(await h.getFile()); }catch(e){} } }
+    })().then(function(){ usaArquivos(arqs); }).catch(function(e){ msg("Não consegui ler a pasta: "+e.message); desenhaPasta("sem"); });
+  }
+  // Firefox/Safari: escolhe a pasta por um <input webkitdirectory> (sem lembrar dela)
+  var inpDir=null;
+  function escolhePasta(){
+    if(FS){
+      window.showDirectoryPicker({id:"fpa-base",mode:"read"}).then(function(h){ pasta=h; idb("put","pasta",h); listaPasta(); })
+        .catch(function(e){ if(e&&e.name!=="AbortError") msg("Não consegui abrir a pasta: "+e.message); });
+      return;
+    }
+    if(!inpDir){ inpDir=el("input",{type:"file",webkitdirectory:"",multiple:"",hidden:"",id:"_dir"}); document.getElementById("_ov").appendChild(inpDir);
+      inpDir.addEventListener("change",function(){ usaArquivos(Array.prototype.slice.call(inpDir.files||[]).filter(function(f){ return !/[\\/].*[\\/]/.test(f.webkitRelativePath||""); })); inpDir.value=""; }); }
+    inpDir.click();
+  }
+  function iniciaPasta(){
+    desenhaPasta("sem");
+    if(!FS) return;
+    idb("get","pasta").then(function(h){
+      if(!h||typeof h.queryPermission!=="function") return;
+      pasta=h;
+      h.queryPermission({mode:"read"}).then(function(p){ if(!document.getElementById("_ov")) return; if(p==="granted") listaPasta(); else desenhaPasta("permissao"); })
+        .catch(function(){ desenhaPasta("permissao"); });
+    });
+    // voltou do Plano com o arquivo salvo: atualiza a lista
+    window.addEventListener("focus",function(){ if(pasta&&document.getElementById("_ov"))
+      pasta.queryPermission({mode:"read"}).then(function(p){ if(p==="granted"&&document.getElementById("_ov")) listaPasta(); }).catch(function(){}); });
+  }
+  // ajustes do painel gravados também na pasta (fpa-ajustes.json), para o time compartilhar
+  window.__gravaAjustesPasta__=null;
+  function habilitaGravacao(){
+    if(!pasta||typeof pasta.getFileHandle!=="function") return;
+    window.__gravaAjustesPasta__=function(txt){
+      pasta.requestPermission({mode:"readwrite"}).then(function(p){
+        if(p!=="granted") return;
+        return pasta.getFileHandle("fpa-ajustes.json",{create:true}).then(function(fh){ return fh.createWritable(); })
+          .then(function(w){ return w.write(txt).then(function(){ return w.close(); }); });
+      }).catch(function(){});
+    };
+  }
+
+  /* ---- link de exportação do Plano (só abre a página; nenhum dado sai daqui) ---- */
+  var PLANO_PADRAO="https://plano.allstrategy.com.br/performance/dre-exportar-valores?NOME=plano&PLANEJAMENTO=31&idpro=330-1790938214";
+  function planoUrl(){ try{ var u=localStorage.getItem("fpa-plano-url"); if(u&&/^https:\/\//i.test(u)) return u; }catch(e){} return PLANO_PADRAO; }
+  function wirePlano(){
+    var b=document.getElementById("_plano"), ed=document.getElementById("_planoEd"), fm=document.getElementById("_planoForm"), inp=document.getElementById("_planoUrl");
+    b.onclick=function(){ window.open(planoUrl(),"_blank","noopener,noreferrer"); };
+    ed.onclick=function(){ fm.hidden=!fm.hidden; fm.style.display=fm.hidden?"none":"flex"; inp.value=planoUrl(); if(!fm.hidden) inp.focus(); };
+    fm.style.display="none";
+    document.getElementById("_planoOk").onclick=function(){
+      var u=inp.value.trim();
+      if(!/^https:\/\/[^\s]+$/i.test(u)){ msg("O link precisa ser um endereço seguro (começar com https)."); return; }
+      u=u.replace(/([?&])_=\d+(&|$)/,function(m,a,b){ return b?a:""; });     // tira o carimbo anti-cache
+      try{ localStorage.setItem("fpa-plano-url",u); }catch(e){}
+      fm.hidden=true; fm.style.display="none"; msg("Link do Plano salvo neste navegador.","#34D399"); ed.focus();
+    };
+    document.getElementById("_planoPad").onclick=function(){ try{ localStorage.removeItem("fpa-plano-url"); }catch(e){} inp.value=PLANO_PADRAO; };
+  }
   function wire(){
+    wirePlano(); iniciaPasta();
     var inp=document.getElementById("_file"),zone=document.getElementById("_zone");
     inp.addEventListener("change",function(e){processar(e.target.files[0]);e.target.value="";});
     ["dragover","dragenter"].forEach(function(ev){zone.addEventListener(ev,function(e){e.preventDefault();zone.style.borderColor="#22D3EE";zone.style.background="rgba(34,211,238,.06)";});});
@@ -1129,8 +1269,9 @@ function aplicaAjustes(){
 }
 function salvaAjustes(o){
   AJUSTES=validaAjustes(o);
-  try{ localStorage.setItem("fpa-ajustes",JSON.stringify(AJUSTES)); }catch(e){}
-  if(window.__gravaAjustesPasta__) window.__gravaAjustesPasta__(textoAjustes());   // pasta (tela de carga)
+  const t=textoAjustes();
+  try{ localStorage.setItem("fpa-ajustes",t); }catch(e){}
+  if(window.__gravaAjustesPasta__) window.__gravaAjustesPasta__(t);   // pasta da base (tela de carga)
   aplicaAjustes();
   if(window.__APP_PRONTO__) render();
 }
@@ -2073,7 +2214,15 @@ function _semLastro(minMeses){
 
 /* ---------- HISTÓRICO DE PENDÊNCIAS POR MÊS ---------- */
 const cacheHist={};
-try{ const s=localStorage.getItem("fpa-ajustes"); if(s) AJUSTES=validaAjustes(JSON.parse(s)); }catch(e){ AJUSTES=AJ_VAZIO(); }
+// ajustes salvos no navegador e/ou na pasta da base (fpa-ajustes.json): vale o mais recente
+let ORIGEM_AJ="";
+(()=>{
+  const cands=[];
+  try{ const s=localStorage.getItem("fpa-ajustes"); if(s) cands.push(["navegador",JSON.parse(s)]); }catch(e){}
+  try{ if(window.__AJUSTES_PASTA__) cands.push(["pasta",JSON.parse(window.__AJUSTES_PASTA__)]); }catch(e){}
+  cands.sort((a,b)=>String(b[1]&&b[1].salvoEm||"").localeCompare(String(a[1]&&a[1].salvoEm||"")));
+  for(const [o,c] of cands){ try{ AJUSTES=validaAjustes(c); ORIGEM_AJ=o; break; }catch(e){} }
+})();
 aplicaAjustes();
 function histPendencias(cod){
   const key=cod+"|"+modo;

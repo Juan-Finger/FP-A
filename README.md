@@ -5,12 +5,18 @@ Painel interno de FP&A, **em um único arquivo**: `dashboard.html`.
 ## Uso
 
 1. Abra o `dashboard.html` direto no navegador (duplo clique; funciona via `file://`, sem servidor).
-2. Arraste o CSV exportado do **Plano** para a tela, ou clique para escolher o arquivo.
+2. Escolha a **pasta da base**: o painel lista os CSV dela com data e hora (o mais recente primeiro)
+   e abre o escolhido. No Chrome/Edge a pasta fica lembrada (basta confirmar o acesso nas próximas
+   vezes); no Firefox ela é escolhida a cada vez. Também dá para arrastar o CSV para a tela.
+   **Exportar nova base do Plano** abre o link de exportação numa nova aba (com o seu login); salve o
+   CSV na pasta e ele aparece na lista ao voltar. O link pode ser editado ("editar link") e fica
+   salvo no navegador.
 3. Confira o **Resumo da carga** (link na barra lateral): linhas ignoradas, avisos e totais por mês,
    para bater com o Plano antes de analisar.
 
 - **100% offline.** Não usa bibliotecas, CDN nem fontes externas. Uma Content-Security-Policy no
-  próprio arquivo bloqueia qualquer conexão de rede, então nenhum dado sai do navegador.
+  próprio arquivo bloqueia qualquer conexão de rede, então nenhum dado sai do navegador. O único endereço externo é o
+  link do Plano, que só abre uma aba nova quando você clica (o teste C0 garante isso).
 - **Visão Geral → Por conta**: contas com falha de todos os segmentos, consolidadas, com filtros
   de segmento, alcance, natureza, fixo/variável, busca e ordenação, além de exportação do
   recorte. Filtrar um único segmento dá exatamente a visão "Por conta" daquele segmento.
@@ -22,7 +28,9 @@ Painel interno de FP&A, **em um único arquivo**: `dashboard.html`.
   quadrimestral, semestral, anual ou meses escolhidos). Fora desses meses, ou se já houve
   lançamento no ciclo, a conta aparece como **Fora do ciclo** e não conta como pendência. O padrão
   observado nos lançamentos é sugerido ("usar"). Os ajustes ficam salvos no navegador e podem ser
-  exportados/importados como `fpa-ajustes.json` para levar a outro computador ou ao time.
+  exportados/importados como `fpa-ajustes.json`. Com a pasta da base escolhida (Chrome/Edge), o
+  painel também grava `fpa-ajustes.json` na pasta, e quem abrir a mesma pasta sincronizada recebe os
+  ajustes. Vale a versão mais recente entre o navegador e a pasta.
 - **Trocar base** (barra lateral) volta à tela de carga e mantém a tela atual.
 - Atalhos: `Ctrl+K` busca, `?` lista de atalhos, `G` guia de análise, `P` imprimir/PDF.
 
